@@ -42,7 +42,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             end: Alignment.bottomCenter,
             colors: [
               colorScheme.surface,
-              colorScheme.primary.withValues(alpha: 0.2),
+              colorScheme.primary.withOpacity(0.2),
             ],
           ),
         ),
@@ -92,7 +92,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     backgroundColor: colorScheme.secondary,
                     foregroundColor: colorScheme.onSecondary,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+                      borderRadius: BorderRadius.circular(32),
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                   ),
@@ -136,12 +136,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       decoration: BoxDecoration(
         color: _currentPage == index 
             ? colorScheme.primary 
-            : colorScheme.primary.withValues(alpha: 0.2),
+            : colorScheme.primary.withOpacity(0.2),
         borderRadius: BorderRadius.circular(4),
       ),
     );
   }
 }
+
 
 class OnboardingPage {
   final String title;

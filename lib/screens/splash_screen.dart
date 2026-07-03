@@ -33,8 +33,8 @@ class _SplashScreenState extends State<SplashScreen> {
             end: Alignment.bottomRight,
             colors: [
               colorScheme.primary,
-              colorScheme.primary.withValues(alpha: 0.8),
-              colorScheme.secondary.withValues(alpha: 0.2),
+              colorScheme.primary.withOpacity(0.8),
+              colorScheme.secondary.withOpacity(0.2),
             ],
           ),
         ),
@@ -47,7 +47,7 @@ class _SplashScreenState extends State<SplashScreen> {
               width: 150,
               height: 150,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
+                color: Colors.white.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -56,7 +56,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 color: colorScheme.secondary, // Turmeric Gold
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 25),
             Text(
               'KOSMICO',
               style: TextStyle(
@@ -69,7 +69,7 @@ class _SplashScreenState extends State<SplashScreen> {
             Text(
               'WELLNESS',
               style: TextStyle(
-                color: colorScheme.secondary.withValues(alpha: 0.8),
+                color: colorScheme.secondary.withOpacity(0.8),
                 fontSize: 16,
                 letterSpacing: 2,
               ),
