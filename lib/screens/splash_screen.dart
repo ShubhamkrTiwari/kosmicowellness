@@ -61,7 +61,7 @@ class _SplashScreenState extends State<SplashScreen> {
               'KOSMICO',
               style: TextStyle(
                 color: colorScheme.onPrimary,
-                fontSize: 32,
+                fontSize: 30,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 4,
               ),
