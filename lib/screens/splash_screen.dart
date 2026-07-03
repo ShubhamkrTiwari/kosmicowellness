@@ -44,7 +44,7 @@ class _SplashScreenState extends State<SplashScreen> {
           children: [
             // Placeholder for Logo
             Container(
-              width: 150,
+              width: 151,
               height: 150,
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.1),
