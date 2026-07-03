@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
+import 'auth_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -77,7 +78,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     if (_currentPage == _pages.length - 1) {
                       Navigator.of(context).pushReplacement(
                         MaterialPageRoute(
-                          builder: (context) => const HomeScreen(title: 'Kosmico Wellness'),
+                          builder: (context) => const AuthScreen(),
                         ),
                       );
                     } else {
@@ -110,7 +111,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               onPressed: () {
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
-                    builder: (context) => const HomeScreen(title: 'Kosmico Wellness'),
+                    builder: (context) => const AuthScreen(),
                   ),
                 );
               },
