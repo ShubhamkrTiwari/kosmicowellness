@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../main.dart';
+import '../home_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -24,14 +24,12 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   void _submit() {
-    if (_formKey.currentState!.validate()) {
-      // Mock authentication
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => const HomeScreen(title: 'Kosmico Wellness'),
-        ),
-      );
-    }
+     // Navigating directly to HomeScreen as per requirement (bypassing actual auth)
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (context) => const HomeScreen(title: 'Kosmico Wellness'),
+      ),
+    );
   }
 
   @override
