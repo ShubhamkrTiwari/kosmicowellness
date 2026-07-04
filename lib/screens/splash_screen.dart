@@ -42,7 +42,7 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Placeholder for Logo
+            // Logo from Assets
             Container(
               width: 150,
               height: 150,
@@ -50,10 +50,16 @@ class _SplashScreenState extends State<SplashScreen> {
                 color: Colors.white.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                Icons.spa,
-                size: 80,
-                color: colorScheme.secondary, // Turmeric Gold
+              child: Padding(
+                padding: const EdgeInsets.all(25.0),
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  errorBuilder: (context, error, stackTrace) => Icon(
+                    Icons.spa,
+                    size: 80,
+                    color: colorScheme.secondary,
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 24),

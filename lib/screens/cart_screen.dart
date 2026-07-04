@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../managers/cart_manager.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -8,29 +9,12 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
-  // Mock cart items for demonstration
-  final List<Map<String, dynamic>> _cartItems = [
-    {
-      'name': 'Ayurvedic Hair Oil',
-      'price': 499,
-      'quantity': 1,
-      'icon': '🌿',
-    },
-    {
-      'name': 'Active Protein Powder',
-      'price': 1299,
-      'quantity': 1,
-      'icon': '💪',
-    },
-  ];
-
-  double get _totalPrice {
-    return _cartItems.fold(0, (sum, item) => sum + (item['price'] * item['quantity']));
-  }
+  final cartManager = CartManager();
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final items = cartManager.items;
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -49,12 +33,12 @@ class _CartScreenState extends State<CartScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: _cartItems.isEmpty
+      body: items.isEmpty
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.shopping_basket_outlined, size: 80, color: colorScheme.primary.withOpacity(0.3)),
+                  Icon(Icons.shopping_basket_outlined, size: 80, color: colorScheme.primary.withValues(alpha: 0.3)),
                   const SizedBox(height: 16),
                   Text(
                     'Your cart is empty',
@@ -77,9 +61,15 @@ class _CartScreenState extends State<CartScreen> {
                 Expanded(
                   child: ListView.builder(
                     padding: const EdgeInsets.all(16),
-                    itemCount: _cartItems.length,
+                    itemCount: items.length,
                     itemBuilder: (context, index) {
-                      final item = _cartItems[index];
+                      final item = items[index];
+                      // Ensure values are not null before rendering
+                      final String itemName = (item['name'] ?? 'Unknown Item').toString();
+                      final String itemIcon = (item['icon'] ?? '🌿').toString();
+                      final String itemPrice = (item['price'] ?? 0).toString();
+                      final String itemQuantity = (item['quantity'] ?? 1).toString();
+
                       return Container(
                         margin: const EdgeInsets.only(bottom: 16),
                         padding: const EdgeInsets.all(12),
@@ -88,7 +78,7 @@ class _CartScreenState extends State<CartScreen> {
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: colorScheme.primary.withOpacity(0.05),
+                              color: colorScheme.primary.withValues(alpha: 0.05),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -105,7 +95,7 @@ class _CartScreenState extends State<CartScreen> {
                               ),
                               alignment: Alignment.center,
                               child: Text(
-                                item['icon'],
+                                itemIcon,
                                 style: const TextStyle(fontSize: 32),
                               ),
                             ),
@@ -115,7 +105,7 @@ class _CartScreenState extends State<CartScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    item['name'],
+                                    itemName,
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 16,
@@ -123,7 +113,7 @@ class _CartScreenState extends State<CartScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '₹${item['price']}',
+                                    '₹$itemPrice',
                                     style: TextStyle(
                                       color: colorScheme.secondary,
                                       fontWeight: FontWeight.bold,
@@ -138,23 +128,19 @@ class _CartScreenState extends State<CartScreen> {
                                   icon: const Icon(Icons.remove_circle_outline, size: 22),
                                   onPressed: () {
                                     setState(() {
-                                      if (item['quantity'] > 1) {
-                                        item['quantity']--;
-                                      } else {
-                                        _cartItems.removeAt(index);
-                                      }
+                                      cartManager.removeItem(index);
                                     });
                                   },
                                 ),
                                 Text(
-                                  '${item['quantity']}',
+                                  itemQuantity,
                                   style: const TextStyle(fontWeight: FontWeight.bold),
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.add_circle_outline, size: 22),
                                   onPressed: () {
                                     setState(() {
-                                      item['quantity']++;
+                                      cartManager.incrementItem(index);
                                     });
                                   },
                                 ),
@@ -173,7 +159,7 @@ class _CartScreenState extends State<CartScreen> {
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
                     boxShadow: [
                       BoxShadow(
-                        color: colorScheme.primary.withOpacity(0.1),
+                        color: colorScheme.primary.withValues(alpha: 0.1),
                         blurRadius: 20,
                         offset: const Offset(0, -5),
                       ),
@@ -190,7 +176,7 @@ class _CartScreenState extends State<CartScreen> {
                             style: TextStyle(fontSize: 16, color: Colors.grey),
                           ),
                           Text(
-                            '₹${_totalPrice.toStringAsFixed(2)}',
+                            '₹${cartManager.totalPrice.toStringAsFixed(2)}',
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,

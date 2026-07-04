@@ -3,6 +3,8 @@ import 'screens/splash_screen.dart';
 import 'screens/cart_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/notification_screen.dart';
+import 'managers/cart_manager.dart';
+import 'managers/wishlist_manager.dart';
 
 void main() {
   runApp(const MyApp());
@@ -18,16 +20,16 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF557153), // Deep Sage Green
-          primary: const Color(0xFF557153),
-          secondary: const Color(0xFFA67C52), // Earthy Gold/Brown
+          seedColor: const Color(0xFF00833E), // Logo Green
+          primary: const Color(0xFF00833E),
+          secondary: const Color(0xFF1B264F), // Logo Navy Blue
           surface: const Color(0xFFF9F6F2), // Off-white/Cream
           onPrimary: Colors.white,
           onSecondary: Colors.white,
         ),
         useMaterial3: true,
         textTheme: const TextTheme(
-          displayLarge: TextStyle(fontFamily: 'Serif', fontWeight: FontWeight.bold, color: Color(0xFF557153)),
+          displayLarge: TextStyle(fontFamily: 'Serif', fontWeight: FontWeight.bold, color: Color(0xFF00833E)),
           titleLarge: TextStyle(fontFamily: 'Serif', fontWeight: FontWeight.w600),
         ),
       ),
@@ -218,17 +220,48 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: Container(
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: colorScheme.surface,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            product['icon']!,
-                            style: const TextStyle(fontSize: 48),
-                          ),
+                        child: Stack(
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: colorScheme.surface,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                product['icon']!,
+                                style: const TextStyle(fontSize: 48),
+                              ),
+                            ),
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    WishlistManager().toggleWishlist(product);
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.8),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    WishlistManager().isWishlisted(product['name']!)
+                                        ? Icons.favorite
+                                        : Icons.favorite_border,
+                                    size: 18,
+                                    color: WishlistManager().isWishlisted(product['name']!)
+                                        ? Colors.red
+                                        : colorScheme.primary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -263,16 +296,29 @@ class _HomeScreenState extends State<HomeScreen> {
                               color: colorScheme.primary,
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: colorScheme.secondary,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                              Icons.add_shopping_cart_outlined,
-                              color: Colors.white,
-                              size: 18,
+                          InkWell(
+                            onTap: () {
+                              CartManager().addItem(product);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('${product['name']} added to cart!'),
+                                  duration: const Duration(seconds: 1),
+                                  behavior: SnackBarBehavior.floating,
+                                  backgroundColor: colorScheme.primary,
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: colorScheme.secondary,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.add_shopping_cart_outlined,
+                                color: Colors.white,
+                                size: 18,
+                              ),
                             ),
                           ),
                         ],
@@ -320,45 +366,60 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: colorScheme.surface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        title: Row(
           children: [
-            Text(
-              'KOSMICO',
-              style: TextStyle(
+            Image.asset(
+              'assets/images/logo.png',
+              height: 30,
+              errorBuilder: (context, error, stackTrace) => Icon(
+                Icons.spa,
+                size: 24,
                 color: colorScheme.primary,
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
-                letterSpacing: 2,
               ),
             ),
-            Text(
-              'Wellness Journey',
-              style: TextStyle(
-                color: colorScheme.secondary,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'KOSMICO',
+                  style: TextStyle(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                    letterSpacing: 2,
+                  ),
+                ),
+                Text(
+                  'Wellness Journey',
+                  style: TextStyle(
+                    color: colorScheme.secondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
         actions: [
-          IconButton(
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                border: Border.all(color: colorScheme.primary.withOpacity(0.1)),
+          if (_selectedIndex == 0)
+            IconButton(
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: colorScheme.primary.withOpacity(0.1)),
+                ),
+                child: Icon(Icons.notifications_none_outlined, color: colorScheme.primary, size: 20),
               ),
-              child: Icon(Icons.notifications_none_outlined, color: colorScheme.primary, size: 20),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const NotificationScreen()),
+                );
+              },
             ),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const NotificationScreen()),
-              );
-            },
-          ),
           IconButton(
             icon: Container(
               padding: const EdgeInsets.all(8),

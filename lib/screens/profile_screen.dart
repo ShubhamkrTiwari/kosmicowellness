@@ -1,8 +1,34 @@
 import 'package:flutter/material.dart';
 import 'help_center_screen.dart';
+import 'payment_methods_screen.dart';
+import 'shipping_addresses_screen.dart';
+import 'my_orders_screen.dart';
+import 'wishlist_screen.dart';
+import '../managers/wishlist_manager.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  final wishlistManager = WishlistManager();
+  final String userName = 'Shubham Tiwari';
+
+  String _getInitials(String name) {
+    if (name.isEmpty) return '??';
+    List<String> parts = name.trim().split(' ');
+    String initials = '';
+    if (parts.length > 0 && parts[0].isNotEmpty) {
+      initials += parts[0][0].toUpperCase();
+    }
+    if (parts.length > 1 && parts[parts.length - 1].isNotEmpty) {
+      initials += parts[parts.length - 1][0].toUpperCase();
+    }
+    return initials.isEmpty ? name[0].toUpperCase() : initials;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,12 +50,12 @@ class ProfileScreen extends StatelessWidget {
                     height: 80,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: colorScheme.primary.withOpacity(0.1),
+                      color: colorScheme.primary.withValues(alpha: 0.1),
                       border: Border.all(color: colorScheme.primary, width: 2),
                     ),
                     child: Center(
                       child: Text(
-                        'JS',
+                        _getInitials(userName),
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
@@ -44,7 +70,7 @@ class ProfileScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Shubham Tiwari',
+                          userName,
                           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                                 fontWeight: FontWeight.bold,
                                 color: colorScheme.primary,
@@ -91,7 +117,14 @@ class ProfileScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _buildStatItem('Orders', '12', Icons.local_shipping_outlined, colorScheme),
-                  _buildStatItem('Wishlist', '5', Icons.favorite_border, colorScheme),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (context) => const WishlistScreen()),
+                      ).then((_) => setState(() {}));
+                    },
+                    child: _buildStatItem('Wishlist', wishlistManager.items.length.toString(), Icons.favorite_border, colorScheme),
+                  ),
                   _buildStatItem('Coupons', '3', Icons.confirmation_number_outlined, colorScheme),
                 ],
               ),
@@ -101,9 +134,21 @@ class ProfileScreen extends StatelessWidget {
 
             // Settings Section
             _buildSectionHeader('Account Settings', colorScheme),
-            _buildMenuItem(Icons.shopping_bag_outlined, 'My Orders', 'Track and manage your orders', colorScheme),
-            _buildMenuItem(Icons.location_on_outlined, 'Shipping Addresses', 'Manage your delivery locations', colorScheme),
-            _buildMenuItem(Icons.payment_outlined, 'Payment Methods', 'Saved cards and UPI', colorScheme),
+            _buildMenuItem(Icons.shopping_bag_outlined, 'My Orders', 'Track and manage your orders', colorScheme, onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const MyOrdersScreen()),
+              );
+            }),
+            _buildMenuItem(Icons.location_on_outlined, 'Shipping Addresses', 'Manage your delivery locations', colorScheme, onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const ShippingAddressesScreen()),
+              );
+            }),
+            _buildMenuItem(Icons.payment_outlined, 'Payment Methods', 'Saved cards and UPI', colorScheme, onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const PaymentMethodsScreen()),
+              );
+            }),
             
             const SizedBox(height: 20),
             
