@@ -178,7 +178,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
         gradient: LinearGradient(
           colors: [
             Color(int.parse(method['color']!)),
-            Color(int.parse(method['color']!)).withOpacity(0.8),
+            Color(int.parse(method['color']!)).withValues(alpha: 0.8),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -186,7 +186,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Color(int.parse(method['color']!)).withOpacity(0.3),
+            color: Color(int.parse(method['color']!)).withValues(alpha: 0.3),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -285,7 +285,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: colorScheme.primary.withOpacity(0.2), width: 1.5),
+          border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2), width: 1.5),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

@@ -5,6 +5,9 @@ import 'shipping_addresses_screen.dart';
 import 'my_orders_screen.dart';
 import 'wishlist_screen.dart';
 import '../managers/wishlist_manager.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -15,19 +18,135 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final wishlistManager = WishlistManager();
-  final String userName = 'Shubham Tiwari';
+  String userName = 'Shubham Tiwari';
+  String userEmail = 'shubham.tiwari@example.com';
+  XFile? _pickedImage;
 
   String _getInitials(String name) {
-    if (name.isEmpty) return '??';
-    List<String> parts = name.trim().split(' ');
-    String initials = '';
-    if (parts.length > 0 && parts[0].isNotEmpty) {
-      initials += parts[0][0].toUpperCase();
+    try {
+      if (name.trim().isEmpty) return '??';
+      List<String> parts = name.trim().split(' ');
+      String initials = '';
+      if (parts.isNotEmpty && parts[0].isNotEmpty) {
+        initials += parts[0][0].toUpperCase();
+      }
+      if (parts.length > 1 && parts[parts.length - 1].isNotEmpty) {
+        initials += parts[parts.length - 1][0].toUpperCase();
+      }
+      return initials.isEmpty ? name.trim()[0].toUpperCase() : initials;
+    } catch (e) {
+      return '??';
     }
-    if (parts.length > 1 && parts[parts.length - 1].isNotEmpty) {
-      initials += parts[parts.length - 1][0].toUpperCase();
+  }
+
+  Future<void> _pickImage() async {
+    final ImagePicker picker = ImagePicker();
+    try {
+      final XFile? pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+      
+      if (pickedFile != null) {
+        setState(() {
+          _pickedImage = pickedFile;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profile picture updated successfully!'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not pick image: ${e.toString()}'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
-    return initials.isEmpty ? name[0].toUpperCase() : initials;
+  }
+
+  void _showEditProfileSheet() {
+    final nameController = TextEditingController(text: userName);
+    final emailController = TextEditingController(text: userEmail);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      ),
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          top: 30,
+          left: 24,
+          right: 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Edit Profile',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 24),
+            TextField(
+              controller: nameController,
+              decoration: _inputDecoration('Full Name'),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailController,
+              decoration: _inputDecoration('Email Address'),
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              height: 55,
+              child: ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    userName = nameController.text.isNotEmpty ? nameController.text : userName;
+                    userEmail = emailController.text.isNotEmpty ? emailController.text : userEmail;
+                  });
+                  Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                child: const Text('Save Changes'),
+              ),
+            ),
+            const SizedBox(height: 30),
+          ],
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+    );
   }
 
   @override
@@ -45,24 +164,66 @@ class _ProfileScreenState extends State<ProfileScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20.0),
               child: Row(
                 children: [
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: colorScheme.primary.withValues(alpha: 0.1),
-                      border: Border.all(color: colorScheme.primary, width: 2),
-                    ),
-                    child: Center(
-                      child: Text(
-                        _getInitials(userName),
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.primary,
+                  Stack(
+                    children: [
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: colorScheme.primary.withValues(alpha: 0.1),
+                          border: Border.all(color: colorScheme.primary, width: 2),
+                        ),
+                        child: Center(
+                          child: _pickedImage == null
+                              ? Text(
+                                  _getInitials(userName),
+                                  style: TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.primary,
+                                  ),
+                                )
+                              : ClipOval(
+                                  child: kIsWeb
+                                      ? Image.network(
+                                          _pickedImage!.path,
+                                          fit: BoxFit.cover,
+                                          width: 80,
+                                          height: 80,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Text(_getInitials(userName));
+                                          },
+                                        )
+                                      : Image.file(
+                                          File(_pickedImage!.path),
+                                          fit: BoxFit.cover,
+                                          width: 80,
+                                          height: 80,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Text(_getInitials(userName));
+                                          },
+                                        ),
+                                ),
                         ),
                       ),
-                    ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: GestureDetector(
+                          onTap: _pickImage,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            child: const Icon(Icons.camera_alt, size: 14, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(width: 20),
                   Expanded(
@@ -75,18 +236,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 fontWeight: FontWeight.bold,
                                 color: colorScheme.primary,
                               ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          'shubham.tiwari@example.com',
+                          userEmail,
                           style: TextStyle(color: Colors.grey[600]),
+                          overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                           decoration: BoxDecoration(
-                            color: colorScheme.secondary.withOpacity(0.1),
+                            color: colorScheme.secondary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: colorScheme.secondary.withOpacity(0.5)),
+                            border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.5)),
                           ),
                           child: Text(
                             'Pitta Dosha',
@@ -101,7 +264,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   IconButton(
-                    onPressed: () {},
+                    onPressed: _showEditProfileSheet,
                     icon: Icon(Icons.edit_outlined, color: colorScheme.primary),
                   ),
                 ],
@@ -202,10 +365,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.primary.withOpacity(0.05)),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.05)),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.primary.withOpacity(0.03),
+            color: colorScheme.primary.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -238,7 +401,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,
-            color: colorScheme.primary.withOpacity(0.7),
+            color: colorScheme.primary.withValues(alpha: 0.7),
             letterSpacing: 1.1,
           ),
         ),
@@ -253,7 +416,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: colorScheme.primary.withOpacity(0.05),
+            color: colorScheme.primary.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, color: colorScheme.primary, size: 22),

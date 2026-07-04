@@ -84,7 +84,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.notifications_off_outlined,
-                      size: 80, color: colorScheme.primary.withOpacity(0.2)),
+                      size: 80, color: colorScheme.primary.withValues(alpha: 0.2)),
                   const SizedBox(height: 16),
                   const Text('No notifications yet',
                       style: TextStyle(fontSize: 16, color: Colors.grey)),
@@ -126,7 +126,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     padding: const EdgeInsets.only(right: 20),
                     alignment: Alignment.centerRight,
                     decoration: BoxDecoration(
-                      color: Colors.redAccent.withOpacity(0.9),
+                      color: Colors.redAccent.withValues(alpha: 0.9),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Icon(Icons.delete_sweep, color: Colors.white, size: 28),
@@ -139,13 +139,13 @@ class _NotificationScreenState extends State<NotificationScreen> {
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: isUnread
-                            ? colorScheme.primary.withOpacity(0.2)
-                            : colorScheme.primary.withOpacity(0.05),
+                            ? colorScheme.primary.withValues(alpha: 0.2)
+                            : colorScheme.primary.withValues(alpha: 0.05),
                         width: isUnread ? 1.5 : 1,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.02),
+                          color: Colors.black.withValues(alpha: 0.02),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),

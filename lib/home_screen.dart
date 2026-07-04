@@ -113,7 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 image: const NetworkImage('https://images.unsplash.com/photo-1615485290382-441e4d0c9cb5?auto=format&fit=crop&q=80&w=800'),
                 fit: BoxFit.cover,
                 colorFilter: ColorFilter.mode(
-                  colorScheme.primary.withOpacity(0.8),
+                  colorScheme.primary.withValues(alpha: 0.8),
                   BlendMode.srcOver,
                 ),
               ),
@@ -134,7 +134,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Text(
                   'Discover the healing power of Ayurveda',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     fontSize: 16,
                   ),
                 ),
@@ -212,7 +212,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(color: colorScheme.primary.withOpacity(0.1)),
+                  side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.1)),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(12),
@@ -342,7 +342,7 @@ class _HomeScreenState extends State<HomeScreen> {
         color: isSelected ? colorScheme.primary : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isSelected ? colorScheme.primary : colorScheme.primary.withOpacity(0.1),
+          color: isSelected ? colorScheme.primary : colorScheme.primary.withValues(alpha: 0.1),
         ),
       ),
       alignment: Alignment.center,
@@ -378,27 +378,31 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'KOSMICO',
-                  style: TextStyle(
-                    color: colorScheme.primary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                    letterSpacing: 2,
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'KOSMICO',
+                    style: TextStyle(
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      letterSpacing: 1.5,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                Text(
-                  'Wellness Journey',
-                  style: TextStyle(
-                    color: colorScheme.secondary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                  Text(
+                    'Wellness Journey',
+                    style: TextStyle(
+                      color: colorScheme.secondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
@@ -410,7 +414,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   shape: BoxShape.circle,
-                  border: Border.all(color: colorScheme.primary.withOpacity(0.1)),
+                  border: Border.all(color: colorScheme.primary.withValues(alpha: 0.1)),
                 ),
                 child: Icon(Icons.notifications_none_outlined, color: colorScheme.primary, size: 20),
               ),
@@ -426,7 +430,7 @@ class _HomeScreenState extends State<HomeScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 shape: BoxShape.circle,
-                border: Border.all(color: colorScheme.primary.withOpacity(0.1)),
+                border: Border.all(color: colorScheme.primary.withValues(alpha: 0.1)),
               ),
               child: Icon(Icons.shopping_bag_outlined, color: colorScheme.primary, size: 20),
             ),
@@ -453,7 +457,7 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: Container(
         margin: const EdgeInsets.fromLTRB(20, 0, 20, 30),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.95),
+          color: Colors.white.withValues(alpha: 0.95),
           borderRadius: BorderRadius.circular(40),
           border: Border.all(
             color: const Color(0xFFB6C4B6), // Soft light green border
@@ -461,13 +465,13 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           boxShadow: [
             BoxShadow(
-              color: colorScheme.primary.withOpacity(0.08),
+              color: colorScheme.primary.withValues(alpha: 0.08),
               blurRadius: 30,
               spreadRadius: 0,
               offset: const Offset(0, 10),
             ),
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withValues(alpha: 0.03),
               blurRadius: 10,
               spreadRadius: -2,
               offset: const Offset(0, 5),
@@ -484,7 +488,7 @@ class _HomeScreenState extends State<HomeScreen> {
               });
             },
             selectedItemColor: colorScheme.primary,
-            unselectedItemColor: Colors.grey.withOpacity(0.6),
+            unselectedItemColor: Colors.grey.withValues(alpha: 0.6),
             showSelectedLabels: true,
             showUnselectedLabels: false,
             type: BottomNavigationBarType.fixed,

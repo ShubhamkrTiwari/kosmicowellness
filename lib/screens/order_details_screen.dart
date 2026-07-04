@@ -149,7 +149,7 @@ class OrderDetailsScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.primary.withOpacity(0.05)),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.05)),
       ),
       child: Row(
         children: [
@@ -192,7 +192,7 @@ class OrderDetailsScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.primary.withOpacity(0.05)),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.05)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -214,7 +214,7 @@ class OrderDetailsScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.primary.withOpacity(0.05)),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.05)),
       ),
       child: Column(
         children: [
