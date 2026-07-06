@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../home_screen.dart';
+import 'package:flutter/services.dart';
+import 'otp_verification_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -12,24 +13,23 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _isLogin = true;
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
 
   @override
   void dispose() {
     _emailController.dispose();
-    _passwordController.dispose();
     _nameController.dispose();
     super.dispose();
   }
 
   void _submit() {
-     // Navigating directly to HomeScreen as per requirement (bypassing actual auth)
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => const HomeScreen(title: 'Kosmico Wellness'),
-      ),
-    );
+    if (_formKey.currentState!.validate()) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => OtpVerificationScreen(email: _emailController.text),
+        ),
+      );
+    }
   }
 
   @override
@@ -87,7 +87,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     const SizedBox(height: 8),
                     Text(
                       _isLogin
-                          ? 'Please sign in to continue'
+                          ? 'Enter your email to receive an OTP'
                           : 'Sign up to start your wellness journey',
                       style: TextStyle(color: colorScheme.onSurfaceVariant),
                     ),
@@ -102,6 +102,9 @@ class _AuthScreenState extends State<AuthScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                        ],
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Please enter your name';
@@ -128,28 +131,10 @@ class _AuthScreenState extends State<AuthScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: true,
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        prefixIcon: const Icon(Icons.lock_outline),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.length < 6) {
-                          return 'Password must be at least 6 characters';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 32),
                     SizedBox(
                       width: double.infinity,
-                      height: 50,
+                      height: 55,
                       child: ElevatedButton(
                         onPressed: _submit,
                         style: ElevatedButton.styleFrom(
@@ -160,7 +145,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           ),
                         ),
                         child: Text(
-                          _isLogin ? 'Login' : 'Sign Up',
+                          _isLogin ? 'Login' : 'Create Account',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,

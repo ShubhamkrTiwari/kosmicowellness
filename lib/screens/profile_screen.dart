@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'help_center_screen.dart';
 import 'payment_methods_screen.dart';
 import 'shipping_addresses_screen.dart';
@@ -105,6 +106,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             TextField(
               controller: nameController,
               decoration: _inputDecoration('Full Name'),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+              ],
             ),
             const SizedBox(height: 16),
             TextField(

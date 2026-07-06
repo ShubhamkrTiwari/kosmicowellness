@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class ShippingAddressesScreen extends StatefulWidget {
   const ShippingAddressesScreen({super.key});
@@ -73,6 +74,9 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
               TextField(
                 controller: nameController,
                 decoration: _inputDecoration('Full Name'),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                ],
               ),
               const SizedBox(height: 16),
               TextField(

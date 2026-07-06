@@ -9,16 +9,35 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _rocketController;
+  late Animation<double> _rocketAnimation;
+
   @override
   void initState() {
     super.initState();
-    Timer(const Duration(seconds: 3), () {
+    
+    _rocketController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _rocketAnimation = Tween<double>(begin: 0, end: -20).animate(
+      CurvedAnimation(parent: _rocketController, curve: Curves.easeInOut),
+    );
+
+    Timer(const Duration(seconds: 4), () {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const OnboardingScreen()),
       );
     });
+  }
+
+  @override
+  void dispose() {
+    _rocketController.dispose();
+    super.dispose();
   }
 
   @override
@@ -80,9 +99,34 @@ class _SplashScreenState extends State<SplashScreen> {
                 letterSpacing: 2,
               ),
             ),
-            const SizedBox(height: 48),
-            CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(colorScheme.secondary),
+            const SizedBox(height: 60),
+            
+            // Rocket Animation instead of CircularProgressIndicator
+            AnimatedBuilder(
+              animation: _rocketAnimation,
+              builder: (context, child) {
+                return Transform.translate(
+                  offset: Offset(0, _rocketAnimation.value),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.rocket_launch,
+                        size: 40,
+                        color: colorScheme.secondary,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Launching Kosmico...',
+                        style: TextStyle(
+                          color: colorScheme.onPrimary.withValues(alpha: 0.7),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           ],
         ),
