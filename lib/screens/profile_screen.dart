@@ -1,14 +1,19 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+
+import '../managers/theme_manager.dart';
+import '../managers/user_manager.dart';
+import '../managers/wishlist_manager.dart';
+import 'auth_screen.dart';
 import 'help_center_screen.dart';
+import 'my_orders_screen.dart';
 import 'payment_methods_screen.dart';
 import 'shipping_addresses_screen.dart';
-import 'my_orders_screen.dart';
 import 'wishlist_screen.dart';
-import '../managers/wishlist_manager.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -19,9 +24,19 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final wishlistManager = WishlistManager();
-  String userName = 'Shubham Tiwari';
-  String userEmail = 'shubham.tiwari@example.com';
+  final userManager = UserManager();
+  late String userName;
+  late String userEmail;
+  late String userPhone;
   XFile? _pickedImage;
+
+  @override
+  void initState() {
+    super.initState();
+    userName = userManager.userName ?? 'Guest User';
+    userEmail = userManager.userEmail ?? 'Not logged in';
+    userPhone = userManager.userPhone ?? 'Add phone number';
+  }
 
   String _getInitials(String name) {
     try {
@@ -80,6 +95,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _showEditProfileSheet() {
     final nameController = TextEditingController(text: userName);
     final emailController = TextEditingController(text: userEmail);
+    final phoneController = TextEditingController(text: userPhone == 'Add phone number' ? '' : userPhone);
 
     showModalBottomSheet(
       context: context,
@@ -87,64 +103,92 @@ class _ProfileScreenState extends State<ProfileScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
       ),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          top: 30,
-          left: 24,
-          right: 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Edit Profile',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 24),
-            TextField(
-              controller: nameController,
-              decoration: _inputDecoration('Full Name'),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
-              ],
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: emailController,
-              decoration: _inputDecoration('Email Address'),
-            ),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    userName = nameController.text.isNotEmpty ? nameController.text : userName;
-                    userEmail = emailController.text.isNotEmpty ? emailController.text : userEmail;
-                  });
-                  Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-                child: const Text('Save Changes'),
+      builder: (context) {
+        final colorScheme = Theme.of(context).colorScheme;
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            top: 30,
+            left: 24,
+            right: 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Edit Profile',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
-            ),
-            const SizedBox(height: 30),
-          ],
-        ),
-      ),
+              const SizedBox(height: 24),
+              TextField(
+                controller: nameController,
+                decoration: _inputDecoration('Full Name', Icons.person_outline),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: emailController,
+                readOnly: true,
+                enabled: false,
+                style: TextStyle(color: colorScheme.onSurfaceVariant),
+                decoration: _inputDecoration('Email Address', Icons.email_outlined).copyWith(
+                  filled: true,
+                  fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: _inputDecoration('Phone Number', Icons.phone_outlined),
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(10),
+                ],
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final newName = nameController.text.trim();
+                    final newEmail = emailController.text.trim();
+                    final newPhone = phoneController.text.trim();
+
+                    if (newName.isNotEmpty && newEmail.isNotEmpty) {
+                      await userManager.updateProfile(newName, newEmail, newPhone);
+                      setState(() {
+                        userName = newName;
+                        userEmail = newEmail;
+                        userPhone = newPhone.isEmpty ? 'Add phone number' : newPhone;
+                      });
+                      if (mounted) Navigator.pop(context);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  child: const Text('Save Changes'),
+                ),
+              ),
+              const SizedBox(height: 30),
+            ],
+          ),
+        );
+      },
     );
   }
 
-  InputDecoration _inputDecoration(String label) {
+  InputDecoration _inputDecoration(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
+      prefixIcon: Icon(icon, size: 20),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -242,9 +286,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                           overflow: TextOverflow.ellipsis,
                         ),
+                        const SizedBox(height: 4),
                         Text(
                           userEmail,
-                          style: TextStyle(color: Colors.grey[600]),
+                          style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          userPhone,
+                          style: TextStyle(color: Colors.grey[600], fontSize: 14),
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 8),
@@ -306,6 +356,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 MaterialPageRoute(builder: (context) => const MyOrdersScreen()),
               );
             }),
+            _buildMenuItem(
+              Icons.phone_android_outlined, 
+              'Mobile Number', 
+              userPhone, 
+              colorScheme, 
+              onTap: _showEditProfileSheet
+            ),
             _buildMenuItem(Icons.location_on_outlined, 'Shipping Addresses', 'Manage your delivery locations', colorScheme, onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (context) => const ShippingAddressesScreen()),
@@ -326,6 +383,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 20),
 
             _buildSectionHeader('Support & Preferences', colorScheme),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4),
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    ThemeManager().isDarkMode ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+                    color: colorScheme.primary,
+                    size: 22,
+                  ),
+                ),
+                title: const Text(
+                  'Dark Mode',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                ),
+                subtitle: Text(
+                  ThemeManager().isDarkMode ? 'Currently Dark' : 'Currently Light',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+                trailing: Switch(
+                  value: ThemeManager().isDarkMode,
+                  onChanged: (value) async {
+                    await ThemeManager().toggleTheme();
+                    setState(() {});
+                  },
+                  activeTrackColor: colorScheme.primary,
+                ),
+              ),
+            ),
             _buildMenuItem(Icons.help_outline, 'Help Center', 'FAQs and support chat', colorScheme, onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (context) => const HelpCenterScreen()),
@@ -341,7 +431,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () {},
+                  onPressed: () async {
+                    await userManager.logout();
+                    if (mounted) {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (context) => const AuthScreen()),
+                        (route) => false,
+                      );
+                    }
+                  },
                   icon: const Icon(Icons.logout, size: 20),
                   label: const Text('Logout'),
                   style: OutlinedButton.styleFrom(
@@ -367,7 +465,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       width: 100,
       padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: colorScheme.primary.withValues(alpha: 0.05)),
         boxShadow: [

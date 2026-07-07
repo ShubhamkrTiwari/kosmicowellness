@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'otp_verification_screen.dart';
+import '../services/api_service.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -11,6 +12,7 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   bool _isLogin = true;
+  bool _isLoading = false;
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _nameController = TextEditingController();
@@ -22,13 +24,42 @@ class _AuthScreenState extends State<AuthScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  void _submit() async {
     if (_formKey.currentState!.validate()) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => OtpVerificationScreen(email: _emailController.text),
-        ),
-      );
+      setState(() => _isLoading = true);
+
+      final Map<String, dynamic> result;
+      if (_isLogin) {
+        result = await ApiService.login(_emailController.text);
+      } else {
+        result = await ApiService.register(_nameController.text, _emailController.text);
+      }
+
+      setState(() => _isLoading = false);
+
+      if (result['success']) {
+        if (mounted) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => OtpVerificationScreen(
+                email: _emailController.text,
+                name: _isLogin ? null : _nameController.text,
+                isLogin: _isLogin,
+              ),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message']),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -58,22 +89,12 @@ class _AuthScreenState extends State<AuthScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Image.asset(
-                      'assets/images/logo.png',
+                      'assets/images/kosmicologo.png',
                       height: 80,
                       errorBuilder: (context, error, stackTrace) => Icon(
                         Icons.spa,
                         size: 80,
                         color: colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'KOSMICO',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.primary,
-                        letterSpacing: 4,
                       ),
                     ),
                     const SizedBox(height: 32),
@@ -136,7 +157,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       width: double.infinity,
                       height: 55,
                       child: ElevatedButton(
-                        onPressed: _submit,
+                        onPressed: _isLoading ? null : _submit,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: colorScheme.primary,
                           foregroundColor: Colors.white,
@@ -144,13 +165,22 @@ class _AuthScreenState extends State<AuthScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: Text(
-                          _isLogin ? 'Login' : 'Create Account',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(
+                                _isLogin ? 'Login' : 'Create Account',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                       ),
                     ),
                     const SizedBox(height: 16),

@@ -2,11 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import '../home_screen.dart';
+import '../services/api_service.dart';
+import '../managers/user_manager.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
   final String email;
+  final String? name; // Added name
+  final bool isLogin;
 
-  const OtpVerificationScreen({super.key, required this.email});
+  const OtpVerificationScreen({
+    super.key, 
+    required this.email, 
+    this.name, 
+    this.isLogin = false
+  });
 
   @override
   State<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
@@ -19,6 +28,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   int _timerSeconds = 30;
   Timer? _timer;
   bool _canResend = false;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -57,26 +67,69 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     });
   }
 
-  void _resendOtp() {
+  void _resendOtp() async {
     if (_canResend) {
-      _startTimer();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('OTP Resent Successfully!'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      setState(() => _isLoading = true);
+      final result = await ApiService.resendOtp(widget.email);
+      setState(() => _isLoading = false);
+
+      if (result['success']) {
+        _startTimer();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('OTP Resent Successfully!'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message']),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
     }
   }
 
-  void _verifyOtp() {
+  void _verifyOtp() async {
     String otp = _controllers.map((e) => e.text).join();
     if (otp.length == 6) {
-      // Navigate to Home
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const HomeScreen(title: 'Kosmico Wellness')),
-        (route) => false,
-      );
+      setState(() => _isLoading = true);
+      
+      final result = widget.isLogin 
+          ? await ApiService.verifyLogin(widget.email, otp)
+          : await ApiService.verifySignup(widget.email, otp);
+      
+      setState(() => _isLoading = false);
+
+      if (result['success']) {
+        // Save user data
+        await UserManager().saveUser(result['data'], manualName: widget.name);
+
+        if (mounted) {
+          // Navigate to Home
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const HomeScreen(title: 'Kosmico Wellness')),
+            (route) => false,
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message']),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a valid 6-digit OTP')),
@@ -168,17 +221,23 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                   width: double.infinity,
                   height: 55,
                   child: ElevatedButton(
-                    onPressed: _verifyOtp,
+                    onPressed: _isLoading ? null : _verifyOtp,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: colorScheme.primary,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       elevation: 0,
                     ),
-                    child: const Text(
-                      'Verify',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
+                    child: _isLoading 
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Text(
+                            'Verify',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 32),

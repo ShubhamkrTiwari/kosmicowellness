@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:device_preview/device_preview.dart';
+import 'package:flutter/services.dart';
 import 'screens/splash_screen.dart';
 import 'screens/cart_screen.dart';
 import 'screens/profile_screen.dart';
@@ -7,9 +9,19 @@ import 'screens/product_details_screen.dart';
 import 'screens/product_list_screen.dart';
 import 'managers/cart_manager.dart';
 import 'managers/wishlist_manager.dart';
+import 'managers/user_manager.dart';
+import 'managers/theme_manager.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await UserManager().init();
+  await ThemeManager().init();
+  runApp(
+    DevicePreview(
+      enabled: true,
+      builder: (context) => const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -17,25 +29,45 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Kosmico Wellness',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF00833E), // Logo Green
-          primary: const Color(0xFF00833E),
-          secondary: const Color(0xFF1B264F), // Logo Navy Blue
-          surface: const Color(0xFFF9F6F2), // Off-white/Cream
-          onPrimary: Colors.white,
-          onSecondary: Colors.white,
-        ),
-        useMaterial3: true,
-        textTheme: const TextTheme(
-          displayLarge: TextStyle(fontFamily: 'Serif', fontWeight: FontWeight.bold, color: Color(0xFF00833E)),
-          titleLarge: TextStyle(fontFamily: 'Serif', fontWeight: FontWeight.w600),
-        ),
-      ),
-      home: const SplashScreen(),
+    return ListenableBuilder(
+      listenable: ThemeManager(),
+      builder: (context, _) {
+        return MaterialApp(
+          title: 'Kosmico Wellness',
+          debugShowCheckedModeBanner: false,
+          themeMode: ThemeManager().isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: const Color(0xFF00833E),
+              primary: const Color(0xFF00833E),
+              secondary: const Color(0xFF1B264F),
+              surface: const Color(0xFFF9F6F2),
+              onPrimary: Colors.white,
+              onSecondary: Colors.white,
+              brightness: Brightness.light,
+            ),
+            useMaterial3: true,
+            textTheme: const TextTheme(
+              displayLarge: TextStyle(fontFamily: 'Serif', fontWeight: FontWeight.bold, color: Color(0xFF00833E)),
+              titleLarge: TextStyle(fontFamily: 'Serif', fontWeight: FontWeight.w600),
+            ),
+          ),
+          darkTheme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: const Color(0xFF00833E),
+              primary: const Color(0xFF00833E),
+              secondary: const Color(0xFF1B264F),
+              brightness: Brightness.dark,
+            ),
+            useMaterial3: true,
+            textTheme: const TextTheme(
+              displayLarge: TextStyle(fontFamily: 'Serif', fontWeight: FontWeight.bold, color: Colors.white),
+              titleLarge: TextStyle(fontFamily: 'Serif', fontWeight: FontWeight.w600, color: Colors.white),
+            ),
+          ),
+          home: const SplashScreen(),
+        );
+      },
     );
   }
 }
@@ -95,7 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 hintText: 'Search products...',
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
-                fillColor: Colors.white,
+                fillColor: colorScheme.surfaceVariant.withValues(alpha: 0.5),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
                   borderSide: BorderSide.none,
@@ -223,7 +255,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
                 child: Card(
                   elevation: 0,
-                  color: Colors.white,
+                  color: colorScheme.surfaceVariant.withValues(alpha: 0.3),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                     side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.1)),
@@ -363,7 +395,7 @@ class _HomeScreenState extends State<HomeScreen> {
         margin: const EdgeInsets.only(right: 10),
         padding: const EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
-          color: isSelected ? colorScheme.primary : Colors.white,
+          color: isSelected ? colorScheme.primary : colorScheme.surfaceVariant,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected ? colorScheme.primary : colorScheme.primary.withValues(alpha: 0.1),
@@ -446,7 +478,7 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: colorScheme.surfaceVariant.withValues(alpha: 0.5),
                   shape: BoxShape.circle,
                   border: Border.all(color: colorScheme.primary.withValues(alpha: 0.1)),
                 ),
@@ -462,7 +494,7 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: colorScheme.surfaceVariant.withValues(alpha: 0.5),
                 shape: BoxShape.circle,
                 border: Border.all(color: colorScheme.primary.withValues(alpha: 0.1)),
               ),
@@ -490,62 +522,83 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       bottomNavigationBar: Container(
         margin: const EdgeInsets.fromLTRB(20, 0, 20, 30),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.95),
-          borderRadius: BorderRadius.circular(40),
-          border: Border.all(
-            color: const Color(0xFFB6C4B6), // Soft light green border
-            width: 1.5,
-          ),
+          color: colorScheme.brightness == Brightness.dark 
+              ? colorScheme.surfaceVariant
+              : Colors.white,
+          borderRadius: BorderRadius.circular(30),
           boxShadow: [
             BoxShadow(
-              color: colorScheme.primary.withValues(alpha: 0.08),
-              blurRadius: 30,
-              spreadRadius: 0,
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 25,
               offset: const Offset(0, 10),
-            ),
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 10,
-              spreadRadius: -2,
-              offset: const Offset(0, 5),
             ),
           ],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(40),
-          child: BottomNavigationBar(
-            currentIndex: _selectedIndex,
-            onTap: (index) {
-              setState(() {
-                _selectedIndex = index;
-              });
-            },
-            selectedItemColor: colorScheme.primary,
-            unselectedItemColor: Colors.grey.withValues(alpha: 0.6),
-            showSelectedLabels: true,
-            showUnselectedLabels: false,
-            type: BottomNavigationBarType.fixed,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.home_outlined),
-                activeIcon: Icon(Icons.home),
-                label: 'Home',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.category_outlined),
-                activeIcon: Icon(Icons.category),
-                label: 'Products',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.person_outline),
-                activeIcon: Icon(Icons.person),
-                label: 'Profile',
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildNavItem(0, Icons.home_outlined, Icons.home_rounded, 'Home', colorScheme),
+            _buildNavItem(1, Icons.category_outlined, Icons.category_rounded, 'Products', colorScheme),
+            _buildNavItem(2, Icons.person_outline_rounded, Icons.person_rounded, 'Profile', colorScheme),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(int index, IconData icon, IconData activeIcon, String label, ColorScheme colorScheme) {
+    bool isSelected = _selectedIndex == index;
+    return InkWell(
+      onTap: () {
+        if (!isSelected) {
+          HapticFeedback.lightImpact();
+          setState(() {
+            _selectedIndex = index;
+          });
+        }
+      },
+      splashColor: Colors.transparent,
+      highlightColor: Colors.transparent,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOutQuint,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? colorScheme.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: colorScheme.primary.withValues(alpha: 0.25),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  )
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isSelected ? activeIcon : icon,
+              color: isSelected ? Colors.white : Colors.grey[500],
+              size: 24,
+            ),
+            if (isSelected) ...[
+              const SizedBox(width: 10),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  letterSpacing: 0.2,
+                ),
               ),
             ],
-          ),
+          ],
         ),
       ),
     );

@@ -10,25 +10,18 @@ class PaymentMethodsScreen extends StatefulWidget {
 class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
   final List<Map<String, String>> _paymentMethods = [
     {
-      'type': 'Visa',
-      'number': '**** **** **** 4582',
-      'expiry': '09/26',
+      'type': 'Bank',
+      'number': 'A/C: ****4582',
+      'expiry': 'IFSC: KOSM000123',
       'holder': 'Shubham Tiwari',
       'color': '0xFF1B264F', // Logo Navy
-    },
-    {
-      'type': 'Mastercard',
-      'number': '**** **** **** 9210',
-      'expiry': '12/25',
-      'holder': 'Shubham Tiwari',
-      'color': '0xFF00833E', // Logo Green
     },
     {
       'type': 'UPI',
       'number': 'shubham@okaxis',
       'expiry': '',
       'holder': 'Shubham Tiwari',
-      'color': '0xFF424242',
+      'color': '0xFF00833E', // Logo Green
     },
   ];
 
@@ -36,7 +29,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
     final isEditing = index != null;
     final method = isEditing ? _paymentMethods[index] : null;
 
-    final typeController = TextEditingController(text: method?['type'] ?? 'Visa');
+    final typeController = TextEditingController(text: method?['type'] ?? 'Bank');
     final numberController = TextEditingController(text: method?['number'] ?? '');
     final expiryController = TextEditingController(text: method?['expiry'] ?? '');
     final holderController = TextEditingController(text: method?['holder'] ?? 'Shubham Tiwari');
@@ -73,16 +66,20 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
               DropdownButtonFormField<String>(
                 value: typeController.text,
                 decoration: _inputDecoration('Method Type', Icons.category_outlined),
-                items: ['Visa', 'Mastercard', 'UPI']
+                items: ['Bank', 'UPI']
                     .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                     .toList(),
                 onChanged: (val) => setState(() => typeController.text = val!),
               ),
               const SizedBox(height: 16),
-              _buildModernTextField(numberController, 'Number / UPI ID', Icons.payment_outlined),
+              _buildModernTextField(
+                numberController, 
+                typeController.text == 'Bank' ? 'Account Number' : 'UPI ID', 
+                Icons.payment_outlined
+              ),
               const SizedBox(height: 16),
-              if (typeController.text != 'UPI')
-                _buildModernTextField(expiryController, 'Expiry (MM/YY)', Icons.calendar_today_outlined),
+              if (typeController.text == 'Bank')
+                _buildModernTextField(expiryController, 'IFSC Code', Icons.account_balance_outlined),
               const SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,
@@ -169,7 +166,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Saved Cards', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text('Saved Methods', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 TextButton(onPressed: () => _showPaymentBottomSheet(), child: Text('+ Add New', style: TextStyle(color: colorScheme.primary))),
               ],
             ),
@@ -269,16 +266,16 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('CARD HOLDER', style: TextStyle(color: Colors.white54, fontSize: 10, letterSpacing: 1)),
+                          const Text('SAVED DETAILS', style: TextStyle(color: Colors.white54, fontSize: 10, letterSpacing: 1)),
                           const SizedBox(height: 4),
                           Text(method['holder']!.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
                         ],
                       ),
-                      if (isCard)
+                      if (method['type'] == 'Bank')
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('EXPIRES', style: TextStyle(color: Colors.white54, fontSize: 10, letterSpacing: 1)),
+                            const Text('IFSC', style: TextStyle(color: Colors.white54, fontSize: 10, letterSpacing: 1)),
                             const SizedBox(height: 4),
                             Text(method['expiry']!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
                           ],

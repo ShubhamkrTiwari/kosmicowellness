@@ -72,7 +72,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               child: Padding(
                 padding: const EdgeInsets.all(25.0),
                 child: Image.asset(
-                  'assets/images/logo.png',
+                  'assets/images/kosmicologo.png',
                   errorBuilder: (context, error, stackTrace) => Icon(
                     Icons.spa,
                     size: 80,
