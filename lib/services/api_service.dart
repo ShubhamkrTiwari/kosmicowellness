@@ -1,10 +1,59 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ApiService {
   // Use 10.0.2.2 for Android Emulator to reach localhost
   static const String baseUrl = 'http://192.168.1.6:5000';
   
+  static Future<Map<String, dynamic>> updateProfileWithImage({
+    required String name,
+    required String phoneNumber,
+    XFile? imageFile,
+    required String token,
+  }) async {
+    try {
+      var uri = Uri.parse('$baseUrl/api/auth/profile');
+      var request = http.MultipartRequest('PUT', uri);
+      
+      request.headers.addAll({
+        'Authorization': 'Bearer $token',
+      });
+      
+      request.fields['name'] = name;
+      request.fields['phoneNumber'] = phoneNumber;
+
+      if (imageFile != null) {
+        Uint8List imageBytes = await imageFile.readAsBytes();
+        
+        // Determine the mime type based on file extension
+        String ext = imageFile.name.split('.').last.toLowerCase();
+        String mimeType = 'image/jpeg'; // Default
+        if (ext == 'png') mimeType = 'image/png';
+        if (ext == 'gif') mimeType = 'image/gif';
+        if (ext == 'webp') mimeType = 'image/webp';
+
+        var multipartFile = http.MultipartFile.fromBytes(
+          'profilePicture', 
+          imageBytes,
+          filename: imageFile.name,
+          contentType: MediaType.parse(mimeType),
+        );
+        request.files.add(multipartFile);
+      }
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+      
+      return _processResponse(response);
+    } catch (e) {
+      print('Update Profile Error: $e');
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
   static Future<Map<String, dynamic>> register(String name, String email) async {
     try {
       final response = await http.post(
@@ -83,12 +132,141 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> saveAddress({
+    required String addressLabel,
+    required String fullName,
+    required String streetAddress,
+    required String city,
+    required String pincode,
+    required String phoneNumber,
+    required String token,
+    bool isDefault = false,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/address'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'addressLabel': addressLabel,
+          'fullName': fullName,
+          'streetAddress': streetAddress,
+          'city': city,
+          'pincode': pincode,
+          'phoneNumber': phoneNumber,
+          'isDefault': isDefault,
+        }),
+      );
+      return _processResponse(response);
+    } catch (e) {
+      print('Save Address Error: $e');
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> getAddresses(String token) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/address'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+      return _processResponse(response);
+    } catch (e) {
+      print('Get Addresses Error: $e');
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateAddress({
+    required String addressId,
+    required String addressLabel,
+    required String fullName,
+    required String streetAddress,
+    required String city,
+    required String pincode,
+    required String phoneNumber,
+    required String token,
+    bool? isDefault,
+  }) async {
+    try {
+      final Map<String, dynamic> body = {
+        'addressLabel': addressLabel,
+        'fullName': fullName,
+        'streetAddress': streetAddress,
+        'city': city,
+        'pincode': pincode,
+        'phoneNumber': phoneNumber,
+      };
+      if (isDefault != null) body['isDefault'] = isDefault;
+
+      final response = await http.put(
+        Uri.parse('$baseUrl/api/address/$addressId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(body),
+      );
+      return _processResponse(response);
+    } catch (e) {
+      print('Update Address Error: $e');
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> setDefaultAddress(String addressId, String token) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/api/address/set-default/$addressId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+      return _processResponse(response);
+    } catch (e) {
+      print('Set Default Address Error: $e');
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> deleteAddress(String addressId, String token) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/api/address/$addressId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+      return _processResponse(response);
+    } catch (e) {
+      print('Delete Address Error: $e');
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
   static Map<String, dynamic> _processResponse(http.Response response) {
-    final data = jsonDecode(response.body);
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      return {'success': true, 'data': data};
-    } else {
-      return {'success': false, 'message': data['message'] ?? 'Something went wrong'};
+    try {
+      // Handle success status codes (including 204 No Content for deletes)
+      if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 204) {
+        final data = response.body.isNotEmpty ? jsonDecode(response.body) : null;
+        return {'success': true, 'data': data};
+      } else {
+        final data = response.body.isNotEmpty ? jsonDecode(response.body) : null;
+        return {
+          'success': false, 
+          'message': (data != null && data['message'] != null) ? data['message'] : 'Something went wrong'
+        };
+      }
+    } catch (e) {
+      print('Response Processing Error: $e');
+      return {
+        'success': false, 
+        'message': 'Server Error (${response.statusCode}).'
+      };
     }
   }
 }

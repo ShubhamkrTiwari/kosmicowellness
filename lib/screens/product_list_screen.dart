@@ -174,7 +174,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
           hintText: 'Search products...',
           prefixIcon: const Icon(Icons.search),
           filled: true,
-          fillColor: Colors.white,
+          fillColor: colorScheme.surfaceContainerHighest,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none,
@@ -203,7 +203,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 decoration: BoxDecoration(
-                  color: isSelected ? colorScheme.primary : Colors.white,
+                  color: isSelected ? colorScheme.primary : colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(30),
                   boxShadow: isSelected
                       ? [BoxShadow(color: colorScheme.primary.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))]
@@ -238,7 +238,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
         margin: const EdgeInsets.only(bottom: 20),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: colorScheme.surfaceContainer,
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(

@@ -71,7 +71,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Image.asset(
-                        'assets/images/logo.png',
+                        'assets/images/kosmicologo.png',
                         height: 40,
                         errorBuilder: (context, error, stackTrace) => const SizedBox(width: 40),
                       ),

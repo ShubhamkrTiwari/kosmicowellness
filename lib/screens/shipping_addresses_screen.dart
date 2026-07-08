@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../managers/user_manager.dart';
+import '../services/api_service.dart';
+
 class ShippingAddressesScreen extends StatefulWidget {
   const ShippingAddressesScreen({super.key});
 
@@ -9,28 +12,45 @@ class ShippingAddressesScreen extends StatefulWidget {
 }
 
 class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
-  final List<Map<String, String>> _addresses = [
-    {
-      'id': '1',
-      'label': 'Home',
-      'name': 'Shubham Tiwari',
-      'address': '123 Ayurveda Street, Wellness District',
-      'city': 'Mumbai',
-      'pincode': '400001',
-      'phone': '+91 98765 43210',
-      'isDefault': 'true',
-    },
-    {
-      'id': '2',
-      'label': 'Office',
-      'name': 'Shubham Tiwari',
-      'address': 'Green Tower, 4th Floor, Tech Park',
-      'city': 'Mumbai',
-      'pincode': '400076',
-      'phone': '+91 98765 43211',
-      'isDefault': 'false',
-    },
-  ];
+  final List<Map<String, String>> _addresses = [];
+  final userManager = UserManager();
+  bool isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAddresses();
+  }
+
+  Future<void> _loadAddresses() async {
+    if (mounted) setState(() => isLoading = true);
+    await userManager.init();
+    final token = userManager.token;
+    
+    if (token != null && token.isNotEmpty) {
+      final result = await ApiService.getAddresses(token);
+      if (result['success'] && mounted) {
+        setState(() {
+          _addresses.clear();
+          if (result['data'] is List) {
+            for (var addr in result['data']) {
+              _addresses.add({
+                'id': addr['_id'] is Map ? addr['_id']['\$oid']?.toString() ?? '' : addr['_id']?.toString() ?? addr['id']?.toString() ?? '',
+                'label': addr['addressLabel']?.toString() ?? 'Home',
+                'name': addr['fullName']?.toString() ?? '',
+                'address': addr['streetAddress']?.toString() ?? '',
+                'city': addr['city']?.toString() ?? '',
+                'pincode': addr['pincode']?.toString() ?? '',
+                'phone': addr['phoneNumber']?.toString() ?? '',
+                'isDefault': addr['isDefault']?.toString() ?? 'false',
+              });
+            }
+          }
+        });
+      }
+    }
+    if (mounted) setState(() => isLoading = false);
+  }
 
   void _showAddressBottomSheet({int? index}) {
     final isEditing = index != null;
@@ -49,23 +69,27 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
       ),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          top: 30,
-          left: 24,
-          right: 24,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                isEditing ? 'Edit Address' : 'Add New Address',
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 24),
+      builder: (context) {
+        bool isSaving = false;
+        bool isDefaultValue = address?['isDefault'] == 'true';
+        return StatefulBuilder(
+          builder: (context, setModalState) => Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              top: 30,
+              left: 24,
+              right: 24,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isEditing ? 'Edit Address' : 'Add New Address',
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 24),
               TextField(
                 controller: labelController,
                 decoration: _inputDecoration('Address Label (e.g. Home, Office)'),
@@ -108,44 +132,122 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
                 keyboardType: TextInputType.phone,
                 decoration: _inputDecoration('Phone Number'),
               ),
+              const SizedBox(height: 16),
+              SwitchListTile(
+                title: const Text('Set as Default Address'),
+                value: isDefaultValue,
+                onChanged: (val) {
+                  setModalState(() => isDefaultValue = val);
+                },
+                activeColor: Theme.of(context).colorScheme.primary,
+                contentPadding: EdgeInsets.zero,
+              ),
               const SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,
                 height: 55,
                 child: ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      final newData = {
-                        'id': isEditing ? address!['id']! : DateTime.now().toString(),
-                        'label': labelController.text,
-                        'name': nameController.text,
-                        'address': addressController.text,
-                        'city': cityController.text,
-                        'pincode': pincodeController.text,
-                        'phone': phoneController.text,
-                        'isDefault': isEditing ? address!['isDefault']! : 'false',
-                      };
-                      if (isEditing) {
-                        _addresses[index] = newData;
-                      } else {
-                        _addresses.add(newData);
+                  onPressed: isSaving ? null : () async {
+                    final label = labelController.text.trim();
+                    final name = nameController.text.trim();
+                    final street = addressController.text.trim();
+                    final city = cityController.text.trim();
+                    final pincode = pincodeController.text.trim();
+                    final phone = phoneController.text.trim();
+
+                    if (label.isNotEmpty && name.isNotEmpty && street.isNotEmpty && 
+                        city.isNotEmpty && pincode.isNotEmpty && phone.isNotEmpty) {
+                      setModalState(() => isSaving = true);
+                      
+                      await userManager.init();
+                      final token = userManager.token;
+                      
+                      if (token == null || token.isEmpty) {
+                        setModalState(() => isSaving = false);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Authentication error. Please login again.'),
+                              backgroundColor: Colors.red,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                        return;
                       }
-                    });
-                    Navigator.pop(context);
+
+                      final Map<String, dynamic> result;
+                      if (isEditing) {
+                        result = await ApiService.updateAddress(
+                          addressId: address!['id']!,
+                          addressLabel: label,
+                          fullName: name,
+                          streetAddress: street,
+                          city: city,
+                          pincode: pincode,
+                          phoneNumber: phone,
+                          token: token,
+                          isDefault: isDefaultValue,
+                        );
+                      } else {
+                        result = await ApiService.saveAddress(
+                          addressLabel: label,
+                          fullName: name,
+                          streetAddress: street,
+                          city: city,
+                          pincode: pincode,
+                          phoneNumber: phone,
+                          token: token,
+                          isDefault: isDefaultValue,
+                        );
+                      }
+
+                      if (result['success']) {
+                        await _loadAddresses();
+                        if (mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(isEditing ? 'Address updated successfully!' : 'Address saved successfully!'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      } else {
+                        setModalState(() => isSaving = false);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(result['message'] ?? 'Failed to save address'),
+                              backgroundColor: Colors.redAccent,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      }
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.primary,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
-                  child: Text(isEditing ? 'Update Address' : 'Save Address'),
+                  child: isSaving 
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : Text(isEditing ? 'Update Address' : 'Save Address'),
                 ),
               ),
               const SizedBox(height: 30),
-            ],
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -179,24 +281,36 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Saved Addresses',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      body: isLoading 
+          ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Saved Addresses',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  if (_addresses.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 40),
+                        child: Text(
+                          'No saved addresses found',
+                          style: TextStyle(color: Colors.grey.shade500),
+                        ),
+                      ),
+                    ),
+                  ...List.generate(_addresses.length, (index) {
+                    return _buildAddressCard(_addresses[index], index, colorScheme);
+                  }),
+                  const SizedBox(height: 24),
+                  _buildAddAddressButton(colorScheme),
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
-            ...List.generate(_addresses.length, (index) {
-              return _buildAddressCard(_addresses[index], index, colorScheme);
-            }),
-            const SizedBox(height: 24),
-            _buildAddAddressButton(colorScheme),
-          ],
-        ),
-      ),
     );
   }
 
@@ -206,7 +320,7 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isDefault ? colorScheme.primary : colorScheme.primary.withValues(alpha: 0.1),
@@ -229,13 +343,13 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
-                  color: isDefault ? colorScheme.primary : Colors.grey.shade100,
+                  color: isDefault ? colorScheme.primary : colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   address['label']!,
                   style: TextStyle(
-                    color: isDefault ? Colors.white : Colors.grey.shade700,
+                    color: isDefault ? Colors.white : colorScheme.onSurfaceVariant,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
@@ -243,18 +357,101 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
               ),
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_horiz),
-                onSelected: (value) {
+                onSelected: (value) async {
                   if (value == 'edit') {
                     _showAddressBottomSheet(index: index);
                   } else if (value == 'delete') {
-                    setState(() => _addresses.removeAt(index));
-                  } else if (value == 'default') {
-                    setState(() {
-                      for (var a in _addresses) {
-                        a['isDefault'] = 'false';
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Delete Address'),
+                        content: const Text('Are you sure you want to delete this address?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (confirm == true) {
+                      await userManager.init();
+                      final token = userManager.token;
+                      final addressId = address['id'];
+
+                      if (token != null && token.isNotEmpty && addressId != null && addressId.isNotEmpty) {
+                        print('Deleting Address with ID: $addressId'); // Debug print
+                        final result = await ApiService.deleteAddress(addressId, token);
+                        
+                        if (result['success']) {
+                          setState(() => _addresses.removeAt(index));
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Address deleted successfully!'),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                          // Optional: Refresh from server to be 100% sure
+                          _loadAddresses();
+                        } else {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(result['message'] ?? 'Failed to delete address'),
+                                backgroundColor: Colors.redAccent,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        }
+                      } else {
+                         if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Invalid address ID or not logged in'),
+                              backgroundColor: Colors.redAccent,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
                       }
-                      address['isDefault'] = 'true';
-                    });
+                    }
+                  } else if (value == 'default') {
+                    await userManager.init();
+                    final token = userManager.token;
+                    final addressId = address['id'];
+
+                    if (token != null && token.isNotEmpty && addressId != null && addressId.isNotEmpty) {
+                      final result = await ApiService.setDefaultAddress(addressId, token);
+                      if (result['success']) {
+                        _loadAddresses();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Default address updated!'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      } else {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(result['message'] ?? 'Failed to set default address'),
+                              backgroundColor: Colors.redAccent,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      }
+                    }
                   }
                 },
                 itemBuilder: (context) => [

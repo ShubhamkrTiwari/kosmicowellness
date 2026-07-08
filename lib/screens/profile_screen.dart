@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../managers/theme_manager.dart';
 import '../managers/user_manager.dart';
 import '../managers/wishlist_manager.dart';
+import '../services/api_service.dart';
 import 'auth_screen.dart';
 import 'help_center_screen.dart';
 import 'my_orders_screen.dart';
@@ -33,9 +34,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    userName = userManager.userName ?? 'Guest User';
-    userEmail = userManager.userEmail ?? 'Not logged in';
-    userPhone = userManager.userPhone ?? 'Add phone number';
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    await userManager.init();
+    setState(() {
+      userName = userManager.userName ?? 'Guest User';
+      userEmail = userManager.userEmail ?? 'Not logged in';
+      userPhone = userManager.userPhone ?? 'Add phone number';
+    });
   }
 
   String _getInitials(String name) {
@@ -69,13 +77,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() {
           _pickedImage = pickedFile;
         });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Profile picture updated successfully!'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+
+        // Ensure token is loaded
+        await userManager.init();
+        final token = userManager.token;
+        
+        if (token == null || token.isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Authentication error. Please login again.'),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+          return;
+        }
+
+        // Backend API Call to save the image immediately
+        final result = await ApiService.updateProfileWithImage(
+          name: userName,
+          phoneNumber: userPhone == 'Add phone number' ? '' : userPhone,
+          imageFile: pickedFile,
+          token: token,
+        );
+
+        if (result['success']) {
+          await userManager.saveUser(result['data']);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Profile picture updated successfully!'),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to sync with server: ${result['message']}'),
+                backgroundColor: Colors.orange,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
         }
       }
     } catch (e) {
@@ -104,82 +151,143 @@ class _ProfileScreenState extends State<ProfileScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
       ),
       builder: (context) {
-        final colorScheme = Theme.of(context).colorScheme;
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-            top: 30,
-            left: 24,
-            right: 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Edit Profile',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        bool isSaving = false;
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final colorScheme = Theme.of(context).colorScheme;
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                top: 30,
+                left: 24,
+                right: 24,
               ),
-              const SizedBox(height: 24),
-              TextField(
-                controller: nameController,
-                decoration: _inputDecoration('Full Name', Icons.person_outline),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: emailController,
-                readOnly: true,
-                enabled: false,
-                style: TextStyle(color: colorScheme.onSurfaceVariant),
-                decoration: _inputDecoration('Email Address', Icons.email_outlined).copyWith(
-                  filled: true,
-                  fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: _inputDecoration('Phone Number', Icons.phone_outlined),
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(10),
-                ],
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                height: 55,
-                child: ElevatedButton(
-                  onPressed: () async {
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Edit Profile',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 24),
+                  TextField(
+                    controller: nameController,
+                    decoration: _inputDecoration('Full Name', Icons.person_outline),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: emailController,
+                    readOnly: true,
+                    enabled: false,
+                    style: TextStyle(color: colorScheme.onSurfaceVariant),
+                    decoration: _inputDecoration('Email Address', Icons.email_outlined).copyWith(
+                      filled: true,
+                      fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: phoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: _inputDecoration('Phone Number', Icons.phone_outlined),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(10),
+                    ],
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 55,
+                    child: ElevatedButton(
+                  onPressed: isSaving ? null : () async {
                     final newName = nameController.text.trim();
-                    final newEmail = emailController.text.trim();
                     final newPhone = phoneController.text.trim();
 
-                    if (newName.isNotEmpty && newEmail.isNotEmpty) {
-                      await userManager.updateProfile(newName, newEmail, newPhone);
-                      setState(() {
-                        userName = newName;
-                        userEmail = newEmail;
-                        userPhone = newPhone.isEmpty ? 'Add phone number' : newPhone;
-                      });
-                      if (mounted) Navigator.pop(context);
+                    if (newName.isNotEmpty) {
+                      setModalState(() => isSaving = true);
+                      
+                      // Ensure token is loaded
+                      await userManager.init();
+                      final token = userManager.token;
+                      
+                      if (token == null || token.isEmpty) {
+                        setModalState(() => isSaving = false);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Authentication error. Please login again.'),
+                              backgroundColor: Colors.red,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                        return;
+                      }
+                      
+                      final result = await ApiService.updateProfileWithImage(
+                        name: newName,
+                        phoneNumber: newPhone,
+                        imageFile: _pickedImage, // Use the currently picked image if any
+                        token: token,
+                      );
+
+                      if (result['success']) {
+                        // Backend returns the new user data including image URL
+                        await userManager.saveUser(result['data']);
+                        
+                        setState(() {
+                          userName = userManager.userName ?? newName;
+                          userEmail = userManager.userEmail ?? userEmail;
+                          userPhone = userManager.userPhone ?? (newPhone.isEmpty ? 'Add phone number' : newPhone);
+                        });
+                        
+                        if (mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Profile updated successfully!'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      } else {
+                        setModalState(() => isSaving = false);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(result['message']),
+                              backgroundColor: Colors.redAccent,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      }
                     }
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      child: isSaving 
+                          ? const SizedBox(
+                              height: 20, 
+                              width: 20, 
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                            )
+                          : const Text('Save Changes'),
+                    ),
                   ),
-                  child: const Text('Save Changes'),
-                ),
+                  const SizedBox(height: 30),
+                ],
               ),
-              const SizedBox(height: 30),
-            ],
-          ),
+            );
+          }
         );
       },
     );
@@ -223,7 +331,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           border: Border.all(color: colorScheme.primary, width: 2),
                         ),
                         child: Center(
-                          child: _pickedImage == null
+                          child: _pickedImage == null && userManager.profilePicture == null
                               ? Text(
                                   _getInitials(userName),
                                   style: TextStyle(
@@ -233,18 +341,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ),
                                 )
                               : ClipOval(
-                                  child: kIsWeb
-                                      ? Image.network(
-                                          _pickedImage!.path,
-                                          fit: BoxFit.cover,
-                                          width: 80,
-                                          height: 80,
-                                          errorBuilder: (context, error, stackTrace) {
-                                            return Text(_getInitials(userName));
-                                          },
-                                        )
-                                      : Image.file(
-                                          File(_pickedImage!.path),
+                                  child: _pickedImage != null
+                                      ? (kIsWeb
+                                          ? Image.network(
+                                              _pickedImage!.path,
+                                              fit: BoxFit.cover,
+                                              width: 80,
+                                              height: 80,
+                                            )
+                                          : Image.file(
+                                              File(_pickedImage!.path),
+                                              fit: BoxFit.cover,
+                                              width: 80,
+                                              height: 80,
+                                            ))
+                                      : Image.network(
+                                          userManager.profilePicture!,
                                           fit: BoxFit.cover,
                                           width: 80,
                                           height: 80,
@@ -289,12 +401,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         const SizedBox(height: 4),
                         Text(
                           userEmail,
-                          style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                          style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
                           userPhone,
-                          style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                          style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 8),
@@ -356,13 +468,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 MaterialPageRoute(builder: (context) => const MyOrdersScreen()),
               );
             }),
-            _buildMenuItem(
-              Icons.phone_android_outlined, 
-              'Mobile Number', 
-              userPhone, 
-              colorScheme, 
-              onTap: _showEditProfileSheet
-            ),
             _buildMenuItem(Icons.location_on_outlined, 'Shipping Addresses', 'Manage your delivery locations', colorScheme, onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (context) => const ShippingAddressesScreen()),
@@ -529,7 +634,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         subtitle: Text(
           subtitle,
-          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
         ),
         trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
         onTap: onTap ?? () {},

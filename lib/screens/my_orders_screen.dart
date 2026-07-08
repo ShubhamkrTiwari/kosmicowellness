@@ -128,7 +128,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> with SingleTickerProvid
       margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
@@ -146,7 +146,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> with SingleTickerProvid
             children: [
               Text(
                 'Order #${order['id']}',
-                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.onSurface),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),

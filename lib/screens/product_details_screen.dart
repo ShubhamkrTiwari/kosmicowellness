@@ -20,7 +20,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     final product = widget.product;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: colorScheme.surface,
       body: Stack(
         children: [
           CustomScrollView(
@@ -34,7 +34,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 leading: Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: CircleAvatar(
-                    backgroundColor: Colors.white.withValues(alpha: 0.9),
+                    backgroundColor: colorScheme.surface.withValues(alpha: 0.9),
                     child: IconButton(
                       icon: const Icon(Icons.arrow_back_ios_new, size: 18),
                       onPressed: () => Navigator.pop(context),
@@ -46,7 +46,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   Padding(
                     padding: const EdgeInsets.all(8.0),
                     child: CircleAvatar(
-                      backgroundColor: Colors.white.withValues(alpha: 0.9),
+                      backgroundColor: colorScheme.surface.withValues(alpha: 0.9),
                       child: IconButton(
                         icon: Icon(
                           WishlistManager().isWishlisted(product['name']!)
@@ -70,7 +70,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                         end: Alignment.bottomCenter,
                         colors: [
                           colorScheme.primary.withValues(alpha: 0.05),
-                          Colors.white,
+                          colorScheme.surface,
                         ],
                       ),
                     ),
@@ -237,7 +237,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         const Spacer(),
         Container(
           decoration: BoxDecoration(
-            color: Colors.grey[100],
+            color: colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -265,7 +265,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
         boxShadow: [
           BoxShadow(
@@ -280,7 +280,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey[300]!),
+              border: Border.all(color: colorScheme.outlineVariant),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(Icons.chat_bubble_outline, color: colorScheme.primary),

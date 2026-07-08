@@ -53,13 +53,16 @@ class MyApp extends StatelessWidget {
             ),
           ),
           darkTheme: ThemeData(
+            useMaterial3: true,
+            brightness: Brightness.dark,
             colorScheme: ColorScheme.fromSeed(
               seedColor: const Color(0xFF00833E),
-              primary: const Color(0xFF00833E),
-              secondary: const Color(0xFF1B264F),
               brightness: Brightness.dark,
+              primary: const Color(0xFF00833E),
+              secondary: const Color(0xFF4CBB17), // Lighter green for dark mode
+              surface: const Color(0xFF1A1C18),
+              onSurface: const Color(0xFFE2E3DC),
             ),
-            useMaterial3: true,
             textTheme: const TextTheme(
               displayLarge: TextStyle(fontFamily: 'Serif', fontWeight: FontWeight.bold, color: Colors.white),
               titleLarge: TextStyle(fontFamily: 'Serif', fontWeight: FontWeight.w600, color: Colors.white),
@@ -435,7 +438,7 @@ class _HomeScreenState extends State<HomeScreen> {
         title: Row(
           children: [
             Image.asset(
-              'assets/images/logo.png',
+              'assets/images/kosmicologo.png',
               height: 30,
               errorBuilder: (context, error, stackTrace) => Icon(
                 Icons.spa,
@@ -524,9 +527,7 @@ class _HomeScreenState extends State<HomeScreen> {
         margin: const EdgeInsets.fromLTRB(20, 0, 20, 30),
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
         decoration: BoxDecoration(
-          color: colorScheme.brightness == Brightness.dark 
-              ? colorScheme.surfaceVariant
-              : Colors.white,
+          color: colorScheme.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(30),
           boxShadow: [
             BoxShadow(

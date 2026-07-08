@@ -174,7 +174,7 @@ class HelpCenterScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: colorScheme.primary.withOpacity(0.08)),
         boxShadow: [
@@ -217,7 +217,7 @@ class HelpCenterScreen extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.5),
+        color: colorScheme.surfaceContainer.withOpacity(0.5),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: colorScheme.primary.withOpacity(0.05)),
       ),
@@ -242,9 +242,9 @@ class HelpCenterScreen extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   value,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
-                    color: Colors.black87,
+                    color: colorScheme.onSurface.withOpacity(0.8),
                     height: 1.4,
                   ),
                 ),
