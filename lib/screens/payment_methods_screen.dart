@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'payment_screen.dart';
 
 class PaymentMethodsScreen extends StatefulWidget {
   const PaymentMethodsScreen({super.key});
@@ -167,7 +168,14 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Saved Methods', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                TextButton(onPressed: () => _showPaymentBottomSheet(), child: Text('+ Add New', style: TextStyle(color: colorScheme.primary))),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (context) => const PaymentScreen()),
+                    );
+                  },
+                  child: Text('+ Add New', style: TextStyle(color: colorScheme.primary)),
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -194,7 +202,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: cardColor.withValues(alpha: 0.3),
+            color: cardColor.withOpacity(0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -208,12 +216,12 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
             Positioned(
               right: -50,
               top: -50,
-              child: CircleAvatar(radius: 100, backgroundColor: Colors.white.withValues(alpha: 0.05)),
+              child: CircleAvatar(radius: 100, backgroundColor: Colors.white.withOpacity(0.05)),
             ),
             Positioned(
               left: -30,
               bottom: -30,
-              child: CircleAvatar(radius: 80, backgroundColor: Colors.black.withValues(alpha: 0.05)),
+              child: CircleAvatar(radius: 80, backgroundColor: Colors.black.withOpacity(0.05)),
             ),
             
             Padding(
@@ -227,7 +235,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
+                          color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -295,9 +303,9 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colorScheme.primary.withValues(alpha: 0.05),
+        color: colorScheme.primary.withOpacity(0.05),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.1)),
+        border: Border.all(color: colorScheme.primary.withOpacity(0.1)),
       ),
       child: Row(
         children: [

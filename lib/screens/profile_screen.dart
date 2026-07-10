@@ -186,7 +186,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     style: TextStyle(color: colorScheme.onSurfaceVariant),
                     decoration: _inputDecoration('Email Address', Icons.email_outlined).copyWith(
                       filled: true,
-                      fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                      fillColor: colorScheme.surfaceVariant.withOpacity(0.5),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -327,7 +327,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         height: 80,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: colorScheme.primary.withValues(alpha: 0.1),
+                          color: colorScheme.primary.withOpacity(0.1),
                           border: Border.all(color: colorScheme.primary, width: 2),
                         ),
                         child: Center(
@@ -413,9 +413,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                           decoration: BoxDecoration(
-                            color: colorScheme.secondary.withValues(alpha: 0.1),
+                            color: colorScheme.secondary.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.5)),
+                            border: Border.all(color: colorScheme.secondary.withOpacity(0.5)),
                           ),
                           child: Text(
                             'Pitta Dosha',
@@ -494,7 +494,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: colorScheme.primary.withValues(alpha: 0.05),
+                    color: colorScheme.primary.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -526,7 +526,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 MaterialPageRoute(builder: (context) => const HelpCenterScreen()),
               );
             }),
-            _buildMenuItem(Icons.info_outline, 'About Kosmico', 'Our story and values', colorScheme),
+            _buildMenuItem(Icons.info_outline, 'About Kosmico', 'Our story and values', colorScheme, onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const AboutKosmicoScreen()),
+              );
+            }),
 
             const SizedBox(height: 30),
 
@@ -570,12 +574,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       width: 100,
       padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        color: colorScheme.surfaceVariant.withOpacity(0.3),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.05)),
+        border: Border.all(color: colorScheme.primary.withOpacity(0.05)),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.primary.withValues(alpha: 0.03),
+            color: colorScheme.primary.withOpacity(0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -608,7 +612,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,
-            color: colorScheme.primary.withValues(alpha: 0.7),
+            color: colorScheme.primary.withOpacity(0.7),
             letterSpacing: 1.1,
           ),
         ),
@@ -623,7 +627,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: colorScheme.primary.withValues(alpha: 0.05),
+            color: colorScheme.primary.withOpacity(0.05),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, color: colorScheme.primary, size: 22),
@@ -638,6 +642,274 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
         onTap: onTap ?? () {},
+      ),
+    );
+  }
+}
+
+class AboutKosmicoScreen extends StatelessWidget {
+  const AboutKosmicoScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      backgroundColor: colorScheme.surface,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 250,
+            pinned: true,
+            stretch: true,
+            backgroundColor: colorScheme.primary,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            flexibleSpace: FlexibleSpaceBar(
+              title: const Text(
+                'About Kosmico',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  shadows: [Shadow(color: Colors.black45, blurRadius: 10)],
+                ),
+              ),
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=1000',
+                    fit: BoxFit.cover,
+                  ),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          colorScheme.primary.withOpacity(0.8),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeaderInfo(context, colorScheme),
+                  const SizedBox(height: 32),
+                  _buildStatsRow(colorScheme),
+                  const SizedBox(height: 32),
+                  _buildSectionCard(
+                    context,
+                    'Our Mission',
+                    'To provide premium quality Ayurvedic and herbal healthcare products that promote wellness and natural healing, while maintaining the highest standards of manufacturing excellence. We believe in harnessing the power of nature to create solutions that enhance lives.',
+                    Icons.auto_awesome_outlined,
+                    colorScheme,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildSectionCard(
+                    context,
+                    'Our Vision',
+                    'To become a globally recognized leader in Ayurvedic and herbal product manufacturing, empowering businesses worldwide to bring natural healthcare solutions to their customers. We envision a future where traditional medicine and modern science work hand in hand.',
+                    Icons.visibility_outlined,
+                    colorScheme,
+                  ),
+                  const SizedBox(height: 32),
+                  Text(
+                    'Core Strengths',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildStrengthItem(
+                    context,
+                    Icons.precision_manufacturing_outlined,
+                    'Advanced Facilities',
+                    'State-of-the-art manufacturing infrastructure with modern technology.',
+                    colorScheme,
+                  ),
+                  _buildStrengthItem(
+                    context,
+                    Icons.public_outlined,
+                    'Global Expertise',
+                    'Successfully launched 100+ brands in domestic and international markets.',
+                    colorScheme,
+                  ),
+                  _buildStrengthItem(
+                    context,
+                    Icons.biotech_outlined,
+                    'Quality Control',
+                    'Rigorous standards and testing for all Ayurvedic product manufacturing.',
+                    colorScheme,
+                  ),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderInfo(BuildContext context, ColorScheme colorScheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(Icons.spa_rounded, color: colorScheme.primary, size: 32),
+            ),
+            const SizedBox(width: 16),
+            const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'KOSMICO WELLNESS',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1),
+                ),
+                Text(
+                  'Ancient Wisdom, Modern Living',
+                  style: TextStyle(color: Colors.grey, fontSize: 14),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'Kosmico is a leading Indian contract manufacturer specializing in premium Ayurvedic and herbal products. Having partnered with over 100 companies, we combine deep-rooted commitment to Ayurvedic traditions with modern technology to deliver products of exceptional quality.',
+          style: TextStyle(
+            fontSize: 16,
+            height: 1.6,
+            color: colorScheme.onSurface.withOpacity(0.8),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatsRow(ColorScheme colorScheme) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _buildStatBox('100+', 'Partner\nBrands', colorScheme),
+        _buildStatBox('500+', 'Natural\nProducts', colorScheme),
+        _buildStatBox('Global', 'Market\nReach', colorScheme),
+      ],
+    );
+  }
+
+  Widget _buildStatBox(String value, String label, ColorScheme colorScheme) {
+    return Container(
+      width: 100,
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colorScheme.primary.withOpacity(0.1)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: colorScheme.primary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionCard(BuildContext context, String title, String content, IconData icon, ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceVariant,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: colorScheme.primary, size: 24),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            content,
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.5,
+              color: colorScheme.onSurface.withOpacity(0.7),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStrengthItem(BuildContext context, IconData icon, String title, String description, ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            backgroundColor: colorScheme.secondary.withOpacity(0.1),
+            child: Icon(icon, color: colorScheme.secondary, size: 20),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                Text(
+                  description,
+                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

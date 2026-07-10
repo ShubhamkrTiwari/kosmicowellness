@@ -174,7 +174,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
           hintText: 'Search products...',
           prefixIcon: const Icon(Icons.search),
           filled: true,
-          fillColor: colorScheme.surfaceContainerHighest,
+          fillColor: colorScheme.surfaceVariant,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none,
@@ -203,10 +203,10 @@ class _ProductListScreenState extends State<ProductListScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 decoration: BoxDecoration(
-                  color: isSelected ? colorScheme.primary : colorScheme.surfaceContainerHighest,
+                  color: isSelected ? colorScheme.primary : colorScheme.surfaceVariant,
                   borderRadius: BorderRadius.circular(30),
                   boxShadow: isSelected
-                      ? [BoxShadow(color: colorScheme.primary.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))]
+                      ? [BoxShadow(color: colorScheme.primary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))]
                       : null,
                 ),
                 alignment: Alignment.center,
@@ -238,11 +238,11 @@ class _ProductListScreenState extends State<ProductListScreen> {
         margin: const EdgeInsets.only(bottom: 20),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: colorScheme.surfaceContainer,
+          color: colorScheme.surfaceVariant.withOpacity(0.5),
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
+              color: Colors.black.withOpacity(0.03),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -256,7 +256,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                 width: 100,
                 height: 100,
                 decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.05),
+                  color: colorScheme.primary.withOpacity(0.05),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 alignment: Alignment.center,
@@ -277,7 +277,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: colorScheme.secondary.withValues(alpha: 0.1),
+                          color: colorScheme.secondary.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -337,27 +337,36 @@ class _ProductListScreenState extends State<ProductListScreen> {
                           color: colorScheme.primary,
                         ),
                       ),
-                      ElevatedButton(
-                        onPressed: () {
-                          CartManager().addItem(product);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Added to cart'),
-                              behavior: SnackBarBehavior.floating,
+                      ListenableBuilder(
+                        listenable: CartManager(),
+                        builder: (context, _) {
+                          final quantity = CartManager().getProductQuantity(product['name']!);
+                          return ElevatedButton(
+                            onPressed: () {
+                              CartManager().addItem(product);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Added to cart'),
+                                  behavior: SnackBarBehavior.floating,
+                                  backgroundColor: colorScheme.primary,
+                                  duration: const Duration(seconds: 1),
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
                               backgroundColor: colorScheme.primary,
-                              duration: const Duration(seconds: 1),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                              minimumSize: const Size(60, 32),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: Text(
+                              quantity > 0 ? 'Add ($quantity)' : 'Add',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                             ),
                           );
                         },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: colorScheme.primary,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-                          minimumSize: const Size(60, 32),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        child: const Text('Add', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                       ),
                     ],
                   ),

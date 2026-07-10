@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'onboarding_screen.dart';
+import '../services/api_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -25,6 +26,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     _rocketAnimation = Tween<double>(begin: 0, end: -20).animate(
       CurvedAnimation(parent: _rocketController, curve: Curves.easeInOut),
     );
+
+    // Start waking up the server early
+    ApiService.wakeUpServer();
 
     Timer(const Duration(seconds: 4), () {
       if (!mounted) return;
@@ -52,8 +56,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             end: Alignment.bottomRight,
             colors: [
               colorScheme.primary,
-              colorScheme.primary.withValues(alpha: 0.8),
-              colorScheme.secondary.withValues(alpha: 0.2),
+              colorScheme.primary.withOpacity(0.8),
+              colorScheme.secondary.withOpacity(0.2),
             ],
           ),
         ),
@@ -66,7 +70,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               width: 150,
               height: 150,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
+                color: Colors.white.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
               child: Padding(
@@ -94,7 +98,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             Text(
               'WELLNESS',
               style: TextStyle(
-                color: colorScheme.secondary.withValues(alpha: 0.8),
+                color: colorScheme.secondary.withOpacity(0.8),
                 fontSize: 16,
                 letterSpacing: 2,
               ),
@@ -118,7 +122,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       Text(
                         'Launching Kosmico...',
                         style: TextStyle(
-                          color: colorScheme.onPrimary.withValues(alpha: 0.7),
+                          color: colorScheme.onPrimary.withOpacity(0.7),
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
                         ),

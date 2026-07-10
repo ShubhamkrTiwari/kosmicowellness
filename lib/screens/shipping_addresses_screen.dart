@@ -320,15 +320,15 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainer,
+        color: colorScheme.surfaceVariant,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: isDefault ? colorScheme.primary : colorScheme.primary.withValues(alpha: 0.1),
+          color: isDefault ? colorScheme.primary : colorScheme.primary.withOpacity(0.1),
           width: isDefault ? 2 : 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.primary.withValues(alpha: 0.05),
+            color: colorScheme.primary.withOpacity(0.05),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -343,7 +343,7 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
-                  color: isDefault ? colorScheme.primary : colorScheme.surfaceContainerHighest,
+                  color: isDefault ? colorScheme.primary : colorScheme.surfaceVariant,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -490,7 +490,7 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2), width: 1.5, style: BorderStyle.solid),
+          border: Border.all(color: colorScheme.primary.withOpacity(0.2), width: 1.5, style: BorderStyle.solid),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

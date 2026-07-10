@@ -197,7 +197,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                           contentPadding: EdgeInsets.zero,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: colorScheme.primary.withValues(alpha: 0.2)),
+                            borderSide: BorderSide(color: colorScheme.primary.withOpacity(0.2)),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),

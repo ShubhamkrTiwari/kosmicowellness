@@ -128,7 +128,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> with SingleTickerProvid
       margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainer,
+        color: colorScheme.surfaceVariant,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(

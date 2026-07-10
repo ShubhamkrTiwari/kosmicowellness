@@ -75,7 +75,7 @@ class _AuthScreenState extends State<AuthScreen> {
             end: Alignment.bottomCenter,
             colors: [
               colorScheme.surface,
-              colorScheme.primary.withValues(alpha: 0.1),
+              colorScheme.primary.withOpacity(0.1),
             ],
           ),
         ),

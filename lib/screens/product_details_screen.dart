@@ -34,7 +34,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 leading: Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: CircleAvatar(
-                    backgroundColor: colorScheme.surface.withValues(alpha: 0.9),
+                    backgroundColor: colorScheme.surface.withOpacity(0.9),
                     child: IconButton(
                       icon: const Icon(Icons.arrow_back_ios_new, size: 18),
                       onPressed: () => Navigator.pop(context),
@@ -46,7 +46,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   Padding(
                     padding: const EdgeInsets.all(8.0),
                     child: CircleAvatar(
-                      backgroundColor: colorScheme.surface.withValues(alpha: 0.9),
+                      backgroundColor: colorScheme.surface.withOpacity(0.9),
                       child: IconButton(
                         icon: Icon(
                           WishlistManager().isWishlisted(product['name']!)
@@ -69,7 +69,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          colorScheme.primary.withValues(alpha: 0.05),
+                          colorScheme.primary.withOpacity(0.05),
                           colorScheme.surface,
                         ],
                       ),
@@ -123,7 +123,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
-                              color: colorScheme.primary.withValues(alpha: 0.1),
+                              color: colorScheme.primary.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: Row(
@@ -216,7 +216,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: colorScheme.primary.withValues(alpha: 0.05),
+            color: colorScheme.primary.withOpacity(0.05),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, color: colorScheme.primary, size: 24),
@@ -237,7 +237,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         const Spacer(),
         Container(
           decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest,
+            color: colorScheme.surfaceVariant,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -269,7 +269,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 20,
             offset: const Offset(0, -5),
           ),

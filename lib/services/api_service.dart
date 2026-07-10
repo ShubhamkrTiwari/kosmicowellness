@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
@@ -6,7 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 class ApiService {
   // Use 10.0.2.2 for Android Emulator to reach localhost
-  static const String baseUrl = 'http://192.168.1.6:5000';
+  static const String baseUrl = 'https://backend-j8qd.onrender.com';
   
   static Future<Map<String, dynamic>> updateProfileWithImage({
     required String name,
@@ -49,13 +50,14 @@ class ApiService {
       
       return _processResponse(response);
     } catch (e) {
-      print('Update Profile Error: $e');
-      return {'success': false, 'message': 'Connection error: $e'};
+      print('API Error: $e');
+      return _handleError(e);
     }
   }
 
   static Future<Map<String, dynamic>> register(String name, String email) async {
     try {
+      print('Attempting to register: $email');
       final response = await http.post(
         Uri.parse('$baseUrl/api/auth/register'),
         headers: {'Content-Type': 'application/json'},
@@ -63,25 +65,28 @@ class ApiService {
           'name': name,
           'email': email,
         }),
-      );
+      ).timeout(const Duration(seconds: 90));
       return _processResponse(response);
     } catch (e) {
-      return {'success': false, 'message': 'Connection error: $e'};
+      print('Register Error: $e');
+      return _handleError(e);
     }
   }
 
   static Future<Map<String, dynamic>> login(String email) async {
     try {
+      print('Attempting to login: $email');
       final response = await http.post(
         Uri.parse('$baseUrl/api/auth/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': email,
         }),
-      );
+      ).timeout(const Duration(seconds: 90));
       return _processResponse(response);
     } catch (e) {
-      return {'success': false, 'message': 'Connection error: $e'};
+      print('Login Error: $e');
+      return _handleError(e);
     }
   }
 
@@ -94,10 +99,10 @@ class ApiService {
           'email': email,
           'otp': otp,
         }),
-      );
+      ).timeout(const Duration(seconds: 90));
       return _processResponse(response);
     } catch (e) {
-      return {'success': false, 'message': 'Connection error: $e'};
+      return _handleError(e);
     }
   }
 
@@ -110,10 +115,10 @@ class ApiService {
           'email': email,
           'otp': otp,
         }),
-      );
+      ).timeout(const Duration(seconds: 90));
       return _processResponse(response);
     } catch (e) {
-      return {'success': false, 'message': 'Connection error: $e'};
+      return _handleError(e);
     }
   }
 
@@ -128,7 +133,7 @@ class ApiService {
       );
       return _processResponse(response);
     } catch (e) {
-      return {'success': false, 'message': 'Connection error: $e'};
+      return _handleError(e);
     }
   }
 
@@ -161,8 +166,7 @@ class ApiService {
       );
       return _processResponse(response);
     } catch (e) {
-      print('Save Address Error: $e');
-      return {'success': false, 'message': 'Connection error: $e'};
+      return _handleError(e);
     }
   }
 
@@ -176,8 +180,7 @@ class ApiService {
       );
       return _processResponse(response);
     } catch (e) {
-      print('Get Addresses Error: $e');
-      return {'success': false, 'message': 'Connection error: $e'};
+      return _handleError(e);
     }
   }
 
@@ -213,8 +216,7 @@ class ApiService {
       );
       return _processResponse(response);
     } catch (e) {
-      print('Update Address Error: $e');
-      return {'success': false, 'message': 'Connection error: $e'};
+      return _handleError(e);
     }
   }
 
@@ -228,8 +230,7 @@ class ApiService {
       );
       return _processResponse(response);
     } catch (e) {
-      print('Set Default Address Error: $e');
-      return {'success': false, 'message': 'Connection error: $e'};
+      return _handleError(e);
     }
   }
 
@@ -243,14 +244,39 @@ class ApiService {
       );
       return _processResponse(response);
     } catch (e) {
-      print('Delete Address Error: $e');
-      return {'success': false, 'message': 'Connection error: $e'};
+      return _handleError(e);
     }
+  }
+
+  static Future<void> wakeUpServer() async {
+    try {
+      // Just a simple GET request to wake up the Render free tier server
+      http.get(Uri.parse(baseUrl)).timeout(const Duration(seconds: 10));
+    } catch (_) {}
+  }
+
+  static Map<String, dynamic> _handleError(dynamic e) {
+    if (e is SocketException) {
+      return {
+        'success': false, 
+        'message': 'Server unreachable. Please check your internet or if the server is down.'
+      };
+    } else if (e is http.ClientException) {
+      return {
+        'success': false,
+        'message': 'Network error. Please try again.'
+      };
+    } else if (e.toString().contains('TimeoutException')) {
+      return {
+        'success': false,
+        'message': 'Server is taking longer than usual to start. We are waking it up! Please wait 10 seconds and try again.'
+      };
+    }
+    return {'success': false, 'message': 'Connection error: $e'};
   }
 
   static Map<String, dynamic> _processResponse(http.Response response) {
     try {
-      // Handle success status codes (including 204 No Content for deletes)
       if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 204) {
         final data = response.body.isNotEmpty ? jsonDecode(response.body) : null;
         return {'success': true, 'data': data};
@@ -262,7 +288,6 @@ class ApiService {
         };
       }
     } catch (e) {
-      print('Response Processing Error: $e');
       return {
         'success': false, 
         'message': 'Server Error (${response.statusCode}).'
