@@ -200,10 +200,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _highlightItem(Icons.eco_outlined, 'Organic', colorScheme),
-            _highlightItem(Icons.science_outlined, 'Lab Tested', colorScheme),
-            _highlightItem(Icons.auto_awesome_outlined, 'Handmade', colorScheme),
-            _highlightItem(Icons.verified_outlined, 'Authentic', colorScheme),
+            Expanded(child: _highlightItem(Icons.eco_outlined, 'Organic', colorScheme)),
+            Expanded(child: _highlightItem(Icons.science_outlined, 'Lab Tested', colorScheme)),
+            Expanded(child: _highlightItem(Icons.auto_awesome_outlined, 'Handmade', colorScheme)),
+            Expanded(child: _highlightItem(Icons.verified_outlined, 'Authentic', colorScheme)),
           ],
         ),
       ],
@@ -212,6 +212,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
   Widget _highlightItem(IconData icon, String label, ColorScheme colorScheme) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           padding: const EdgeInsets.all(12),
@@ -224,6 +225,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         const SizedBox(height: 8),
         Text(
           label,
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey[600]),
         ),
       ],

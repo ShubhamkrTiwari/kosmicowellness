@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../managers/notification_manager.dart';
 import '../managers/theme_manager.dart';
 import '../managers/user_manager.dart';
 import '../managers/wishlist_manager.dart';
@@ -105,6 +106,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         if (result['success']) {
           await userManager.saveUser(result['data']);
+          
+          NotificationManager().addNotification(
+            title: 'Profile Updated',
+            message: 'Your profile picture has been updated successfully.',
+            icon: '📸',
+            type: 'profile',
+          );
+
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -240,6 +249,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         // Backend returns the new user data including image URL
                         await userManager.saveUser(result['data']);
                         
+                        NotificationManager().addNotification(
+                          title: 'Profile Updated',
+                          message: 'Your personal details have been updated.',
+                          icon: '👤',
+                          type: 'profile',
+                        );
+
                         setState(() {
                           userName = userManager.userName ?? newName;
                           userEmail = userManager.userEmail ?? userEmail;
@@ -443,18 +459,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20.0),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildStatItem('Orders', '12', Icons.local_shipping_outlined, colorScheme),
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (context) => const WishlistScreen()),
-                      ).then((_) => setState(() {}));
-                    },
-                    child: _buildStatItem('Wishlist', wishlistManager.items.length.toString(), Icons.favorite_border, colorScheme),
+                  Expanded(child: _buildStatItem('Orders', '12', Icons.local_shipping_outlined, colorScheme)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (context) => const WishlistScreen()),
+                        ).then((_) => setState(() {}));
+                      },
+                      child: _buildStatItem('Wishlist', wishlistManager.items.length.toString(), Icons.favorite_border, colorScheme),
+                    ),
                   ),
-                  _buildStatItem('Coupons', '3', Icons.confirmation_number_outlined, colorScheme),
+                  const SizedBox(width: 12),
+                  Expanded(child: _buildStatItem('Coupons', '3', Icons.confirmation_number_outlined, colorScheme)),
                 ],
               ),
             ),
@@ -571,7 +590,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildStatItem(String label, String value, IconData icon, ColorScheme colorScheme) {
     return Container(
-      width: 100,
       padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
         color: colorScheme.surfaceVariant.withOpacity(0.3),
@@ -779,18 +797,20 @@ class AboutKosmicoScreen extends StatelessWidget {
               child: Icon(Icons.spa_rounded, color: colorScheme.primary, size: 32),
             ),
             const SizedBox(width: 16),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'KOSMICO WELLNESS',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1),
-                ),
-                Text(
-                  'Ancient Wisdom, Modern Living',
-                  style: TextStyle(color: Colors.grey, fontSize: 14),
-                ),
-              ],
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'KOSMICO WELLNESS',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1),
+                  ),
+                  Text(
+                    'Ancient Wisdom, Modern Living',
+                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -809,18 +829,18 @@ class AboutKosmicoScreen extends StatelessWidget {
 
   Widget _buildStatsRow(ColorScheme colorScheme) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _buildStatBox('100+', 'Partner\nBrands', colorScheme),
-        _buildStatBox('500+', 'Natural\nProducts', colorScheme),
-        _buildStatBox('Global', 'Market\nReach', colorScheme),
+        Expanded(child: _buildStatBox('100+', 'Partner\nBrands', colorScheme)),
+        const SizedBox(width: 12),
+        Expanded(child: _buildStatBox('500+', 'Natural\nProducts', colorScheme)),
+        const SizedBox(width: 12),
+        Expanded(child: _buildStatBox('Global', 'Market\nReach', colorScheme)),
       ],
     );
   }
 
   Widget _buildStatBox(String value, String label, ColorScheme colorScheme) {
     return Container(
-      width: 100,
       padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
         color: colorScheme.primary.withOpacity(0.05),

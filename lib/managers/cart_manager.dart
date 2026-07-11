@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'notification_manager.dart';
 
 class CartManager extends ChangeNotifier {
   static final CartManager _instance = CartManager._internal();
@@ -37,6 +38,14 @@ class CartManager extends ChangeNotifier {
         'icon': icon,
       });
     }
+
+    NotificationManager().addNotification(
+      title: 'Cart Updated',
+      message: '$name added to your wellness cart.',
+      icon: '🛒',
+      type: 'cart',
+    );
+
     notifyListeners();
   }
 

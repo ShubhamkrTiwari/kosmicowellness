@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../managers/notification_manager.dart';
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -8,40 +9,7 @@ class NotificationScreen extends StatefulWidget {
 }
 
 class _NotificationScreenState extends State<NotificationScreen> {
-  final List<Map<String, String>> _notifications = [
-    {
-      'id': '1',
-      'title': 'Order Delivered!',
-      'message': 'Your Ayurvedic Hair Oil has been delivered successfully.',
-      'time': '2 hours ago',
-      'icon': '📦',
-      'isRead': 'false',
-    },
-    {
-      'id': '2',
-      'title': 'Exclusive Offer',
-      'message': 'Get 20% off on all Immunity boosters this weekend.',
-      'time': '5 hours ago',
-      'icon': '🔥',
-      'isRead': 'true',
-    },
-    {
-      'id': '3',
-      'title': 'Wellness Tip',
-      'message': 'Start your day with warm lemon water for better digestion.',
-      'time': '1 day ago',
-      'icon': '🍋',
-      'isRead': 'true',
-    },
-    {
-      'id': '4',
-      'title': 'New Product Launch',
-      'message': 'Discover our new range of Herbal Teas now available.',
-      'time': '2 days ago',
-      'icon': '🍵',
-      'isRead': 'true',
-    },
-  ];
+  final notificationManager = NotificationManager();
 
   @override
   Widget build(BuildContext context) {
@@ -65,21 +33,28 @@ class _NotificationScreenState extends State<NotificationScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
-          TextButton(
-            onPressed: () {
-              setState(() {
-                _notifications.clear();
-              });
+          ListenableBuilder(
+            listenable: notificationManager,
+            builder: (context, _) {
+              if (notificationManager.notifications.isEmpty) return const SizedBox.shrink();
+              return TextButton(
+                onPressed: () => notificationManager.clearAll(),
+                child: Text(
+                  'Clear All',
+                  style: TextStyle(color: colorScheme.secondary),
+                ),
+              );
             },
-            child: Text(
-              'Clear All',
-              style: TextStyle(color: colorScheme.secondary),
-            ),
           ),
         ],
       ),
-      body: _notifications.isEmpty
-          ? Center(
+      body: ListenableBuilder(
+        listenable: notificationManager,
+        builder: (context, _) {
+          final notifications = notificationManager.notifications;
+
+          if (notifications.isEmpty) {
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -90,52 +65,43 @@ class _NotificationScreenState extends State<NotificationScreen> {
                       style: TextStyle(fontSize: 16, color: Colors.grey)),
                 ],
               ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _notifications.length,
-              itemBuilder: (context, index) {
-                final item = _notifications[index];
-                final bool isUnread = item['isRead'] == 'false';
+            );
+          }
 
-                return Dismissible(
-                  key: Key(item['id']!),
-                  direction: DismissDirection.endToStart,
-                  onDismissed: (direction) {
-                    setState(() {
-                      _notifications.removeAt(index);
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('Notification deleted'),
-                        backgroundColor: colorScheme.primary,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        action: SnackBarAction(
-                          label: 'Undo',
-                          textColor: Colors.white,
-                          onPressed: () {
-                            // Logic to undo would go here
-                          },
-                        ),
-                      ),
-                    );
-                  },
-                  background: Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.only(right: 20),
-                    alignment: Alignment.centerRight,
-                    decoration: BoxDecoration(
-                      color: Colors.redAccent.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Icon(Icons.delete_sweep, color: Colors.white, size: 28),
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: notifications.length,
+            itemBuilder: (context, index) {
+              final item = notifications[index];
+              final bool isUnread = item['isRead'] == 'false';
+
+              return Dismissible(
+                key: Key(item['id']!),
+                direction: DismissDirection.endToStart,
+                onDismissed: (direction) {
+                  notificationManager.removeNotification(item['id']!);
+                },
+                background: Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.only(right: 20),
+                  alignment: Alignment.centerRight,
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(20),
                   ),
+                  child: const Icon(Icons.delete_sweep, color: Colors.white, size: 28),
+                ),
+                child: GestureDetector(
+                  onTap: () {
+                    if (isUnread) {
+                      notificationManager.markAsRead(item['id']!);
+                    }
+                  },
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: isUnread ? Colors.white : colorScheme.surfaceVariant.withOpacity(0.3),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: isUnread
@@ -163,7 +129,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                           ),
                           alignment: Alignment.center,
                           child: Text(
-                            item['icon']!,
+                            item['icon'] ?? '🔔',
                             style: const TextStyle(fontSize: 24),
                           ),
                         ),
@@ -175,13 +141,16 @@ class _NotificationScreenState extends State<NotificationScreen> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(
-                                    item['title']!,
-                                    style: TextStyle(
-                                      fontWeight:
-                                          isUnread ? FontWeight.bold : FontWeight.w600,
-                                      fontSize: 16,
-                                      color: colorScheme.primary,
+                                  Flexible(
+                                    child: Text(
+                                      item['title'] ?? 'Notification',
+                                      style: TextStyle(
+                                        fontWeight:
+                                            isUnread ? FontWeight.bold : FontWeight.w600,
+                                        fontSize: 16,
+                                        color: colorScheme.primary,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                   if (isUnread)
@@ -197,7 +166,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                item['message']!,
+                                item['message'] ?? '',
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: Colors.grey[600],
@@ -206,7 +175,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                item['time']!,
+                                item['time'] ?? '',
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: Colors.grey[400],
@@ -219,9 +188,12 @@ class _NotificationScreenState extends State<NotificationScreen> {
                       ],
                     ),
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

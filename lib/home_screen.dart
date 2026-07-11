@@ -12,10 +12,13 @@ import 'managers/wishlist_manager.dart';
 import 'managers/user_manager.dart';
 import 'managers/theme_manager.dart';
 
+import 'managers/notification_manager.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await UserManager().init();
   await ThemeManager().init();
+  await NotificationManager().init();
   runApp(
     DevicePreview(
       enabled: true,
@@ -347,14 +350,18 @@ class _HomeScreenState extends State<HomeScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              product['price'] ?? '₹0',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: colorScheme.primary,
+                            Flexible(
+                              child: Text(
+                                product['price'] ?? '₹0',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: colorScheme.primary,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            const SizedBox(width: 4),
                             ListenableBuilder(
                               listenable: CartManager(),
                               builder: (context, _) {
@@ -521,19 +528,56 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           if (_selectedIndex == 0)
-            IconButton(
-              icon: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceVariant.withOpacity(0.5),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: colorScheme.primary.withOpacity(0.1)),
-                ),
-                child: Icon(Icons.notifications_none_outlined, color: colorScheme.primary, size: 20),
-              ),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => const NotificationScreen()),
+            ListenableBuilder(
+              listenable: NotificationManager(),
+              builder: (context, _) {
+                final int unreadCount = NotificationManager().unreadCount;
+                return IconButton(
+                  icon: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceVariant.withOpacity(0.5),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: colorScheme.primary.withOpacity(0.1)),
+                        ),
+                        child: Icon(Icons.notifications_none_outlined, color: colorScheme.primary, size: 20),
+                      ),
+                      if (unreadCount > 0)
+                        Positioned(
+                          right: -2,
+                          top: -2,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 1.5),
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 16,
+                              minHeight: 16,
+                            ),
+                            child: Text(
+                              unreadCount.toString(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (context) => const NotificationScreen()),
+                    );
+                  },
                 );
               },
             ),
@@ -621,9 +665,9 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _buildNavItem(0, Icons.home_outlined, Icons.home_rounded, 'Home', colorScheme),
-            _buildNavItem(1, Icons.category_outlined, Icons.category_rounded, 'Products', colorScheme),
-            _buildNavItem(2, Icons.person_outline_rounded, Icons.person_rounded, 'Profile', colorScheme),
+            Expanded(child: _buildNavItem(0, Icons.home_outlined, Icons.home_rounded, 'Home', colorScheme)),
+            Expanded(child: _buildNavItem(1, Icons.category_outlined, Icons.category_rounded, 'Products', colorScheme)),
+            Expanded(child: _buildNavItem(2, Icons.person_outline_rounded, Icons.person_rounded, 'Profile', colorScheme)),
           ],
         ),
       ),
@@ -661,6 +705,7 @@ class _HomeScreenState extends State<HomeScreen> {
               : null,
         ),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
@@ -669,14 +714,18 @@ class _HomeScreenState extends State<HomeScreen> {
               size: 24,
             ),
             if (isSelected) ...[
-              const SizedBox(width: 10),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  letterSpacing: 0.2,
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    letterSpacing: 0.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

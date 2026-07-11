@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../managers/notification_manager.dart';
 import 'product_details_screen.dart';
 import '../managers/cart_manager.dart';
 import '../managers/wishlist_manager.dart';
@@ -71,6 +72,20 @@ class _ProductListScreenState extends State<ProductListScreen> {
       'reviews': '1.5k',
     },
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Demo: Trigger a notification for a new product
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      NotificationManager().addNotification(
+        title: 'New Arrival!',
+        message: 'Amla Juice is now back in stock with a fresh batch.',
+        icon: '🥤',
+        type: 'product',
+      );
+    });
+  }
 
   List<Map<String, String>> get _filteredProducts {
     return products.where((product) {
@@ -274,22 +289,27 @@ class _ProductListScreenState extends State<ProductListScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: colorScheme.secondary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          product['category']!.toUpperCase(),
-                          style: TextStyle(
-                            color: colorScheme.secondary,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: colorScheme.secondary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            product['category']!.toUpperCase(),
+                            style: TextStyle(
+                              color: colorScheme.secondary,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Icon(
                         WishlistManager().isWishlisted(product['name']!)
                             ? Icons.favorite
@@ -329,14 +349,19 @@ class _ProductListScreenState extends State<ProductListScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        product['price']!,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 19,
-                          color: colorScheme.primary,
+                      Flexible(
+                        child: Text(
+                          product['price']!,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 19,
+                            color: colorScheme.primary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
                       ),
+                      const SizedBox(width: 8),
                       ListenableBuilder(
                         listenable: CartManager(),
                         builder: (context, _) {

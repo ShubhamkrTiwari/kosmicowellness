@@ -37,7 +37,7 @@ class UserManager {
     _userEmail = user['email'];
     _userPhone = user['phone'] ?? user['mobile'] ?? user['phoneNumber'];
     _profilePicture = user['profilePicture'] ?? _profilePicture;
-    
+
     // Update token if it's provided in the response (check multiple possible locations)
     String? newToken = userData['token'] ?? userData['data']?['token'] ?? userData['authToken'] ?? user['token'];
     if (newToken != null && newToken.isNotEmpty) {

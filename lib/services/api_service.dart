@@ -6,8 +6,8 @@ import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
 
 class ApiService {
-  // Use 10.0.2.2 for Android Emulator to reach localhost
-  static const String baseUrl = 'https://backend-j8qd.onrender.com';
+
+  static const String baseUrl = 'http://13.207.149.184';
   
   static Future<Map<String, dynamic>> updateProfileWithImage({
     required String name,
@@ -28,7 +28,7 @@ class ApiService {
 
       if (imageFile != null) {
         Uint8List imageBytes = await imageFile.readAsBytes();
-        
+
         // Determine the mime type based on file extension
         String ext = imageFile.name.split('.').last.toLowerCase();
         String mimeType = 'image/jpeg'; // Default
@@ -57,35 +57,53 @@ class ApiService {
 
   static Future<Map<String, dynamic>> register(String name, String email) async {
     try {
-      print('Attempting to register: $email');
+      final url = Uri.parse('$baseUrl/api/auth/register');
+      print('DEBUG: Requesting Register -> $url');
+      
       final response = await http.post(
-        Uri.parse('$baseUrl/api/auth/register'),
-        headers: {'Content-Type': 'application/json'},
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'User-Agent': 'KosmicoApp/1.0', // Added to avoid bot detection
+          'Connection': 'keep-alive',
+        },
         body: jsonEncode({
-          'name': name,
-          'email': email,
+          'name': name.trim(),
+          'email': email.trim().toLowerCase(),
         }),
-      ).timeout(const Duration(seconds: 90));
+      ).timeout(const Duration(seconds: 95));
+      
+      print('DEBUG: Response received. Status: ${response.statusCode}');
       return _processResponse(response);
     } catch (e) {
-      print('Register Error: $e');
+      print('DEBUG: Register Error -> $e');
       return _handleError(e);
     }
   }
 
   static Future<Map<String, dynamic>> login(String email) async {
     try {
-      print('Attempting to login: $email');
+      final url = Uri.parse('$baseUrl/api/auth/login');
+      print('DEBUG: Requesting Login -> $url');
+      
       final response = await http.post(
-        Uri.parse('$baseUrl/api/auth/login'),
-        headers: {'Content-Type': 'application/json'},
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'User-Agent': 'KosmicoApp/1.0',
+          'Connection': 'keep-alive',
+        },
         body: jsonEncode({
-          'email': email,
+          'email': email.trim().toLowerCase(),
         }),
-      ).timeout(const Duration(seconds: 90));
+      ).timeout(const Duration(seconds: 95));
+      
+      print('DEBUG: Response received. Status: ${response.statusCode}');
       return _processResponse(response);
     } catch (e) {
-      print('Login Error: $e');
+      print('DEBUG: Login Error -> $e');
       return _handleError(e);
     }
   }

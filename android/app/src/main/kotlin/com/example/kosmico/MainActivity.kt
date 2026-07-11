@@ -1,4 +1,4 @@
-package com.example.kosmico
+package com.kosmico.wellness
 
 import io.flutter.embedding.android.FlutterActivity
 
