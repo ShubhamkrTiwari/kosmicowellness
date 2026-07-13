@@ -7,7 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 class ApiService {
 
-  static const String baseUrl = 'http://13.207.149.184';
+  static const String baseUrl = 'http://3.7.180.215';
   
   static Future<Map<String, dynamic>> updateProfileWithImage({
     required String name,
@@ -259,6 +259,128 @@ class ApiService {
         headers: {
           'Authorization': 'Bearer $token',
         },
+      );
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> getPaymentMethods(String token) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/payment/saved-methods'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+          'User-Agent': 'KosmicoApp/1.0',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> savePaymentMethod(Map<String, dynamic> methodData, String token) async {
+    try {
+      final url = Uri.parse('$baseUrl/api/payment/save-method');
+      print('DEBUG: Requesting Save Payment Method -> $url');
+      print('DEBUG: Body -> ${jsonEncode(methodData)}');
+
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+          'User-Agent': 'KosmicoApp/1.0',
+        },
+        body: jsonEncode(methodData),
+      ).timeout(const Duration(seconds: 30));
+      
+      print('DEBUG: Response Status: ${response.statusCode}');
+      print('DEBUG: Response Body: ${response.body}');
+      
+      return _processResponse(response);
+    } catch (e) {
+      print('DEBUG: Save Payment Method Error -> $e');
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> updatePaymentMethod(String methodId, Map<String, dynamic> methodData, String token) async {
+    try {
+      final url = Uri.parse('$baseUrl/api/payment/save-method/$methodId');
+      print('DEBUG: Requesting Update Payment Method -> $url');
+      print('DEBUG: Body -> ${jsonEncode(methodData)}');
+
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+          'User-Agent': 'KosmicoApp/1.0',
+        },
+        body: jsonEncode(methodData),
+      ).timeout(const Duration(seconds: 30));
+
+      print('DEBUG: Response Status: ${response.statusCode}');
+      print('DEBUG: Response Body: ${response.body}');
+
+      return _processResponse(response);
+    } catch (e) {
+      print('DEBUG: Update Payment Method Error -> $e');
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> deletePaymentMethod(String methodId, String token) async {
+    try {
+      final url = Uri.parse('$baseUrl/api/payment/save-method/$methodId');
+      print('DEBUG: Requesting Delete Payment Method -> $url');
+
+      final response = await http.delete(
+        url,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+          'User-Agent': 'KosmicoApp/1.0',
+        },
+      ).timeout(const Duration(seconds: 30));
+
+      print('DEBUG: Response Status: ${response.statusCode}');
+      print('DEBUG: Response Body: ${response.body}');
+
+      return _processResponse(response);
+    } catch (e) {
+      print('DEBUG: Delete Payment Method Error -> $e');
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> placeOrder({
+    required List<Map<String, dynamic>> items,
+    required String addressId,
+    required String paymentMethodId,
+    required double totalPrice,
+    required String token,
+  }) async {
+    try {
+      final url = Uri.parse('$baseUrl/api/orders/place');
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'items': items,
+          'addressId': addressId,
+          'paymentMethodId': paymentMethodId,
+          'totalPrice': totalPrice,
+        }),
       );
       return _processResponse(response);
     } catch (e) {

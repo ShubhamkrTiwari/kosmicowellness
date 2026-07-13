@@ -5,7 +5,8 @@ import '../managers/user_manager.dart';
 import '../services/api_service.dart';
 
 class ShippingAddressesScreen extends StatefulWidget {
-  const ShippingAddressesScreen({super.key});
+  final bool isSelectionMode;
+  const ShippingAddressesScreen({super.key, this.isSelectionMode = false});
 
   @override
   State<ShippingAddressesScreen> createState() => _ShippingAddressesScreenState();
@@ -316,168 +317,175 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
 
   Widget _buildAddressCard(Map<String, String> address, int index, ColorScheme colorScheme) {
     final bool isDefault = address['isDefault'] == 'true';
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceVariant,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: isDefault ? colorScheme.primary : colorScheme.primary.withOpacity(0.1),
-          width: isDefault ? 2 : 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.primary.withOpacity(0.05),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
+    return InkWell(
+      onTap: widget.isSelectionMode ? () {
+        Navigator.pop(context, address);
+      } : null,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceVariant,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isDefault ? colorScheme.primary : colorScheme.primary.withOpacity(0.1),
+            width: isDefault ? 2 : 1,
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isDefault ? colorScheme.primary : colorScheme.surfaceVariant,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  address['label']!,
-                  style: TextStyle(
-                    color: isDefault ? Colors.white : colorScheme.onSurfaceVariant,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
+          boxShadow: [
+            BoxShadow(
+              color: colorScheme.primary.withOpacity(0.05),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isDefault ? colorScheme.primary : colorScheme.surfaceVariant,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    address['label']!,
+                    style: TextStyle(
+                      color: isDefault ? Colors.white : colorScheme.onSurfaceVariant,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-              ),
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_horiz),
-                onSelected: (value) async {
-                  if (value == 'edit') {
-                    _showAddressBottomSheet(index: index);
-                  } else if (value == 'delete') {
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Delete Address'),
-                        content: const Text('Are you sure you want to delete this address?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            child: const Text('Cancel'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                          ),
-                        ],
-                      ),
-                    );
-
-                    if (confirm == true) {
-                      await userManager.init();
-                      final token = userManager.token;
-                      final addressId = address['id'];
-
-                      if (token != null && token.isNotEmpty && addressId != null && addressId.isNotEmpty) {
-                        print('Deleting Address with ID: $addressId'); // Debug print
-                        final result = await ApiService.deleteAddress(addressId, token);
-                        
-                        if (result['success']) {
-                          setState(() => _addresses.removeAt(index));
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Address deleted successfully!'),
-                                behavior: SnackBarBehavior.floating,
+                if (!widget.isSelectionMode)
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_horiz),
+                    onSelected: (value) async {
+                      if (value == 'edit') {
+                        _showAddressBottomSheet(index: index);
+                      } else if (value == 'delete') {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Delete Address'),
+                            content: const Text('Are you sure you want to delete this address?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text('Cancel'),
                               ),
-                            );
-                          }
-                          // Optional: Refresh from server to be 100% sure
-                          _loadAddresses();
-                        } else {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(result['message'] ?? 'Failed to delete address'),
-                                backgroundColor: Colors.redAccent,
-                                behavior: SnackBarBehavior.floating,
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                child: const Text('Delete', style: TextStyle(color: Colors.red)),
                               ),
-                            );
+                            ],
+                          ),
+                        );
+
+                        if (confirm == true) {
+                          await userManager.init();
+                          final token = userManager.token;
+                          final addressId = address['id'];
+
+                          if (token != null && token.isNotEmpty && addressId != null && addressId.isNotEmpty) {
+                            print('Deleting Address with ID: $addressId'); // Debug print
+                            final result = await ApiService.deleteAddress(addressId, token);
+                            
+                            if (result['success']) {
+                              setState(() => _addresses.removeAt(index));
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Address deleted successfully!'),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                              // Optional: Refresh from server to be 100% sure
+                              _loadAddresses();
+                            } else {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(result['message'] ?? 'Failed to delete address'),
+                                    backgroundColor: Colors.redAccent,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            }
+                          } else {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Invalid address ID or not logged in'),
+                                  backgroundColor: Colors.redAccent,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
                           }
                         }
-                      } else {
-                         if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Invalid address ID or not logged in'),
-                              backgroundColor: Colors.redAccent,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
+                      } else if (value == 'default') {
+                        await userManager.init();
+                        final token = userManager.token;
+                        final addressId = address['id'];
+
+                        if (token != null && token.isNotEmpty && addressId != null && addressId.isNotEmpty) {
+                          final result = await ApiService.setDefaultAddress(addressId, token);
+                          if (result['success']) {
+                            _loadAddresses();
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Default address updated!'),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          } else {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(result['message'] ?? 'Failed to set default address'),
+                                  backgroundColor: Colors.redAccent,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          }
                         }
                       }
-                    }
-                  } else if (value == 'default') {
-                    await userManager.init();
-                    final token = userManager.token;
-                    final addressId = address['id'];
-
-                    if (token != null && token.isNotEmpty && addressId != null && addressId.isNotEmpty) {
-                      final result = await ApiService.setDefaultAddress(addressId, token);
-                      if (result['success']) {
-                        _loadAddresses();
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Default address updated!'),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      } else {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(result['message'] ?? 'Failed to set default address'),
-                              backgroundColor: Colors.redAccent,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      }
-                    }
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                  if (!isDefault) const PopupMenuItem(value: 'default', child: Text('Set as Default')),
-                  const PopupMenuItem(value: 'delete', child: Text('Delete', style: TextStyle(color: Colors.red))),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            address['name']!,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '${address['address']!}, ${address['city']!} - ${address['pincode']!}',
-            style: TextStyle(color: Colors.grey.shade600, height: 1.4),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            address['phone']!,
-            style: const TextStyle(fontWeight: FontWeight.w500),
-          ),
-        ],
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                      if (!isDefault) const PopupMenuItem(value: 'default', child: Text('Set as Default')),
+                      const PopupMenuItem(value: 'delete', child: Text('Delete', style: TextStyle(color: Colors.red))),
+                    ],
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              address['name']!,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${address['address']!}, ${address['city']!} - ${address['pincode']!}',
+              style: TextStyle(color: Colors.grey.shade600, height: 1.4),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              address['phone']!,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
       ),
     );
   }

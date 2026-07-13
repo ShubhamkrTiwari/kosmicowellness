@@ -1,20 +1,47 @@
 import 'package:flutter/material.dart';
+import '../managers/payment_manager.dart';
 
 class PaymentScreen extends StatefulWidget {
-  const PaymentScreen({super.key});
+  final Map<String, dynamic>? editMethod;
+  const PaymentScreen({super.key, this.editMethod});
 
   @override
   State<PaymentScreen> createState() => _PaymentScreenState();
 }
 
 class _PaymentScreenState extends State<PaymentScreen> {
-  String _selectedMethod = 'Bank'; // 'Bank' or 'UPI'
+  late String _selectedMethod;
+  late bool _isDefault;
+  bool _isSavingLocal = false;
 
   final _bankAccountController = TextEditingController();
   final _ifscController = TextEditingController();
   final _bankNameController = TextEditingController();
   final _holderNameController = TextEditingController();
   final _upiIdController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    final method = widget.editMethod;
+    if (method != null) {
+      _selectedMethod = method['type'] == 'BANK_ACCOUNT' ? 'Bank' : 'UPI';
+      _isDefault = method['isDefault'] == true;
+      
+      if (_selectedMethod == 'Bank') {
+        _holderNameController.text = method['accountHolderName'] ?? '';
+        _bankNameController.text = method['bankName'] ?? '';
+        _bankAccountController.text = method['accountNumber'] ?? '';
+        _ifscController.text = method['ifscCode'] ?? '';
+      } else {
+        _holderNameController.text = method['displayName'] ?? '';
+        _upiIdController.text = method['upiId'] ?? '';
+      }
+    } else {
+      _selectedMethod = 'Bank';
+      _isDefault = false;
+    }
+  }
 
   @override
   void dispose() {
@@ -26,15 +53,103 @@ class _PaymentScreenState extends State<PaymentScreen> {
     super.dispose();
   }
 
+  void _savePaymentMethod() async {
+    if (_isSavingLocal) return;
+
+    Map<String, dynamic> method;
+    if (_selectedMethod == 'Bank') {
+      if (_bankAccountController.text.trim().isEmpty || 
+          _ifscController.text.trim().isEmpty || 
+          _holderNameController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please fill all required fields')),
+        );
+        return;
+      }
+      method = {
+        "type": "BANK_ACCOUNT",
+        "accountHolderName": _holderNameController.text.trim(),
+        "bankName": _bankNameController.text.trim(),
+        "accountNumber": _bankAccountController.text.trim(),
+        "ifscCode": _ifscController.text.trim(),
+        "isDefault": _isDefault,
+      };
+    } else {
+      if (_upiIdController.text.trim().isEmpty || _holderNameController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please fill all required fields')),
+        );
+        return;
+      }
+      method = {
+        "type": "UPI",
+        "upiId": _upiIdController.text.trim(),
+        "upild": _upiIdController.text.trim(), // Send both for compatibility
+        "displayName": _holderNameController.text.trim(),
+        "isDefault": _isDefault,
+      };
+    }
+
+    setState(() => _isSavingLocal = true);
+
+    try {
+      bool success;
+      if (widget.editMethod != null) {
+        final id = widget.editMethod!['_id'] ?? widget.editMethod!['id'];
+        if (id == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Error: Payment Method ID not found.'), backgroundColor: Colors.red),
+          );
+          setState(() => _isSavingLocal = false);
+          return;
+        }
+        success = await PaymentManager().updatePaymentMethodById(id.toString(), method);
+      } else {
+        success = await PaymentManager().savePaymentMethod(method);
+      }
+      
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.editMethod != null ? 'Details Updated Successfully' : 'Payment Details Saved Successfully'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.of(context).pop();
+      } else if (mounted) {
+        final errorMsg = PaymentManager().lastError ?? 'Failed to save details. Please try again.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMsg),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingLocal = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isEditing = widget.editMethod != null;
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Add Payment Method', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(isEditing ? 'Edit Payment Method' : 'Add Payment Method', style: const TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
         elevation: 0,
         backgroundColor: colorScheme.surface,
@@ -49,37 +164,39 @@ class _PaymentScreenState extends State<PaymentScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Select Payment Type',
-              style: TextStyle(
-                fontSize: 18, 
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onSurface,
+            if (!isEditing) ...[
+              Text(
+                'Select Payment Type',
+                style: TextStyle(
+                  fontSize: 18, 
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildTypeCard(
-                    title: 'Bank Account',
-                    icon: Icons.account_balance_outlined,
-                    isSelected: _selectedMethod == 'Bank',
-                    onTap: () => setState(() => _selectedMethod = 'Bank'),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildTypeCard(
+                      title: 'Bank Account',
+                      icon: Icons.account_balance_outlined,
+                      isSelected: _selectedMethod == 'Bank',
+                      onTap: _isSavingLocal ? () {} : () => setState(() => _selectedMethod = 'Bank'),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildTypeCard(
-                    title: 'UPI ID',
-                    icon: Icons.vibration_outlined,
-                    isSelected: _selectedMethod == 'UPI',
-                    onTap: () => setState(() => _selectedMethod = 'UPI'),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildTypeCard(
+                      title: 'UPI ID',
+                      icon: Icons.vibration_outlined,
+                      isSelected: _selectedMethod == 'UPI',
+                      onTap: _isSavingLocal ? () {} : () => setState(() => _selectedMethod = 'UPI'),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 32),
+                ],
+              ),
+              const SizedBox(height: 32),
+            ],
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),
               child: _selectedMethod == 'Bank'
@@ -89,13 +206,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       children: [
                         Text('Bank Account Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
                         const SizedBox(height: 20),
-                        _buildTextField(controller: _holderNameController, label: 'Account Holder Name', icon: Icons.person_outline),
+                        _buildTextField(controller: _holderNameController, label: 'Account Holder Name', icon: Icons.person_outline, enabled: !_isSavingLocal),
                         const SizedBox(height: 16),
-                        _buildTextField(controller: _bankNameController, label: 'Bank Name', icon: Icons.business_outlined),
+                        _buildTextField(controller: _bankNameController, label: 'Bank Name', icon: Icons.business_outlined, enabled: !_isSavingLocal),
                         const SizedBox(height: 16),
-                        _buildTextField(controller: _bankAccountController, label: 'Account Number', icon: Icons.numbers_outlined, keyboardType: TextInputType.number),
+                        _buildTextField(controller: _bankAccountController, label: 'Account Number', icon: Icons.numbers_outlined, keyboardType: TextInputType.number, enabled: !_isSavingLocal),
                         const SizedBox(height: 16),
-                        _buildTextField(controller: _ifscController, label: 'IFSC Code', icon: Icons.code_outlined, capitalization: TextCapitalization.characters),
+                        _buildTextField(controller: _ifscController, label: 'IFSC Code', icon: Icons.code_outlined, capitalization: TextCapitalization.characters, enabled: !_isSavingLocal),
                       ],
                     )
                   : Column(
@@ -104,14 +221,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       children: [
                         Text('UPI Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
                         const SizedBox(height: 20),
-                        _buildTextField(controller: _holderNameController, label: 'Display Name', icon: Icons.person_outline),
+                        _buildTextField(controller: _holderNameController, label: 'Display Name', icon: Icons.person_outline, enabled: !_isSavingLocal),
                         const SizedBox(height: 16),
-                        _buildTextField(controller: _upiIdController, label: 'UPI ID (e.g. name@bank)', icon: Icons.alternate_email_outlined),
+                        _buildTextField(controller: _upiIdController, label: 'UPI ID (e.g. name@bank)', icon: Icons.alternate_email_outlined, enabled: !_isSavingLocal),
                         const SizedBox(height: 12),
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.amber.withOpacity(isDark ? 0.2 : 0.1),
+                            color: Colors.amber.withValues(alpha: isDark ? 0.2 : 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
@@ -133,27 +250,29 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       ],
                     ),
             ),
+            const SizedBox(height: 24),
+            SwitchListTile(
+              title: const Text('Set as Default Method', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+              value: _isDefault,
+              onChanged: _isSavingLocal ? null : (val) => setState(() => _isDefault = val),
+              activeThumbColor: colorScheme.primary,
+              contentPadding: EdgeInsets.zero,
+            ),
             const SizedBox(height: 40),
             SizedBox(
               width: double.infinity,
               height: 56,
               child: ElevatedButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('Payment Details Saved Successfully'),
-                      backgroundColor: colorScheme.primary,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                },
+                onPressed: _isSavingLocal ? null : _savePaymentMethod,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: colorScheme.primary,
                   foregroundColor: colorScheme.onPrimary,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   elevation: 0,
                 ),
-                child: const Text('Save Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                child: _isSavingLocal 
+                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Text(isEditing ? 'Update Details' : 'Save Details', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
@@ -176,11 +295,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
         padding: const EdgeInsets.symmetric(vertical: 20),
         decoration: BoxDecoration(
           color: isSelected 
-              ? colorScheme.primary.withOpacity(0.1) 
-              : colorScheme.surfaceVariant.withOpacity(0.3),
+              ? colorScheme.primary.withValues(alpha: 0.1) 
+              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? colorScheme.primary : colorScheme.outline.withOpacity(0.2),
+            color: isSelected ? colorScheme.primary : colorScheme.outline.withValues(alpha: 0.2),
             width: 2,
           ),
         ),
@@ -211,26 +330,28 @@ class _PaymentScreenState extends State<PaymentScreen> {
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
     TextCapitalization capitalization = TextCapitalization.none,
+    bool enabled = true,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
       textCapitalization: capitalization,
+      enabled: enabled,
       style: TextStyle(color: colorScheme.onSurface),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
-        prefixIcon: Icon(icon, size: 20, color: colorScheme.primary.withOpacity(0.7)),
+        prefixIcon: Icon(icon, size: 20, color: colorScheme.primary.withValues(alpha: 0.7)),
         filled: true,
-        fillColor: colorScheme.surfaceVariant.withOpacity(0.3),
+        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: colorScheme.outline.withOpacity(0.2)),
+          borderSide: BorderSide(color: colorScheme.outline.withValues(alpha: 0.2)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: colorScheme.outline.withOpacity(0.2)),
+          borderSide: BorderSide(color: colorScheme.outline.withValues(alpha: 0.2)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),

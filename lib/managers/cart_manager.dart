@@ -86,4 +86,9 @@ class CartManager extends ChangeNotifier {
     }
     return 0;
   }
+
+  void clearCart() {
+    _items.clear();
+    notifyListeners();
+  }
 }

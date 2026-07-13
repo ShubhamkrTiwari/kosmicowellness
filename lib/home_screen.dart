@@ -13,12 +13,14 @@ import 'managers/user_manager.dart';
 import 'managers/theme_manager.dart';
 
 import 'managers/notification_manager.dart';
+import 'managers/payment_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await UserManager().init();
   await ThemeManager().init();
   await NotificationManager().init();
+  await PaymentManager().init();
   runApp(
     DevicePreview(
       enabled: true,

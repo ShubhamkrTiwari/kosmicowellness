@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../managers/cart_manager.dart';
 import '../managers/wishlist_manager.dart';
+import 'checkout_screen.dart';
+import 'cart_screen.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   final Map<String, String> product;
@@ -281,19 +283,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       ),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border.all(color: colorScheme.outlineVariant),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(Icons.chat_bubble_outline, color: colorScheme.primary),
-          ),
-          const SizedBox(width: 16),
           Expanded(
             child: SizedBox(
               height: 60,
-              child: ElevatedButton(
+              child: OutlinedButton(
                 onPressed: () {
                   for (int i = 0; i < _quantity; i++) {
                     CartManager().addItem(product);
@@ -303,8 +296,35 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       content: Text('Added $_quantity ${product['name']} to cart'),
                       behavior: SnackBarBehavior.floating,
                       backgroundColor: colorScheme.primary,
+                      action: SnackBarAction(
+                        label: 'Cart',
+                        textColor: Colors.white,
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CartScreen())),
+                      ),
                     ),
                   );
+                },
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: colorScheme.primary, width: 2),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                child: const Text('Add to Cart', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: SizedBox(
+              height: 60,
+              child: ElevatedButton(
+                onPressed: () {
+                  // Direct Buy: Clear cart or just add this item and go to checkout
+                  // For now, let's just add to cart and go to checkout
+                  CartManager().clearCart(); // Clear old items for "Buy Now"
+                  for (int i = 0; i < _quantity; i++) {
+                    CartManager().addItem(product);
+                  }
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const CheckoutScreen()));
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: colorScheme.primary,
@@ -313,7 +333,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   elevation: 0,
                 ),
                 child: const Text(
-                  'Add to Cart',
+                  'Buy Now',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
