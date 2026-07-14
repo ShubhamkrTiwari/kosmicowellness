@@ -7,7 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 class ApiService {
 
-  static const String baseUrl = 'http://3.7.180.215';
+  static const String baseUrl = 'http://3.7.180.215:5000';
   
   static Future<Map<String, dynamic>> updateProfileWithImage({
     required String name,
@@ -356,6 +356,36 @@ class ApiService {
       return _processResponse(response);
     } catch (e) {
       print('DEBUG: Delete Payment Method Error -> $e');
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> getNotifications(String token) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/notifications'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> markNotificationRead(String notificationId, String token) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/api/notifications/$notificationId/read'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
       return _handleError(e);
     }
   }

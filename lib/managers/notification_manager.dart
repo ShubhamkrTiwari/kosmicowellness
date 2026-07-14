@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import '../services/api_service.dart';
+import 'user_manager.dart';
 
 class NotificationManager extends ChangeNotifier {
   static final NotificationManager _instance = NotificationManager._internal();
@@ -8,12 +10,51 @@ class NotificationManager extends ChangeNotifier {
   NotificationManager._internal();
 
   List<Map<String, String>> _notifications = [];
+  bool _isLoading = false;
 
   List<Map<String, String>> get notifications => _notifications;
   int get unreadCount => _notifications.where((n) => n['isRead'] == 'false').length;
+  bool get isLoading => _isLoading;
 
   Future<void> init() async {
     await loadNotifications();
+    fetchFromApi(); // Fetch from API in background
+  }
+
+  Future<void> fetchFromApi() async {
+    final token = UserManager().token;
+    if (token == null) return;
+
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final result = await ApiService.getNotifications(token);
+      if (result['success'] && result['data'] != null) {
+        final List<dynamic> apiData = result['data'];
+        final List<Map<String, String>> apiNotifications = apiData.map((item) {
+          return {
+            'id': item['_id']?.toString() ?? item['id']?.toString() ?? '',
+            'title': item['title']?.toString() ?? '',
+            'message': item['message']?.toString() ?? '',
+            'time': item['createdAt']?.toString() ?? 'Recent',
+            'icon': item['icon']?.toString() ?? '🔔',
+            'isRead': (item['isRead'] ?? false).toString(),
+            'type': item['type']?.toString() ?? 'general',
+          };
+        }).toList();
+
+        // Merge or replace
+        _notifications = apiNotifications;
+        await saveNotifications();
+        notifyListeners();
+      }
+    } catch (e) {
+      print('Error fetching notifications: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> addNotification({
@@ -37,12 +78,22 @@ class NotificationManager extends ChangeNotifier {
     await saveNotifications();
   }
 
-  void markAsRead(String id) {
+  void markAsRead(String id) async {
     final index = _notifications.indexWhere((n) => n['id'] == id);
     if (index != -1) {
       _notifications[index]['isRead'] = 'true';
       notifyListeners();
-      saveNotifications();
+      await saveNotifications();
+
+      // Call API to mark as read on backend
+      final token = UserManager().token;
+      if (token != null) {
+        try {
+          await ApiService.markNotificationRead(id, token);
+        } catch (e) {
+          print('Error marking notification as read on API: $e');
+        }
+      }
     }
   }
 
