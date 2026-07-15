@@ -30,11 +30,16 @@ class NotificationManager extends ChangeNotifier {
 
     try {
       final result = await ApiService.getNotifications(token);
+      print('DEBUG: Fetch Notifications API Response -> $result');
+      
       if (result['success'] && result['data'] != null) {
         final List<dynamic> apiData = result['data'];
         final List<Map<String, String>> apiNotifications = apiData.map((item) {
+          final String id = item['_id']?.toString() ?? item['id']?.toString() ?? '';
+          print('DEBUG: Notification Item ID -> $id');
+          
           return {
-            'id': item['_id']?.toString() ?? item['id']?.toString() ?? '',
+            'id': id,
             'title': item['title']?.toString() ?? '',
             'message': item['message']?.toString() ?? '',
             'time': item['createdAt']?.toString() ?? 'Recent',
@@ -105,16 +110,60 @@ class NotificationManager extends ChangeNotifier {
     saveNotifications();
   }
 
-  void clearAll() {
+  void clearAll() async {
     _notifications.clear();
     notifyListeners();
-    saveNotifications();
+    await saveNotifications();
+
+    // Call API to clear all on backend
+    final token = UserManager().token;
+    if (token != null) {
+      try {
+        await ApiService.clearAllNotifications(token);
+      } catch (e) {
+        print('Error clearing all notifications from API: $e');
+      }
+    }
   }
 
-  void removeNotification(String id) {
-    _notifications.removeWhere((n) => n['id'] == id);
+  Future<void> removeNotification(String id) async {
+    if (id.isEmpty) return;
+    
+    // Backup for rollback
+    final index = _notifications.indexWhere((n) => n['id'] == id);
+    if (index == -1) return;
+    final backup = _notifications[index];
+
+    // 1. Optimistic UI update
+    _notifications.removeAt(index);
     notifyListeners();
-    saveNotifications();
+
+    final token = UserManager().token;
+    if (token != null) {
+      try {
+        print('DEBUG: Attempting to delete notification with ID: $id');
+        final result = await ApiService.deleteNotification(id, token);
+        
+        if (result['success'] == true) {
+          print('DEBUG: Server deletion successful for ID: $id');
+          await saveNotifications();
+        } else {
+          // 2. Rollback if server failed
+          print('DEBUG: Server deletion failed, rolling back UI. Error: ${result['message']}');
+          if (!_notifications.any((n) => n['id'] == id)) {
+            _notifications.insert(index, backup);
+            notifyListeners();
+          }
+        }
+      } catch (e) {
+        print('DEBUG: Exception during deletion: $e');
+        // Rollback on exception
+        if (!_notifications.any((n) => n['id'] == id)) {
+          _notifications.insert(index, backup);
+          notifyListeners();
+        }
+      }
+    }
   }
 
   Future<void> saveNotifications() async {

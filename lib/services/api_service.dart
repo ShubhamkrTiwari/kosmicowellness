@@ -4,10 +4,20 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter/material.dart';
+import '../home_screen.dart';
+import '../screens/maintenance_screen.dart';
 
 class ApiService {
 
   static const String baseUrl = 'http://3.7.180.215:5000';
+
+  // Helper to ensure clean URLs without double slashes
+  static Uri _getUri(String path) {
+    String cleanBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    String cleanPath = path.startsWith('/') ? path : '/$path';
+    return Uri.parse('$cleanBase$cleanPath');
+  }
   
   static Future<Map<String, dynamic>> updateProfileWithImage({
     required String name,
@@ -16,7 +26,7 @@ class ApiService {
     required String token,
   }) async {
     try {
-      var uri = Uri.parse('$baseUrl/api/auth/profile');
+      var uri = _getUri('/api/auth/profile');
       var request = http.MultipartRequest('PUT', uri);
       
       request.headers.addAll({
@@ -57,7 +67,7 @@ class ApiService {
 
   static Future<Map<String, dynamic>> register(String name, String email) async {
     try {
-      final url = Uri.parse('$baseUrl/api/auth/register');
+      final url = _getUri('/api/auth/register');
       print('DEBUG: Requesting Register -> $url');
       
       final response = await http.post(
@@ -84,7 +94,7 @@ class ApiService {
 
   static Future<Map<String, dynamic>> login(String email) async {
     try {
-      final url = Uri.parse('$baseUrl/api/auth/login');
+      final url = _getUri('/api/auth/login');
       print('DEBUG: Requesting Login -> $url');
       
       final response = await http.post(
@@ -111,7 +121,7 @@ class ApiService {
   static Future<Map<String, dynamic>> verifySignup(String email, String otp) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/api/auth/signup-verify'),
+        _getUri('/api/auth/signup-verify'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': email,
@@ -127,7 +137,7 @@ class ApiService {
   static Future<Map<String, dynamic>> verifyLogin(String email, String otp) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/api/auth/login-verify'),
+        _getUri('/api/auth/login-verify'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': email,
@@ -143,7 +153,7 @@ class ApiService {
   static Future<Map<String, dynamic>> resendOtp(String email) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/api/auth/resend-otp'),
+        _getUri('/api/auth/resend-otp'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': email,
@@ -167,7 +177,7 @@ class ApiService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/api/address'),
+        _getUri('/api/address'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -191,7 +201,7 @@ class ApiService {
   static Future<Map<String, dynamic>> getAddresses(String token) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/api/address'),
+        _getUri('/api/address'),
         headers: {
           'Authorization': 'Bearer $token',
         },
@@ -225,7 +235,7 @@ class ApiService {
       if (isDefault != null) body['isDefault'] = isDefault;
 
       final response = await http.put(
-        Uri.parse('$baseUrl/api/address/$addressId'),
+        _getUri('/api/address/$addressId'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -241,7 +251,7 @@ class ApiService {
   static Future<Map<String, dynamic>> setDefaultAddress(String addressId, String token) async {
     try {
       final response = await http.put(
-        Uri.parse('$baseUrl/api/address/set-default/$addressId'),
+        _getUri('/api/address/set-default/$addressId'),
         headers: {
           'Authorization': 'Bearer $token',
         },
@@ -255,7 +265,7 @@ class ApiService {
   static Future<Map<String, dynamic>> deleteAddress(String addressId, String token) async {
     try {
       final response = await http.delete(
-        Uri.parse('$baseUrl/api/address/$addressId'),
+        _getUri('/api/address/$addressId'),
         headers: {
           'Authorization': 'Bearer $token',
         },
@@ -269,7 +279,7 @@ class ApiService {
   static Future<Map<String, dynamic>> getPaymentMethods(String token) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/api/payment/saved-methods'),
+        _getUri('/api/payment/saved-methods'),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -284,7 +294,7 @@ class ApiService {
 
   static Future<Map<String, dynamic>> savePaymentMethod(Map<String, dynamic> methodData, String token) async {
     try {
-      final url = Uri.parse('$baseUrl/api/payment/save-method');
+      final url = _getUri('/api/payment/save-method');
       print('DEBUG: Requesting Save Payment Method -> $url');
       print('DEBUG: Body -> ${jsonEncode(methodData)}');
 
@@ -311,7 +321,7 @@ class ApiService {
 
   static Future<Map<String, dynamic>> updatePaymentMethod(String methodId, Map<String, dynamic> methodData, String token) async {
     try {
-      final url = Uri.parse('$baseUrl/api/payment/save-method/$methodId');
+      final url = _getUri('/api/payment/save-method/$methodId');
       print('DEBUG: Requesting Update Payment Method -> $url');
       print('DEBUG: Body -> ${jsonEncode(methodData)}');
 
@@ -338,7 +348,7 @@ class ApiService {
 
   static Future<Map<String, dynamic>> deletePaymentMethod(String methodId, String token) async {
     try {
-      final url = Uri.parse('$baseUrl/api/payment/save-method/$methodId');
+      final url = _getUri('/api/payment/save-method/$methodId');
       print('DEBUG: Requesting Delete Payment Method -> $url');
 
       final response = await http.delete(
@@ -363,7 +373,7 @@ class ApiService {
   static Future<Map<String, dynamic>> getNotifications(String token) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/api/notifications'),
+        _getUri('/api/notifications'),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -378,7 +388,54 @@ class ApiService {
   static Future<Map<String, dynamic>> markNotificationRead(String notificationId, String token) async {
     try {
       final response = await http.put(
-        Uri.parse('$baseUrl/api/notifications/$notificationId/read'),
+        _getUri('/api/notifications/$notificationId/read'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> deleteNotification(String notificationId, String token) async {
+    try {
+      // If notificationId is already a full URL (which seems to be happening), use it directly
+      // otherwise construct the URI
+      Uri uri;
+      if (notificationId.startsWith('http')) {
+        uri = Uri.parse(notificationId);
+      } else {
+        uri = _getUri('/api/notifications/$notificationId');
+      }
+      
+      print('DEBUG: Requesting DELETE -> $uri');
+      
+      final response = await http.delete(
+        uri,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+          'User-Agent': 'KosmicoApp/1.0',
+        },
+      ).timeout(const Duration(seconds: 20));
+
+      print('DEBUG: DELETE Status -> ${response.statusCode}');
+      print('DEBUG: DELETE Body -> ${response.body}');
+
+      return _processResponse(response);
+    } catch (e) {
+      print('DEBUG: DELETE Exception -> $e');
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> clearAllNotifications(String token) async {
+    try {
+      final response = await http.delete(
+        _getUri('/api/notifications'),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -398,7 +455,7 @@ class ApiService {
     required String token,
   }) async {
     try {
-      final url = Uri.parse('$baseUrl/api/orders/place');
+      final url = _getUri('/api/orders/place');
       final response = await http.post(
         url,
         headers: {
@@ -418,11 +475,35 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> getLatestUpdate() async {
+    try {
+      final response = await http.get(_getUri('/api/system/updates/latest')).timeout(const Duration(seconds: 10));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
   static Future<void> wakeUpServer() async {
     try {
       // Just a simple GET request to wake up the Render free tier server
       http.get(Uri.parse(baseUrl)).timeout(const Duration(seconds: 10));
     } catch (_) {}
+  }
+
+  static Future<bool> checkMaintenanceMode() async {
+    try {
+      final response = await http.get(_getUri('/api/system/status')).timeout(const Duration(seconds: 3));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['isMaintenanceMode'] == true;
+      }
+      return false;
+    } catch (e) {
+      // If server is unreachable, we treat it as maintenance/down
+      if (e is SocketException) return true;
+      return false;
+    }
   }
 
   static Map<String, dynamic> _handleError(dynamic e) {
@@ -447,8 +528,20 @@ class ApiService {
 
   static Map<String, dynamic> _processResponse(http.Response response) {
     try {
+      // Global Maintenance Check (Blocking all actions)
+      if (response.statusCode == 503) {
+        _redirectToMaintenance();
+        return {'success': false, 'message': 'System Under Maintenance'};
+      }
+
       if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 204) {
         final data = response.body.isNotEmpty ? jsonDecode(response.body) : null;
+        
+        // Check if the response itself contains maintenance flag
+        if (data is Map && data['isMaintenanceMode'] == true) {
+          _redirectToMaintenance();
+        }
+
         return {'success': true, 'data': data};
       } else {
         final data = response.body.isNotEmpty ? jsonDecode(response.body) : null;
@@ -462,6 +555,15 @@ class ApiService {
         'success': false, 
         'message': 'Server Error (${response.statusCode}).'
       };
+    }
+  }
+
+  static void _redirectToMaintenance() {
+    if (navigatorKey.currentState != null) {
+      navigatorKey.currentState!.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const MaintenanceScreen()),
+        (route) => false, // Remove all previous routes to block back button
+      );
     }
   }
 }

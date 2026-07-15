@@ -14,6 +14,9 @@ import 'managers/theme_manager.dart';
 
 import 'managers/notification_manager.dart';
 import 'managers/payment_manager.dart';
+import 'services/api_service.dart';
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,6 +43,7 @@ class MyApp extends StatelessWidget {
         final bool isDark = ThemeManager().isDarkMode == true;
         return MaterialApp(
           title: 'Kosmico Wellness',
+          navigatorKey: navigatorKey,
           debugShowCheckedModeBanner: false,
           themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
           theme: ThemeData(
@@ -94,6 +98,103 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   String _selectedHomeCategory = 'All';
   final List<String> _homeCategories = ['All', 'Hair Care', 'Immunity', 'Diabetes', 'Detox'];
+  
+  Map<String, dynamic>? _updateData;
+  bool _showUpdateBanner = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkForUpdates();
+    });
+  }
+
+  Future<void> _checkForUpdates() async {
+    try {
+      print('DEBUG: Starting update check...');
+      final result = await ApiService.getLatestUpdate();
+      print('DEBUG: Update Check API Response -> $result');
+      
+      if (result['success'] == true && result['data'] != null) {
+        final data = result['data'];
+        final updateInfo = data['update'];
+        
+        print('DEBUG: Extracted Update Info -> $updateInfo');
+        
+        if (updateInfo != null && (updateInfo['isUpdateAvailable'] == true || updateInfo['isUpdateAvailable'].toString() == 'true')) {
+          if (mounted) {
+            setState(() {
+              _updateData = updateInfo;
+              _showUpdateBanner = true;
+            });
+            print('DEBUG: State updated, banner should show');
+            
+            // Show a SnackBar to confirm we found it
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('New Update Available: ${updateInfo['version']}'),
+                backgroundColor: const Color(0xFF00833E),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            
+            _showUpdateDialog(updateInfo);
+          }
+        } else {
+          print('DEBUG: isUpdateAvailable is false or null');
+        }
+      } else {
+        print('DEBUG: API call failed or data is null. Message: ${result['message']}');
+      }
+    } catch (e) {
+      print('DEBUG: Update Check Exception -> $e');
+    }
+  }
+
+  void _showUpdateDialog(Map<String, dynamic> updateInfo) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.update, color: Color(0xFF00833E)),
+            const SizedBox(width: 10),
+            Text(updateInfo['title'] ?? 'Update Available'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('A new version (${updateInfo['version']}) is available.', style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            const Text('Release Notes:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            Text(updateInfo['releaseNotes'] ?? 'Bug fixes and improvements.', style: const TextStyle(fontSize: 14)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Later', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              // Redirect to store
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00833E),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Update Now'),
+          ),
+        ],
+      ),
+    );
+  }
 
   final List<Map<String, String>> products = [
     {
@@ -122,12 +223,64 @@ class _HomeScreenState extends State<HomeScreen> {
     },
   ];
 
+  Widget _buildUpdateBanner(ColorScheme colorScheme) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.secondary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.system_update, color: colorScheme.secondary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _updateData?['title'] ?? 'New Update Available',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  'Version ${_updateData?['version'] ?? ''} is now available.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              // Redirect to Play Store / App Store
+            },
+            style: TextButton.styleFrom(
+              backgroundColor: colorScheme.secondary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Update', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 18),
+            onPressed: () => setState(() => _showUpdateBanner = false),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHomeBody(ColorScheme colorScheme) {
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 120),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (_showUpdateBanner && _updateData != null)
+            _buildUpdateBanner(colorScheme),
+
           // Search Bar
           Padding(
             padding: const EdgeInsets.all(16.0),
@@ -656,6 +809,10 @@ class _HomeScreenState extends State<HomeScreen> {
         decoration: BoxDecoration(
           color: colorScheme.surfaceVariant,
           borderRadius: BorderRadius.circular(30),
+          border: Border.all(
+            color: colorScheme.primary.withOpacity(0.15),
+            width: 1.5,
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.08),
@@ -689,49 +846,75 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       splashColor: Colors.transparent,
       highlightColor: Colors.transparent,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeOutQuint,
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? colorScheme.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: colorScheme.primary.withOpacity(0.25),
-                    blurRadius: 12,
-                    offset: const Offset(0, 6),
-                  )
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isSelected ? activeIcon : icon,
-              color: isSelected ? Colors.white : Colors.grey[500],
-              size: 24,
-            ),
-            if (isSelected) ...[
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    letterSpacing: 0.2,
+      child: AnimatedScale(
+        scale: isSelected ? 1.08 : 1.0,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.elasticOut,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 450),
+          curve: Curves.easeInOutCubic,
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? colorScheme.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: colorScheme.primary.withOpacity(0.3),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                      spreadRadius: 2,
+                    )
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedRotation(
+                turns: isSelected ? 0.15 : 0,
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.elasticOut,
+                child: AnimatedScale(
+                  scale: isSelected ? 1.2 : 1.0,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.elasticOut,
+                  child: Icon(
+                    isSelected ? activeIcon : icon,
+                    color: isSelected ? Colors.white : Colors.grey[500],
+                    size: 24,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              if (isSelected) ...[
+                const SizedBox(width: 8),
+                Flexible(
+                  child: AnimatedSlide(
+                    offset: isSelected ? Offset.zero : const Offset(-0.3, 0),
+                    duration: const Duration(milliseconds: 350),
+                    curve: Curves.easeOutBack,
+                    child: AnimatedOpacity(
+                      opacity: isSelected ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOut,
+                      child: Text(
+                        label,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          letterSpacing: 0.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

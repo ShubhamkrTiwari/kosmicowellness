@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'onboarding_screen.dart';
+import 'maintenance_screen.dart';
 import '../services/api_service.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -27,15 +28,30 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       CurvedAnimation(parent: _rocketController, curve: Curves.easeInOut),
     );
 
-    // Start waking up the server early
+    _startAppFlow();
+  }
+
+  Future<void> _startAppFlow() async {
+    // 1. Start waking up the server
     ApiService.wakeUpServer();
 
-    Timer(const Duration(seconds: 4), () {
-      if (!mounted) return;
+    // 2. Check for Maintenance (takes 1-3 seconds as requested)
+    bool isMaintenance = await ApiService.checkMaintenanceMode();
+    
+    if (isMaintenance && mounted) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+        MaterialPageRoute(builder: (context) => const MaintenanceScreen()),
       );
-    });
+      return;
+    }
+
+    // 3. Normal delay for Splash Screen feel
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+    );
   }
 
   @override
