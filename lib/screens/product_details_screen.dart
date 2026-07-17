@@ -5,7 +5,7 @@ import 'checkout_screen.dart';
 import 'cart_screen.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
-  final Map<String, String> product;
+  final Map<String, dynamic> product;
 
   const ProductDetailsScreen({super.key, required this.product});
 
@@ -71,7 +71,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          colorScheme.primary.withOpacity(0.05),
+                          colorScheme.primary.withValues(alpha: 0.05),
                           colorScheme.surface,
                         ],
                       ),
@@ -79,10 +79,19 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     child: Center(
                       child: Hero(
                         tag: 'product-${product['name']}',
-                        child: Text(
-                          product['icon']!,
-                          style: const TextStyle(fontSize: 160, decoration: TextDecoration.none),
-                        ),
+                        child: (product['image'] != null && product['image'].toString().isNotEmpty)
+                            ? Image.network(
+                                product['image'].toString(),
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) => Text(
+                                  product['icon'] ?? '🌿',
+                                  style: const TextStyle(fontSize: 160, decoration: TextDecoration.none),
+                                ),
+                              )
+                            : Text(
+                                product['icon'] ?? '🌿',
+                                style: const TextStyle(fontSize: 160, decoration: TextDecoration.none),
+                              ),
                       ),
                     ),
                   ),
@@ -133,7 +142,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                                 const Icon(Icons.star, color: Colors.amber, size: 16),
                                 const SizedBox(width: 4),
                                 Text(
-                                  '4.9',
+                                  (product['rating'] ?? '4.9').toString(),
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: colorScheme.primary,
@@ -146,7 +155,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       ),
                       const SizedBox(height: 24),
                       Text(
-                        product['price']!,
+                        (product['price'] ?? '₹0').toString(),
                         style: TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.w900,
@@ -160,7 +169,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        product['description']!,
+                        (product['description'] ?? '').toString(),
                         style: TextStyle(
                           fontSize: 16,
                           color: Colors.grey[600],
@@ -267,7 +276,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     );
   }
 
-  Widget _buildBottomAction(ColorScheme colorScheme, Map<String, String> product) {
+  Widget _buildBottomAction(ColorScheme colorScheme, Map<String, dynamic> product) {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
       decoration: BoxDecoration(

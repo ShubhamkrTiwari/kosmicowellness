@@ -447,6 +447,57 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> addToWishlist(String productId, String token) async {
+    try {
+      final response = await http.post(
+        _getUri('/api/wishlist/add'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'productId': productId,
+        }),
+      );
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> removeFromWishlist(String productId, String token) async {
+    try {
+      final response = await http.post(
+        _getUri('/api/wishlist/remove'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'productId': productId,
+        }),
+      );
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> getWishlist(String token) async {
+    try {
+      final response = await http.get(
+        _getUri('/api/wishlist'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
   static Future<Map<String, dynamic>> placeOrder({
     required List<Map<String, dynamic>> items,
     required String addressId,
@@ -469,6 +520,36 @@ class ApiService {
           'totalPrice': totalPrice,
         }),
       );
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> getProducts() async {
+    try {
+      final response = await http.get(
+        _getUri('/api/products/user/list'),
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'KosmicoApp/1.0',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> getCategories() async {
+    try {
+      final response = await http.get(
+        _getUri('/api/categories/user/list'),
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'KosmicoApp/1.0',
+        },
+      ).timeout(const Duration(seconds: 30));
       return _processResponse(response);
     } catch (e) {
       return _handleError(e);

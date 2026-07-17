@@ -25,6 +25,7 @@ class CartManager extends ChangeNotifier {
     }
 
     final String icon = (item['icon'] ?? '🌿').toString();
+    final String image = (item['image'] ?? '').toString();
 
     // Check if item already exists
     int index = _items.indexWhere((element) => element['name'] == name);
@@ -36,6 +37,7 @@ class CartManager extends ChangeNotifier {
         'price': price,
         'quantity': 1,
         'icon': icon,
+        'image': image,
       });
     }
 

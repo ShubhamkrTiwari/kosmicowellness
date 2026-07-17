@@ -97,17 +97,58 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   String _selectedHomeCategory = 'All';
-  final List<String> _homeCategories = ['All', 'Hair Care', 'Immunity', 'Diabetes', 'Detox'];
+  List<String> _homeCategories = ['All'];
   
   Map<String, dynamic>? _updateData;
   bool _showUpdateBanner = false;
+  
+  List<Map<String, dynamic>> _apiProducts = [];
+  bool _isLoadingProducts = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkForUpdates();
+      _fetchCategories();
+      _fetchProducts();
     });
+  }
+
+  Future<void> _fetchCategories() async {
+    try {
+      final result = await ApiService.getCategories();
+      if (result['success'] == true && result['data'] != null) {
+        final List<dynamic> categoriesData = result['data'];
+        final List<String> fetchedCategories = ['All'];
+        for (var item in categoriesData) {
+          if (item['name'] != null) {
+            fetchedCategories.add(item['name'].toString());
+          }
+        }
+        setState(() {
+          _homeCategories = fetchedCategories;
+        });
+      }
+    } catch (e) {
+      print('DEBUG: Error fetching categories: $e');
+    }
+  }
+
+  Future<void> _fetchProducts() async {
+    setState(() => _isLoadingProducts = true);
+    try {
+      final result = await ApiService.getProducts();
+      if (result['success'] == true && result['data'] != null) {
+        setState(() {
+          _apiProducts = List<Map<String, dynamic>>.from(result['data']);
+        });
+      }
+    } catch (e) {
+      print('DEBUG: Error fetching products: $e');
+    } finally {
+      setState(() => _isLoadingProducts = false);
+    }
   }
 
   Future<void> _checkForUpdates() async {
@@ -196,33 +237,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  final List<Map<String, String>> products = [
-    {
-      'name': 'Ayurvedic Hair Oil',
-      'description': 'Traditional formula with bhringraj & amla for thick growth.',
-      'price': '₹499',
-      'icon': '🌿',
-    },
-    {
-      'name': 'Active Protein Powder',
-      'description': 'Herbal blend with ashwagandha for strength and vitality.',
-      'price': '₹1,299',
-      'icon': '💪',
-    },
-    {
-      'name': 'Diabetes Care',
-      'description': 'Natural support with karela & jamun for blood sugar.',
-      'price': '₹350',
-      'icon': '🩸',
-    },
-    {
-      'name': 'Liver Care Capsules',
-      'description': 'Detoxification and health with kutki & punarnava.',
-      'price': '₹450',
-      'icon': '✨',
-    },
-  ];
-
   Widget _buildUpdateBanner(ColorScheme colorScheme) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -289,7 +303,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 hintText: 'Search products...',
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
-                fillColor: colorScheme.surfaceVariant.withOpacity(0.5),
+                fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
                   borderSide: BorderSide.none,
@@ -311,7 +325,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 image: const NetworkImage('https://images.unsplash.com/photo-1615485290382-441e4d0c9cb5?auto=format&fit=crop&q=80&w=800'),
                 fit: BoxFit.cover,
                 colorFilter: ColorFilter.mode(
-                  colorScheme.primary.withOpacity(0.8),
+                  colorScheme.primary.withValues(alpha: 0.8),
                   BlendMode.srcOver,
                 ),
               ),
@@ -332,7 +346,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Text(
                   'Discover the healing power of Ayurveda',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     fontSize: 14,
                   ),
                 ),
@@ -401,7 +415,19 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          GridView.builder(
+          _isLoadingProducts 
+            ? const Center(child: Padding(
+                padding: EdgeInsets.all(40.0),
+                child: CircularProgressIndicator(),
+              ))
+            : _apiProducts.isEmpty 
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(40.0),
+                    child: Text('No products found', style: TextStyle(color: Colors.grey[500])),
+                  ),
+                )
+              : GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -411,15 +437,28 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
             ),
-            itemCount: products.length,
+            itemCount: _apiProducts.length,
             itemBuilder: (context, index) {
-              final product = products[index];
-              final String name = product['name'] ?? 'Product';
+              final product = _apiProducts[index];
+              final String name = (product['name'] ?? 'Product').toString();
+              final String imageUrl = (product['image'] ?? '').toString();
+              final String price = '₹${product['price'] ?? 0}';
+              
               return GestureDetector(
                 onTap: () {
+                  // Standardize for details screen which might expect Map<String, String>
+                  final detailsProduct = {
+                    'name': name,
+                    'description': (product['description'] ?? '').toString(),
+                    'price': price,
+                    'image': imageUrl,
+                    'category': (product['category'] ?? '').toString(),
+                    'icon': '🌿', // Fallback for UI that still uses icon
+                  };
+
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (context) => ProductDetailsScreen(product: product),
+                      builder: (context) => ProductDetailsScreen(product: detailsProduct),
                     ),
                   ).then((_) {
                     if (mounted) setState(() {});
@@ -427,10 +466,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
                 child: Card(
                   elevation: 0,
-                  color: colorScheme.surfaceVariant.withOpacity(0.3),
+                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(color: colorScheme.primary.withOpacity(0.1)),
+                    side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.1)),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(12),
@@ -447,10 +486,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 alignment: Alignment.center,
-                                child: Text(
-                                  product['icon'] ?? '🌿',
-                                  style: const TextStyle(fontSize: 48, decoration: TextDecoration.none),
-                                ),
+                                child: imageUrl.isNotEmpty 
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Image.network(
+                                        imageUrl,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) => const Icon(Icons.spa, size: 48, color: Colors.grey),
+                                      ),
+                                    )
+                                  : const Icon(Icons.spa, size: 48, color: Colors.grey),
                               ),
                               Positioned(
                                 top: 8,
@@ -463,7 +508,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   child: Container(
                                     padding: const EdgeInsets.all(6),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.8),
+                                      color: Colors.white.withValues(alpha: 0.8),
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(
@@ -493,7 +538,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          product['description'] ?? '',
+                          (product['description'] ?? '').toString(),
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey[600],
@@ -507,7 +552,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           children: [
                             Flexible(
                               child: Text(
-                                product['price'] ?? '₹0',
+                                price,
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
@@ -604,15 +649,15 @@ class _HomeScreenState extends State<HomeScreen> {
         margin: const EdgeInsets.only(right: 10),
         padding: const EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
-          color: isSelected ? colorScheme.primary : colorScheme.surfaceVariant,
+          color: isSelected ? colorScheme.primary : colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? colorScheme.primary : colorScheme.primary.withOpacity(0.1),
+            color: isSelected ? colorScheme.primary : colorScheme.primary.withValues(alpha: 0.1),
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: colorScheme.primary.withOpacity(0.2),
+                    color: colorScheme.primary.withValues(alpha: 0.2),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   )
@@ -694,9 +739,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceVariant.withOpacity(0.5),
+                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                           shape: BoxShape.circle,
-                          border: Border.all(color: colorScheme.primary.withOpacity(0.1)),
+                          border: Border.all(color: colorScheme.primary.withValues(alpha: 0.1)),
                         ),
                         child: Icon(Icons.notifications_none_outlined, color: colorScheme.primary, size: 20),
                       ),
@@ -747,9 +792,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: colorScheme.surfaceVariant.withOpacity(0.5),
+                        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                         shape: BoxShape.circle,
-                        border: Border.all(color: colorScheme.primary.withOpacity(0.1)),
+                        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.1)),
                       ),
                       child: Icon(Icons.shopping_bag_outlined, color: colorScheme.primary, size: 20),
                     ),
@@ -807,15 +852,15 @@ class _HomeScreenState extends State<HomeScreen> {
         margin: const EdgeInsets.fromLTRB(20, 0, 20, 30),
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
         decoration: BoxDecoration(
-          color: colorScheme.surfaceVariant,
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(30),
           border: Border.all(
-            color: colorScheme.primary.withOpacity(0.15),
+            color: colorScheme.primary.withValues(alpha: 0.15),
             width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 25,
               offset: const Offset(0, 10),
             ),
@@ -860,7 +905,7 @@ class _HomeScreenState extends State<HomeScreen> {
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: colorScheme.primary.withOpacity(0.3),
+                      color: colorScheme.primary.withValues(alpha: 0.3),
                       blurRadius: 16,
                       offset: const Offset(0, 8),
                       spreadRadius: 2,

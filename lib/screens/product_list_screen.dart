@@ -3,6 +3,7 @@ import '../managers/notification_manager.dart';
 import 'product_details_screen.dart';
 import '../managers/cart_manager.dart';
 import '../managers/wishlist_manager.dart';
+import '../services/api_service.dart';
 
 class ProductListScreen extends StatefulWidget {
   const ProductListScreen({super.key});
@@ -14,83 +15,69 @@ class ProductListScreen extends StatefulWidget {
 class _ProductListScreenState extends State<ProductListScreen> {
   String _selectedCategory = 'All';
   String _searchQuery = '';
-  final List<String> _categories = ['All', 'Hair Care', 'Skin Care', 'Nutrition', 'Digestion'];
+  List<String> _categories = ['All'];
 
-  final List<Map<String, String>> products = [
-    {
-      'name': 'Ayurvedic Hair Oil',
-      'description': 'Traditional formula with bhringraj & amla for thick growth.',
-      'price': '₹499',
-      'icon': '🌿',
-      'category': 'Hair Care',
-      'rating': '4.8',
-      'reviews': '1.2k',
-    },
-    {
-      'name': 'Active Protein Powder',
-      'description': 'Herbal blend with ashwagandha for strength and vitality.',
-      'price': '₹1,299',
-      'icon': '💪',
-      'category': 'Nutrition',
-      'rating': '4.9',
-      'reviews': '850',
-    },
-    {
-      'name': 'Diabetes Care',
-      'description': 'Natural support with karela & jamun for blood sugar.',
-      'price': '₹350',
-      'icon': '🩸',
-      'category': 'Nutrition',
-      'rating': '4.7',
-      'reviews': '2.4k',
-    },
-    {
-      'name': 'Liver Care Capsules',
-      'description': 'Detoxification and health with kutki & punarnava.',
-      'price': '₹450',
-      'icon': '✨',
-      'category': 'Digestion',
-      'rating': '4.6',
-      'reviews': '500',
-    },
-    {
-      'name': 'Amla Juice',
-      'description': 'Pure organic amla juice for immunity and digestion.',
-      'price': '₹299',
-      'icon': '🥤',
-      'category': 'Digestion',
-      'rating': '4.8',
-      'reviews': '3.1k',
-    },
-    {
-      'name': 'Face Glow Cream',
-      'description': 'Saffron and turmeric based natural skin brightening.',
-      'price': '₹599',
-      'icon': '🧴',
-      'category': 'Skin Care',
-      'rating': '4.5',
-      'reviews': '1.5k',
-    },
-  ];
+  List<Map<String, dynamic>> _apiProducts = [];
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
+    _fetchCategories();
+    _fetchProducts();
+    
     // Demo: Trigger a notification for a new product
     WidgetsBinding.instance.addPostFrameCallback((_) {
       NotificationManager().addNotification(
         title: 'New Arrival!',
-        message: 'Amla Juice is now back in stock with a fresh batch.',
+        message: 'Explore our latest organic collections.',
         icon: '🥤',
         type: 'product',
       );
     });
   }
 
-  List<Map<String, String>> get _filteredProducts {
-    return products.where((product) {
-      final matchesCategory = _selectedCategory == 'All' || product['category'] == _selectedCategory;
-      final matchesSearch = product['name']!.toLowerCase().contains(_searchQuery.toLowerCase());
+  Future<void> _fetchCategories() async {
+    try {
+      final result = await ApiService.getCategories();
+      if (result['success'] == true && result['data'] != null) {
+        final List<dynamic> categoriesData = result['data'];
+        final List<String> fetchedCategories = ['All'];
+        for (var item in categoriesData) {
+          if (item['name'] != null) {
+            fetchedCategories.add(item['name'].toString());
+          }
+        }
+        setState(() {
+          _categories = fetchedCategories;
+        });
+      }
+    } catch (e) {
+      print('DEBUG: Error fetching categories: $e');
+    }
+  }
+
+  Future<void> _fetchProducts() async {
+    setState(() => _isLoading = true);
+    try {
+      final result = await ApiService.getProducts();
+      if (result['success'] == true && result['data'] != null) {
+        setState(() {
+          _apiProducts = List<Map<String, dynamic>>.from(result['data']);
+        });
+      }
+    } catch (e) {
+      print('DEBUG: Error fetching products: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  List<Map<String, dynamic>> get _filteredProducts {
+    return _apiProducts.where((product) {
+      final matchesCategory = _selectedCategory == 'All' || 
+          (product['category']?.toString().toLowerCase() == _selectedCategory.toLowerCase());
+      final matchesSearch = (product['name'] ?? '').toString().toLowerCase().contains(_searchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
     }).toList();
   }
@@ -104,48 +91,56 @@ class _ProductListScreenState extends State<ProductListScreen> {
       backgroundColor: colorScheme.surface,
       body: SafeArea(
         bottom: false,
-        child: CustomScrollView(
-          slivers: [
-            // Scrolling Header
-            SliverToBoxAdapter(
-              child: _buildHeader(colorScheme),
-            ),
-            // Search Bar
-            SliverToBoxAdapter(
-              child: _buildSearchBar(colorScheme),
-            ),
-            // Categories
-            SliverToBoxAdapter(
-              child: _buildCategories(colorScheme),
-            ),
-            // The List of Products
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 120),
-              sliver: filteredList.isEmpty 
-                ? SliverToBoxAdapter(
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 40),
-                        child: Column(
-                          children: [
-                            Icon(Icons.search_off, size: 60, color: Colors.grey[300]),
-                            const SizedBox(height: 16),
-                            Text('No products found', style: TextStyle(color: Colors.grey[600], fontSize: 16)),
-                          ],
+        child: RefreshIndicator(
+          onRefresh: _fetchProducts,
+          child: CustomScrollView(
+            slivers: [
+              // Scrolling Header
+              SliverToBoxAdapter(
+                child: _buildHeader(colorScheme),
+              ),
+              // Search Bar
+              SliverToBoxAdapter(
+                child: _buildSearchBar(colorScheme),
+              ),
+              // Categories
+              SliverToBoxAdapter(
+                child: _buildCategories(colorScheme),
+              ),
+              // The List of Products
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 120),
+                sliver: _isLoading && filteredList.isEmpty
+                  ? const SliverToBoxAdapter(child: Center(child: Padding(
+                      padding: EdgeInsets.only(top: 100),
+                      child: CircularProgressIndicator(),
+                    )))
+                  : filteredList.isEmpty 
+                    ? SliverToBoxAdapter(
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 40),
+                            child: Column(
+                              children: [
+                                Icon(Icons.search_off, size: 60, color: Colors.grey[300]),
+                                const SizedBox(height: 16),
+                                Text('No products found', style: TextStyle(color: Colors.grey[600], fontSize: 16)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      )
+                    : SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            return _buildProductListItem(filteredList[index], colorScheme);
+                          },
+                          childCount: filteredList.length,
                         ),
                       ),
-                    ),
-                  )
-                : SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        return _buildProductListItem(filteredList[index], colorScheme);
-                      },
-                      childCount: filteredList.length,
-                    ),
-                  ),
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -189,7 +184,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
           hintText: 'Search products...',
           prefixIcon: const Icon(Icons.search),
           filled: true,
-          fillColor: colorScheme.surfaceVariant,
+          fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none,
@@ -218,10 +213,10 @@ class _ProductListScreenState extends State<ProductListScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 decoration: BoxDecoration(
-                  color: isSelected ? colorScheme.primary : colorScheme.surfaceVariant,
+                  color: isSelected ? colorScheme.primary : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(30),
                   boxShadow: isSelected
-                      ? [BoxShadow(color: colorScheme.primary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))]
+                      ? [BoxShadow(color: colorScheme.primary.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))]
                       : null,
                 ),
                 alignment: Alignment.center,
@@ -240,12 +235,30 @@ class _ProductListScreenState extends State<ProductListScreen> {
     );
   }
 
-  Widget _buildProductListItem(Map<String, String> product, ColorScheme colorScheme) {
+  Widget _buildProductListItem(Map<String, dynamic> product, ColorScheme colorScheme) {
+    final String name = (product['name'] ?? 'Product').toString();
+    final String imageUrl = (product['image'] ?? '').toString();
+    final String price = '₹${product['price'] ?? 0}';
+    final String rating = (product['rating'] ?? '0.0').toString();
+    final String reviews = (product['numReviews'] ?? '0').toString();
+
     return GestureDetector(
       onTap: () {
+        // Standardize for details screen
+        final detailsProduct = {
+          'name': name,
+          'description': (product['description'] ?? '').toString(),
+          'price': price,
+          'image': imageUrl,
+          'category': (product['category'] ?? '').toString(),
+          'icon': '🌿',
+          'rating': rating,
+          'reviews': reviews,
+        };
+
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => ProductDetailsScreen(product: product),
+            builder: (context) => ProductDetailsScreen(product: detailsProduct),
           ),
         ).then((_) => setState(() {}));
       },
@@ -253,11 +266,11 @@ class _ProductListScreenState extends State<ProductListScreen> {
         margin: const EdgeInsets.only(bottom: 20),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: colorScheme.surfaceVariant.withOpacity(0.5),
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withValues(alpha: 0.03),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -266,19 +279,25 @@ class _ProductListScreenState extends State<ProductListScreen> {
         child: Row(
           children: [
             Hero(
-              tag: 'product-${product['name']}',
+              tag: 'product-$name',
               child: Container(
                 width: 100,
                 height: 100,
                 decoration: BoxDecoration(
-                  color: colorScheme.primary.withOpacity(0.05),
+                  color: colorScheme.surface,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 alignment: Alignment.center,
-                child: Text(
-                  product['icon']!,
-                  style: const TextStyle(fontSize: 45, decoration: TextDecoration.none),
-                ),
+                child: imageUrl.isNotEmpty 
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => const Icon(Icons.spa, size: 45, color: Colors.grey),
+                      ),
+                    )
+                  : const Icon(Icons.spa, size: 45, color: Colors.grey),
               ),
             ),
             const SizedBox(width: 16),
@@ -293,11 +312,11 @@ class _ProductListScreenState extends State<ProductListScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: colorScheme.secondary.withOpacity(0.1),
+                            color: colorScheme.secondary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            product['category']!.toUpperCase(),
+                            (product['category'] ?? 'Wellness').toString().toUpperCase(),
                             style: TextStyle(
                               color: colorScheme.secondary,
                               fontSize: 9,
@@ -311,11 +330,11 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       ),
                       const SizedBox(width: 8),
                       Icon(
-                        WishlistManager().isWishlisted(product['name']!)
+                        WishlistManager().isWishlisted(name)
                             ? Icons.favorite
                             : Icons.favorite_border,
                         size: 18,
-                        color: WishlistManager().isWishlisted(product['name']!)
+                        color: WishlistManager().isWishlisted(name)
                             ? Colors.red
                             : Colors.grey[300],
                       ),
@@ -323,7 +342,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    product['name']!,
+                    name,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 17,
@@ -336,11 +355,11 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       const Icon(Icons.star, color: Colors.amber, size: 14),
                       const SizedBox(width: 4),
                       Text(
-                        product['rating']!,
+                        rating,
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                       Text(
-                        ' (${product['reviews']})',
+                        ' ($reviews)',
                         style: TextStyle(color: Colors.grey[500], fontSize: 11),
                       ),
                     ],
@@ -351,7 +370,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     children: [
                       Flexible(
                         child: Text(
-                          product['price']!,
+                          price,
                           style: TextStyle(
                             fontWeight: FontWeight.w900,
                             fontSize: 19,
@@ -365,7 +384,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       ListenableBuilder(
                         listenable: CartManager(),
                         builder: (context, _) {
-                          final quantity = CartManager().getProductQuantity(product['name']!);
+                          final quantity = CartManager().getProductQuantity(name);
                           return ElevatedButton(
                             onPressed: () {
                               CartManager().addItem(product);

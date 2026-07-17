@@ -88,10 +88,22 @@ class _WishlistScreenState extends State<WishlistScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         alignment: Alignment.center,
-                        child: Text(
-                          item['icon'],
-                          style: const TextStyle(fontSize: 32),
-                        ),
+                        child: (item['image'] != null && item['image'].toString().isNotEmpty)
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.network(
+                                  item['image'].toString(),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Text(
+                                    item['icon'] ?? '🌿',
+                                    style: const TextStyle(fontSize: 32),
+                                  ),
+                                ),
+                              )
+                            : Text(
+                                item['icon'] ?? '🌿',
+                                style: const TextStyle(fontSize: 32),
+                              ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(

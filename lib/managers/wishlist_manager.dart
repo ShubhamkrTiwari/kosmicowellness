@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-class WishlistManager {
+class WishlistManager extends ChangeNotifier {
   static final WishlistManager _instance = WishlistManager._internal();
   factory WishlistManager() => _instance;
   WishlistManager._internal();
@@ -20,9 +20,11 @@ class WishlistManager {
         'name': name,
         'price': item['price'] is int ? item['price'] : int.parse(item['price'].toString().replaceAll('₹', '').replaceAll(',', '').trim()),
         'icon': (item['icon'] ?? '🌿').toString(),
+        'image': (item['image'] ?? '').toString(),
         'description': (item['description'] ?? '').toString(),
       });
     }
+    notifyListeners();
   }
 
   bool isWishlisted(String name) {

@@ -25,8 +25,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final wishlistManager = WishlistManager();
-  final userManager = UserManager();
   late String userName;
   late String userEmail;
   late String userPhone;
@@ -39,11 +37,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadUserData() async {
-    await userManager.init();
+    await UserManager().init();
     setState(() {
-      userName = userManager.userName ?? 'Guest User';
-      userEmail = userManager.userEmail ?? 'Not logged in';
-      userPhone = userManager.userPhone ?? 'Add phone number';
+      userName = UserManager().userName ?? 'Guest User';
+      userEmail = UserManager().userEmail ?? 'Not logged in';
+      userPhone = UserManager().userPhone ?? 'Add phone number';
     });
   }
 
@@ -80,8 +78,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
 
         // Ensure token is loaded
-        await userManager.init();
-        final token = userManager.token;
+        await UserManager().init();
+        final token = UserManager().token;
         
         if (token == null || token.isEmpty) {
           if (mounted) {
@@ -105,7 +103,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
 
         if (result['success']) {
-          await userManager.saveUser(result['data']);
+          await UserManager().saveUser(result['data']);
           
           NotificationManager().addNotification(
             title: 'Profile Updated',
@@ -164,143 +162,151 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             final colorScheme = Theme.of(context).colorScheme;
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-                top: 30,
-                left: 24,
-                right: 24,
+            return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.85,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Edit Profile',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).viewInsets.bottom + 30,
+                    top: 30,
+                    left: 24,
+                    right: 24,
                   ),
-                  const SizedBox(height: 24),
-                  TextField(
-                    controller: nameController,
-                    decoration: _inputDecoration('Full Name', Icons.person_outline),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: emailController,
-                    readOnly: true,
-                    enabled: false,
-                    style: TextStyle(color: colorScheme.onSurfaceVariant),
-                    decoration: _inputDecoration('Email Address', Icons.email_outlined).copyWith(
-                      filled: true,
-                      fillColor: colorScheme.surfaceVariant.withOpacity(0.5),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: phoneController,
-                    keyboardType: TextInputType.phone,
-                    decoration: _inputDecoration('Phone Number', Icons.phone_outlined),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(10),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 55,
-                    child: ElevatedButton(
-                  onPressed: isSaving ? null : () async {
-                    final newName = nameController.text.trim();
-                    final newPhone = phoneController.text.trim();
-
-                    if (newName.isNotEmpty) {
-                      setModalState(() => isSaving = true);
-                      
-                      // Ensure token is loaded
-                      await userManager.init();
-                      final token = userManager.token;
-                      
-                      if (token == null || token.isEmpty) {
-                        setModalState(() => isSaving = false);
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Authentication error. Please login again.'),
-                              backgroundColor: Colors.red,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                        return;
-                      }
-                      
-                      final result = await ApiService.updateProfileWithImage(
-                        name: newName,
-                        phoneNumber: newPhone,
-                        imageFile: _pickedImage, // Use the currently picked image if any
-                        token: token,
-                      );
-
-                      if (result['success']) {
-                        // Backend returns the new user data including image URL
-                        await userManager.saveUser(result['data']);
-                        
-                        NotificationManager().addNotification(
-                          title: 'Profile Updated',
-                          message: 'Your personal details have been updated.',
-                          icon: '👤',
-                          type: 'profile',
-                        );
-
-                        setState(() {
-                          userName = userManager.userName ?? newName;
-                          userEmail = userManager.userEmail ?? userEmail;
-                          userPhone = userManager.userPhone ?? (newPhone.isEmpty ? 'Add phone number' : newPhone);
-                        });
-                        
-                        if (mounted) {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Profile updated successfully!'),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      } else {
-                        setModalState(() => isSaving = false);
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(result['message']),
-                              backgroundColor: Colors.redAccent,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      }
-                    }
-                  },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Edit Profile',
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                       ),
-                      child: isSaving 
-                          ? const SizedBox(
-                              height: 20, 
-                              width: 20, 
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                            )
-                          : const Text('Save Changes'),
-                    ),
+                      const SizedBox(height: 24),
+                      TextField(
+                        controller: nameController,
+                        decoration: _inputDecoration('Full Name', Icons.person_outline),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: emailController,
+                        readOnly: true,
+                        enabled: false,
+                        style: TextStyle(color: colorScheme.onSurfaceVariant),
+                        decoration: _inputDecoration('Email Address', Icons.email_outlined).copyWith(
+                          filled: true,
+                          fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: _inputDecoration('Phone Number', Icons.phone_outlined),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(10),
+                        ],
+                      ),
+                      const SizedBox(height: 32),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 55,
+                        child: ElevatedButton(
+                      onPressed: isSaving ? null : () async {
+                        final newName = nameController.text.trim();
+                        final newPhone = phoneController.text.trim();
+
+                        if (newName.isNotEmpty) {
+                          setModalState(() => isSaving = true);
+                          
+                          // Ensure token is loaded
+                          await UserManager().init();
+                          final token = UserManager().token;
+                          
+                          if (token == null || token.isEmpty) {
+                            setModalState(() => isSaving = false);
+                            if (mounted) {
+                              final messenger = ScaffoldMessenger.of(context);
+                              messenger.showSnackBar(
+                                const SnackBar(
+                                  content: Text('Authentication error. Please login again.'),
+                                  backgroundColor: Colors.red,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                            return;
+                          }
+                          
+                          final result = await ApiService.updateProfileWithImage(
+                            name: newName,
+                            phoneNumber: newPhone,
+                            imageFile: _pickedImage, // Use the currently picked image if any
+                            token: token,
+                          );
+
+                          if (result['success']) {
+                            // Backend returns the new user data including image URL
+                            await UserManager().saveUser(result['data']);
+                            
+                            NotificationManager().addNotification(
+                              title: 'Profile Updated',
+                              message: 'Your personal details have been updated.',
+                              icon: '👤',
+                              type: 'profile',
+                            );
+
+                            setState(() {
+                              userName = UserManager().userName ?? newName;
+                              userEmail = UserManager().userEmail ?? userEmail;
+                              userPhone = UserManager().userPhone ?? (newPhone.isEmpty ? 'Add phone number' : newPhone);
+                            });
+                            
+                            if (mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Profile updated successfully!'),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          } else {
+                            setModalState(() => isSaving = false);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(result['message']),
+                                  backgroundColor: Colors.redAccent,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          }
+                        }
+                      },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Theme.of(context).colorScheme.primary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                          child: isSaving 
+                              ? const SizedBox(
+                                  height: 20, 
+                                  width: 20, 
+                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                                )
+                              : const Text('Save Changes'),
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+                    ],
                   ),
-                  const SizedBox(height: 30),
-                ],
+                ),
               ),
             );
           }
@@ -343,11 +349,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         height: 80,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: colorScheme.primary.withOpacity(0.1),
+                          color: colorScheme.primary.withValues(alpha: 0.1),
                           border: Border.all(color: colorScheme.primary, width: 2),
                         ),
                         child: Center(
-                          child: _pickedImage == null && userManager.profilePicture == null
+                          child: _pickedImage == null && UserManager().profilePicture == null
                               ? Text(
                                   _getInitials(userName),
                                   style: TextStyle(
@@ -372,7 +378,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                               height: 80,
                                             ))
                                       : Image.network(
-                                          userManager.profilePicture!,
+                                          UserManager().profilePicture!,
                                           fit: BoxFit.cover,
                                           width: 80,
                                           height: 80,
@@ -429,14 +435,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                           decoration: BoxDecoration(
-                            color: colorScheme.secondary.withOpacity(0.1),
+                            color: colorScheme.secondary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: colorScheme.secondary.withOpacity(0.5)),
+                            border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.5)),
                           ),
-                          child: Text(
+                          child: const Text(
                             'Pitta Dosha',
                             style: TextStyle(
-                              color: colorScheme.secondary,
+                              color: Color(0xFF1B264F),
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
@@ -463,13 +469,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Expanded(child: _buildStatItem('Orders', '12', Icons.local_shipping_outlined, colorScheme)),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(builder: (context) => const WishlistScreen()),
-                        ).then((_) => setState(() {}));
+                    child: ListenableBuilder(
+                      listenable: WishlistManager(),
+                      builder: (context, _) {
+                        return GestureDetector(
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(builder: (context) => const WishlistScreen()),
+                            ).then((_) => setState(() {}));
+                          },
+                          child: _buildStatItem('Wishlist', WishlistManager().items.length.toString(), Icons.favorite_border, colorScheme),
+                        );
                       },
-                      child: _buildStatItem('Wishlist', wishlistManager.items.length.toString(), Icons.favorite_border, colorScheme),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -513,7 +524,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: colorScheme.primary.withOpacity(0.05),
+                    color: colorScheme.primary.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -560,7 +571,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () async {
-                    await userManager.logout();
+                    await UserManager().logout();
                     if (mounted) {
                       Navigator.of(context).pushAndRemoveUntil(
                         MaterialPageRoute(builder: (context) => const AuthScreen()),
@@ -592,12 +603,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceVariant.withOpacity(0.3),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.primary.withOpacity(0.05)),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.05)),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.primary.withOpacity(0.03),
+            color: colorScheme.primary.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -630,7 +641,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,
-            color: colorScheme.primary.withOpacity(0.7),
+            color: colorScheme.primary.withValues(alpha: 0.7),
             letterSpacing: 1.1,
           ),
         ),
@@ -645,7 +656,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: colorScheme.primary.withOpacity(0.05),
+            color: colorScheme.primary.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, color: colorScheme.primary, size: 22),
@@ -708,7 +719,7 @@ class AboutKosmicoScreen extends StatelessWidget {
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.transparent,
-                          colorScheme.primary.withOpacity(0.8),
+                          colorScheme.primary.withValues(alpha: 0.8),
                         ],
                       ),
                     ),
@@ -791,7 +802,7 @@ class AboutKosmicoScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: colorScheme.primary.withOpacity(0.1),
+                color: colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Icon(Icons.spa_rounded, color: colorScheme.primary, size: 32),
@@ -820,7 +831,7 @@ class AboutKosmicoScreen extends StatelessWidget {
           style: TextStyle(
             fontSize: 16,
             height: 1.6,
-            color: colorScheme.onSurface.withOpacity(0.8),
+            color: colorScheme.onSurface.withValues(alpha: 0.8),
           ),
         ),
       ],
@@ -843,9 +854,9 @@ class AboutKosmicoScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
-        color: colorScheme.primary.withOpacity(0.05),
+        color: colorScheme.primary.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.primary.withOpacity(0.1)),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.1)),
       ),
       child: Column(
         children: [
@@ -872,9 +883,9 @@ class AboutKosmicoScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceVariant,
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -895,7 +906,7 @@ class AboutKosmicoScreen extends StatelessWidget {
             style: TextStyle(
               fontSize: 15,
               height: 1.5,
-              color: colorScheme.onSurface.withOpacity(0.7),
+              color: colorScheme.onSurface.withValues(alpha: 0.7),
             ),
           ),
         ],
@@ -910,7 +921,7 @@ class AboutKosmicoScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CircleAvatar(
-            backgroundColor: colorScheme.secondary.withOpacity(0.1),
+            backgroundColor: colorScheme.secondary.withValues(alpha: 0.1),
             child: Icon(icon, color: colorScheme.secondary, size: 20),
           ),
           const SizedBox(width: 16),

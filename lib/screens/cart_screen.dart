@@ -73,6 +73,7 @@ class _CartScreenState extends State<CartScreen> {
                     // Ensure values are not null before rendering
                     final String itemName = (item['name'] ?? 'Unknown Item').toString();
                     final String itemIcon = (item['icon'] ?? '🌿').toString();
+                    final String itemImage = (item['image'] ?? '').toString();
                     final String itemPrice = (item['price'] ?? 0).toString();
                     final String itemQuantity = (item['quantity'] ?? 1).toString();
 
@@ -80,11 +81,11 @@ class _CartScreenState extends State<CartScreen> {
                       margin: const EdgeInsets.only(bottom: 16),
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: colorScheme.surfaceVariant.withOpacity(0.5),
+                        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: colorScheme.primary.withOpacity(0.05),
+                            color: colorScheme.primary.withValues(alpha: 0.05),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -100,10 +101,22 @@ class _CartScreenState extends State<CartScreen> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             alignment: Alignment.center,
-                            child: Text(
-                              itemIcon,
-                              style: const TextStyle(fontSize: 32),
-                            ),
+                            child: itemImage.isNotEmpty
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Image.network(
+                                      itemImage,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) => Text(
+                                        itemIcon,
+                                        style: const TextStyle(fontSize: 32),
+                                      ),
+                                    ),
+                                  )
+                                : Text(
+                                    itemIcon,
+                                    style: const TextStyle(fontSize: 32),
+                                  ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
