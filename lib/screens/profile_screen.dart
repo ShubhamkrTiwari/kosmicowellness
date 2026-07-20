@@ -11,6 +11,7 @@ import '../managers/user_manager.dart';
 import '../managers/wishlist_manager.dart';
 import '../services/api_service.dart';
 import 'auth_screen.dart';
+import 'coupons_screen.dart';
 import 'help_center_screen.dart';
 import 'my_orders_screen.dart';
 import 'payment_methods_screen.dart';
@@ -331,269 +332,282 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      backgroundColor: colorScheme.surface,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            // Profile Header
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: Row(
-                children: [
-                  Stack(
-                    children: [
-                      Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: colorScheme.primary.withValues(alpha: 0.1),
-                          border: Border.all(color: colorScheme.primary, width: 2),
-                        ),
-                        child: Center(
-                          child: _pickedImage == null && UserManager().profilePicture == null
-                              ? Text(
-                                  _getInitials(userName),
-                                  style: TextStyle(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.bold,
-                                    color: colorScheme.primary,
-                                  ),
-                                )
-                              : ClipOval(
-                                  child: _pickedImage != null
-                                      ? (kIsWeb
-                                          ? Image.network(
-                                              _pickedImage!.path,
-                                              fit: BoxFit.cover,
-                                              width: 80,
-                                              height: 80,
-                                            )
-                                          : Image.file(
-                                              File(_pickedImage!.path),
-                                              fit: BoxFit.cover,
-                                              width: 80,
-                                              height: 80,
-                                            ))
-                                      : Image.network(
-                                          UserManager().profilePicture!,
-                                          fit: BoxFit.cover,
-                                          width: 80,
-                                          height: 80,
-                                          errorBuilder: (context, error, stackTrace) {
-                                            return Text(_getInitials(userName));
-                                          },
-                                        ),
-                                ),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: GestureDetector(
-                          onTap: _pickImage,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: colorScheme.primary,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                            child: const Icon(Icons.camera_alt, size: 14, color: Colors.white),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      color: colorScheme.surface,
+      child: SafeArea(
+        top: false, // AppBar is already handled by HomeScreen
+        bottom: false,
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              const SizedBox(height: 20),
+              // Profile Header
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                child: Row(
+                  children: [
+                    Stack(
                       children: [
-                        Text(
-                          userName,
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.primary,
-                              ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          userEmail,
-                          style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          userPhone,
-                          style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          width: 80,
+                          height: 80,
                           decoration: BoxDecoration(
-                            color: colorScheme.secondary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.5)),
+                            shape: BoxShape.circle,
+                            color: colorScheme.primary.withValues(alpha: 0.1),
+                            border: Border.all(color: colorScheme.primary, width: 2),
                           ),
-                          child: const Text(
-                            'Pitta Dosha',
-                            style: TextStyle(
-                              color: Color(0xFF1B264F),
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
+                          child: Center(
+                            child: _pickedImage == null && UserManager().profilePicture == null
+                                ? Text(
+                                    _getInitials(userName),
+                                    style: TextStyle(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.bold,
+                                      color: colorScheme.primary,
+                                    ),
+                                  )
+                                : ClipOval(
+                                    child: _pickedImage != null
+                                        ? (kIsWeb
+                                            ? Image.network(
+                                                _pickedImage!.path,
+                                                fit: BoxFit.cover,
+                                                width: 80,
+                                                height: 80,
+                                              )
+                                            : Image.file(
+                                                File(_pickedImage!.path),
+                                                fit: BoxFit.cover,
+                                                width: 80,
+                                                height: 80,
+                                              ))
+                                        : Image.network(
+                                            UserManager().profilePicture!,
+                                            fit: BoxFit.cover,
+                                            width: 80,
+                                            height: 80,
+                                            errorBuilder: (context, error, stackTrace) {
+                                              return Text(_getInitials(userName));
+                                            },
+                                          ),
+                                  ),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: GestureDetector(
+                            onTap: _pickImage,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primary,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                              child: const Icon(Icons.camera_alt, size: 14, color: Colors.white),
                             ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  IconButton(
-                    onPressed: _showEditProfileSheet,
-                    icon: Icon(Icons.edit_outlined, color: colorScheme.primary),
-                  ),
-                ],
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            userName,
+                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.primary,
+                                ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            userEmail,
+                            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            userPhone,
+                            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: colorScheme.secondary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.5)),
+                            ),
+                            child: const Text(
+                              'Pitta Dosha',
+                              style: TextStyle(
+                                color: Color(0xFF1B264F),
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _showEditProfileSheet,
+                      icon: Icon(Icons.edit_outlined, color: colorScheme.primary),
+                    ),
+                  ],
+                ),
               ),
-            ),
 
-            const SizedBox(height: 30),
+              const SizedBox(height: 30),
 
-            // Wellness Stats
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: Row(
-                children: [
-                  Expanded(child: _buildStatItem('Orders', '12', Icons.local_shipping_outlined, colorScheme)),
-                  const SizedBox(width: 12),
+              // Wellness Stats
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                child: Row(
+                  children: [
+                    Expanded(child: _buildStatItem('Orders', '12', Icons.local_shipping_outlined, colorScheme)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ListenableBuilder(
+                        listenable: WishlistManager(),
+                        builder: (context, _) {
+                          return GestureDetector(
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(builder: (context) => const WishlistScreen()),
+                              ).then((_) => setState(() {}));
+                            },
+                            child: _buildStatItem('Wishlist', WishlistManager().items.length.toString(), Icons.favorite_border, colorScheme),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
                   Expanded(
-                    child: ListenableBuilder(
-                      listenable: WishlistManager(),
-                      builder: (context, _) {
-                        return GestureDetector(
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(builder: (context) => const WishlistScreen()),
-                            ).then((_) => setState(() {}));
-                          },
-                          child: _buildStatItem('Wishlist', WishlistManager().items.length.toString(), Icons.favorite_border, colorScheme),
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (context) => const CouponsScreen()),
                         );
                       },
+                      child: _buildStatItem('Coupons', '3', Icons.confirmation_number_outlined, colorScheme),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildStatItem('Coupons', '3', Icons.confirmation_number_outlined, colorScheme)),
                 ],
-              ),
-            ),
-
-            const SizedBox(height: 30),
-
-            // Settings Section
-            _buildSectionHeader('Account Settings', colorScheme),
-            _buildMenuItem(Icons.shopping_bag_outlined, 'My Orders', 'Track and manage your orders', colorScheme, onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const MyOrdersScreen()),
-              );
-            }),
-            _buildMenuItem(Icons.location_on_outlined, 'Shipping Addresses', 'Manage your delivery locations', colorScheme, onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const ShippingAddressesScreen()),
-              );
-            }),
-            _buildMenuItem(Icons.payment_outlined, 'Payment Methods', 'Saved cards and UPI', colorScheme, onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const PaymentMethodsScreen()),
-              );
-            }),
-            
-            const SizedBox(height: 20),
-            
-            _buildSectionHeader('Wellness Profile', colorScheme),
-            _buildMenuItem(Icons.health_and_safety_outlined, 'My Dosha Profile', 'View your Ayurvedic constitution', colorScheme),
-            _buildMenuItem(Icons.history_outlined, 'Consultation History', 'Previous sessions with doctors', colorScheme),
-
-            const SizedBox(height: 20),
-
-            _buildSectionHeader('Support & Preferences', colorScheme),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4),
-              child: ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    ThemeManager().isDarkMode ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
-                    color: colorScheme.primary,
-                    size: 22,
-                  ),
-                ),
-                title: const Text(
-                  'Dark Mode',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-                ),
-                subtitle: Text(
-                  ThemeManager().isDarkMode ? 'Currently Dark' : 'Currently Light',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                ),
-                trailing: Switch(
-                  value: ThemeManager().isDarkMode,
-                  onChanged: (value) async {
-                    await ThemeManager().toggleTheme();
-                    setState(() {});
-                  },
-                  activeTrackColor: colorScheme.primary,
                 ),
               ),
-            ),
-            _buildMenuItem(Icons.help_outline, 'Help Center', 'FAQs and support chat', colorScheme, onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const HelpCenterScreen()),
-              );
-            }),
-            _buildMenuItem(Icons.info_outline, 'About Kosmico', 'Our story and values', colorScheme, onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const AboutKosmicoScreen()),
-              );
-            }),
 
-            const SizedBox(height: 30),
+              const SizedBox(height: 30),
 
-            // Logout Button
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () async {
-                    await UserManager().logout();
-                    if (mounted) {
-                      Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (context) => const AuthScreen()),
-                        (route) => false,
-                      );
-                    }
-                  },
-                  icon: const Icon(Icons.logout, size: 20),
-                  label: const Text('Logout'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.redAccent,
-                    side: const BorderSide(color: Colors.redAccent),
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+              // Settings Section
+              _buildSectionHeader('Account Settings', colorScheme),
+              _buildMenuItem(Icons.shopping_bag_outlined, 'My Orders', 'Track and manage your orders', colorScheme, onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const MyOrdersScreen()),
+                );
+              }),
+              _buildMenuItem(Icons.location_on_outlined, 'Shipping Addresses', 'Manage your delivery locations', colorScheme, onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const ShippingAddressesScreen()),
+                );
+              }),
+              _buildMenuItem(Icons.payment_outlined, 'Payment Methods', 'Saved cards and UPI', colorScheme, onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const PaymentMethodsScreen()),
+                );
+              }),
+              
+              const SizedBox(height: 20),
+              
+              _buildSectionHeader('Wellness Profile', colorScheme),
+              _buildMenuItem(Icons.health_and_safety_outlined, 'My Dosha Profile', 'View your Ayurvedic constitution', colorScheme),
+              _buildMenuItem(Icons.history_outlined, 'Consultation History', 'Previous sessions with doctors', colorScheme),
+
+              const SizedBox(height: 20),
+
+              _buildSectionHeader('Support & Preferences', colorScheme),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4),
+                child: ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      ThemeManager().isDarkMode ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+                      color: colorScheme.primary,
+                      size: 22,
+                    ),
+                  ),
+                  title: const Text(
+                    'Dark Mode',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                  ),
+                  subtitle: Text(
+                    ThemeManager().isDarkMode ? 'Currently Dark' : 'Currently Light',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                  trailing: Switch(
+                    value: ThemeManager().isDarkMode,
+                    onChanged: (value) async {
+                      await ThemeManager().toggleTheme();
+                      setState(() {});
+                    },
+                    activeTrackColor: colorScheme.primary,
+                  ),
+                ),
+              ),
+              _buildMenuItem(Icons.help_outline, 'Help Center', 'FAQs and support chat', colorScheme, onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const HelpCenterScreen()),
+                );
+              }),
+              _buildMenuItem(Icons.info_outline, 'About Kosmico', 'Our story and values', colorScheme, onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const AboutKosmicoScreen()),
+                );
+              }),
+
+              const SizedBox(height: 30),
+
+              // Logout Button
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      await UserManager().logout();
+                      if (mounted) {
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(builder: (context) => const AuthScreen()),
+                          (route) => false,
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.logout, size: 20),
+                    label: const Text('Logout'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.redAccent,
+                      side: const BorderSide(color: Colors.redAccent),
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 120), // Bottom padding for floating nav bar
-          ],
+              const SizedBox(height: 140), // Bottom padding for floating nav bar
+            ],
+          ),
         ),
       ),
     );
@@ -601,7 +615,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildStatItem(String label, String value, IconData icon, ColorScheme colorScheme) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(20),
@@ -615,16 +629,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, color: colorScheme.primary, size: 24),
           const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
           ),
           Text(
             label,
-            style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: Colors.grey[600], fontSize: 11),
           ),
         ],
       ),

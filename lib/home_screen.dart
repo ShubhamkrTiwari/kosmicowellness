@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:device_preview/device_preview.dart';
 import 'package:flutter/services.dart';
 import 'screens/splash_screen.dart';
@@ -94,7 +95,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _selectedIndex = 0;
   String _selectedHomeCategory = 'All';
   List<String> _homeCategories = ['All'];
@@ -104,15 +105,55 @@ class _HomeScreenState extends State<HomeScreen> {
   
   List<Map<String, dynamic>> _apiProducts = [];
   bool _isLoadingProducts = false;
+  Timer? _refreshTimer;
+
+  final GlobalKey<ProductListScreenState> _productListKey = GlobalKey<ProductListScreenState>();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkForUpdates();
-      _fetchCategories();
-      _fetchProducts();
+      _refreshAllData();
     });
+    
+    // Auto refresh every 5 minutes
+    _refreshTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
+      _refreshAllData();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      print('DEBUG: App resumed, auto-refreshing data...');
+      _refreshAllData();
+    }
+  }
+
+  List<Map<String, dynamic>> get _filteredHomeProducts {
+    if (_selectedHomeCategory == 'All') {
+      return _apiProducts;
+    }
+    return _apiProducts.where((product) {
+      return product['category']?.toString().toLowerCase() == _selectedHomeCategory.toLowerCase();
+    }).toList();
+  }
+
+  Future<void> _refreshAllData() async {
+    await Future.wait([
+      _checkForUpdates(),
+      _fetchCategories(),
+      _fetchProducts(),
+      NotificationManager().fetchFromApi(),
+    ]);
   }
 
   Future<void> _fetchCategories() async {
@@ -287,11 +328,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHomeBody(ColorScheme colorScheme) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 120),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    return RefreshIndicator(
+      onRefresh: () async {
+        _refreshAllData();
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(bottom: 140),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           if (_showUpdateBanner && _updateData != null)
             _buildUpdateBanner(colorScheme),
 
@@ -420,11 +466,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: EdgeInsets.all(40.0),
                 child: CircularProgressIndicator(),
               ))
-            : _apiProducts.isEmpty 
+            : _filteredHomeProducts.isEmpty 
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(40.0),
-                    child: Text('No products found', style: TextStyle(color: Colors.grey[500])),
+                    child: Text('No products found in this category', style: TextStyle(color: Colors.grey[500])),
                   ),
                 )
               : GridView.builder(
@@ -437,9 +483,9 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
             ),
-            itemCount: _apiProducts.length,
+            itemCount: _filteredHomeProducts.length,
             itemBuilder: (context, index) {
-              final product = _apiProducts[index];
+              final product = _filteredHomeProducts[index];
               final String name = (product['name'] ?? 'Product').toString();
               final String imageUrl = (product['image'] ?? '').toString();
               final String price = '₹${product['price'] ?? 0}';
@@ -531,19 +577,19 @@ class _HomeScreenState extends State<HomeScreen> {
                           name,
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                            fontSize: 13,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Text(
                           (product['description'] ?? '').toString(),
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             color: Colors.grey[600],
                           ),
-                          maxLines: 2,
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 12),
@@ -569,12 +615,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                 return InkWell(
                                   onTap: () {
                                     CartManager().addItem(product);
+                                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text('$name added to cart!'),
-                                        duration: const Duration(seconds: 1),
+                                        duration: const Duration(milliseconds: 1500),
                                         behavior: SnackBarBehavior.floating,
                                         backgroundColor: colorScheme.primary,
+                                        action: SnackBarAction(
+                                          label: 'View',
+                                          textColor: Colors.white,
+                                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => CartScreen())),
+                                        ),
                                       ),
                                     );
                                   },
@@ -635,6 +687,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 
@@ -681,7 +734,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      extendBody: true,
+      extendBody: false,
       appBar: AppBar(
         backgroundColor: colorScheme.surface,
         surfaceTintColor: Colors.transparent,
@@ -837,22 +890,19 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: Container(
-        color: colorScheme.surface,
-        child: IndexedStack(
-          index: _selectedIndex,
-          children: [
-            _buildHomeBody(colorScheme),
-            const ProductListScreen(),
-            const ProfileScreen(),
-          ],
-        ),
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: [
+          Container(color: colorScheme.surface, child: _buildHomeBody(colorScheme)),
+          Container(color: colorScheme.surface, child: ProductListScreen(key: _productListKey)),
+          Container(color: colorScheme.surface, child: const ProfileScreen()),
+        ],
       ),
       bottomNavigationBar: Container(
         margin: const EdgeInsets.fromLTRB(20, 0, 20, 30),
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
         decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+          color: colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(30),
           border: Border.all(
             color: colorScheme.primary.withValues(alpha: 0.15),
@@ -887,7 +937,14 @@ class _HomeScreenState extends State<HomeScreen> {
           setState(() {
             _selectedIndex = index;
           });
+          
+          // Specifically refresh ProductListScreen if switching to it
+          if (index == 1) {
+            _productListKey.currentState?.refreshData();
+          }
         }
+        // Refresh data when any tab is clicked (including current one)
+        _refreshAllData();
       },
       splashColor: Colors.transparent,
       highlightColor: Colors.transparent,
@@ -898,7 +955,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 450),
           curve: Curves.easeInOutCubic,
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           decoration: BoxDecoration(
             color: isSelected ? colorScheme.primary : Colors.transparent,
             borderRadius: BorderRadius.circular(22),

@@ -85,12 +85,18 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> with SingleTickerProvid
       },
     ];
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(20),
-      itemCount: orders.length,
-      itemBuilder: (context, index) {
-        return _buildOrderCard(orders[index], colorScheme, true);
+    return RefreshIndicator(
+      onRefresh: () async {
+        setState(() {});
       },
+      child: ListView.builder(
+        padding: const EdgeInsets.all(20),
+        physics: const AlwaysScrollableScrollPhysics(),
+        itemCount: orders.length,
+        itemBuilder: (context, index) {
+          return _buildOrderCard(orders[index], colorScheme, true);
+        },
+      ),
     );
   }
 
@@ -114,12 +120,18 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> with SingleTickerProvid
       },
     ];
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(20),
-      itemCount: orders.length,
-      itemBuilder: (context, index) {
-        return _buildOrderCard(orders[index], colorScheme, false);
+    return RefreshIndicator(
+      onRefresh: () async {
+        setState(() {});
       },
+      child: ListView.builder(
+        padding: const EdgeInsets.all(20),
+        physics: const AlwaysScrollableScrollPhysics(),
+        itemCount: orders.length,
+        itemBuilder: (context, index) {
+          return _buildOrderCard(orders[index], colorScheme, false);
+        },
+      ),
     );
   }
 
@@ -228,21 +240,22 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> with SingleTickerProvid
                 } else {
                   // Reorder Action
                   CartManager().addItem(order);
-
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Row(
                         children: [
                           const Icon(Icons.check_circle, color: Colors.white),
                           const SizedBox(width: 12),
-                          Text('${order['items']} added to cart!'),
+                          Expanded(child: Text('${order['items']} added to cart!')),
                         ],
                       ),
                       backgroundColor: colorScheme.primary,
                       behavior: SnackBarBehavior.floating,
+                      duration: const Duration(milliseconds: 1500),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       action: SnackBarAction(
-                        label: 'View Cart',
+                        label: 'View',
                         textColor: Colors.white,
                         onPressed: () {
                           Navigator.of(context).push(

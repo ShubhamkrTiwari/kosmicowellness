@@ -271,27 +271,37 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                     const SizedBox(height: 40),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(isBank ? 'ACCOUNT HOLDER' : 'DISPLAY NAME', style: const TextStyle(color: Colors.white54, fontSize: 10, letterSpacing: 1)),
-                            const SizedBox(height: 4),
-                            Text(
-                              (isBank ? (method['accountHolderName'] ?? 'NAME NOT SET') : (method['displayName'] ?? method['name'] ?? 'NAME NOT SET')).toString().toUpperCase(),
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)
-                            ),
-                          ],
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(isBank ? 'ACCOUNT HOLDER' : 'DISPLAY NAME', style: const TextStyle(color: Colors.white54, fontSize: 10, letterSpacing: 1)),
+                              const SizedBox(height: 4),
+                              Text(
+                                (isBank ? (method['accountHolderName'] ?? 'NAME NOT SET') : (method['displayName'] ?? method['name'] ?? 'NAME NOT SET')).toString().toUpperCase(),
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
                         ),
-                        if (isBank)
+                        if (isBank) ...[
+                          const SizedBox(width: 16),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text('IFSC', style: TextStyle(color: Colors.white54, fontSize: 10, letterSpacing: 1)),
                               const SizedBox(height: 4),
-                              Text(method['ifscCode']?.toString() ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+                              Text(
+                                method['ifscCode']?.toString() ?? '', 
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)
+                              ),
                             ],
                           ),
+                        ],
                       ],
                     ),
                   ],

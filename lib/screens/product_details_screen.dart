@@ -107,30 +107,34 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                product['category']?.toUpperCase() ?? 'WELLNESS',
-                                style: TextStyle(
-                                  color: colorScheme.primary,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                  letterSpacing: 2,
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  product['category']?.toUpperCase() ?? 'WELLNESS',
+                                  style: TextStyle(
+                                    color: colorScheme.primary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                    letterSpacing: 1.5,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                product['name']!,
-                                style: const TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: -0.5,
+                                const SizedBox(height: 6),
+                                Text(
+                                  product['name']!,
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: -0.5,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 12),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
@@ -157,7 +161,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       Text(
                         (product['price'] ?? '₹0').toString(),
                         style: TextStyle(
-                          fontSize: 32,
+                          fontSize: 28,
                           fontWeight: FontWeight.w900,
                           color: colorScheme.secondary,
                         ),
@@ -300,15 +304,17 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   for (int i = 0; i < _quantity; i++) {
                     CartManager().addItem(product);
                   }
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Added $_quantity ${product['name']} to cart'),
                       behavior: SnackBarBehavior.floating,
                       backgroundColor: colorScheme.primary,
+                      duration: const Duration(milliseconds: 1500),
                       action: SnackBarAction(
-                        label: 'Cart',
+                        label: 'View',
                         textColor: Colors.white,
-                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CartScreen())),
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => CartScreen())),
                       ),
                     ),
                   );

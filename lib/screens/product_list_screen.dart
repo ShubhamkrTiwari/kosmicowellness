@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../managers/notification_manager.dart';
+import 'cart_screen.dart';
 import 'product_details_screen.dart';
 import '../managers/cart_manager.dart';
 import '../managers/wishlist_manager.dart';
@@ -9,16 +12,21 @@ class ProductListScreen extends StatefulWidget {
   const ProductListScreen({super.key});
 
   @override
-  State<ProductListScreen> createState() => _ProductListScreenState();
+  State<ProductListScreen> createState() => ProductListScreenState();
 }
 
-class _ProductListScreenState extends State<ProductListScreen> {
+class ProductListScreenState extends State<ProductListScreen> {
   String _selectedCategory = 'All';
   String _searchQuery = '';
   List<String> _categories = ['All'];
 
   List<Map<String, dynamic>> _apiProducts = [];
   bool _isLoading = false;
+  Timer? _refreshTimer;
+
+  void refreshData() {
+    _refreshAll();
+  }
 
   @override
   void initState() {
@@ -26,15 +34,26 @@ class _ProductListScreenState extends State<ProductListScreen> {
     _fetchCategories();
     _fetchProducts();
     
-    // Demo: Trigger a notification for a new product
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      NotificationManager().addNotification(
-        title: 'New Arrival!',
-        message: 'Explore our latest organic collections.',
-        icon: '🥤',
-        type: 'product',
-      );
+    // Auto refresh every 5 minutes while on this screen
+    _refreshTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
+      if (mounted) {
+        _fetchCategories();
+        _fetchProducts();
+      }
     });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refreshAll() async {
+    await Future.wait([
+      _fetchCategories(),
+      _fetchProducts(),
+    ]);
   }
 
   Future<void> _fetchCategories() async {
@@ -92,8 +111,9 @@ class _ProductListScreenState extends State<ProductListScreen> {
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
-          onRefresh: _fetchProducts,
+          onRefresh: _refreshAll,
           child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               // Scrolling Header
               SliverToBoxAdapter(
@@ -109,7 +129,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
               ),
               // The List of Products
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 120),
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 140),
                 sliver: _isLoading && filteredList.isEmpty
                   ? const SliverToBoxAdapter(child: Center(child: Padding(
                       padding: EdgeInsets.only(top: 100),
@@ -388,12 +408,18 @@ class _ProductListScreenState extends State<ProductListScreen> {
                           return ElevatedButton(
                             onPressed: () {
                               CartManager().addItem(product);
+                              ScaffoldMessenger.of(context).hideCurrentSnackBar();
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text('Added to cart'),
                                   behavior: SnackBarBehavior.floating,
                                   backgroundColor: colorScheme.primary,
-                                  duration: const Duration(seconds: 1),
+                                  duration: const Duration(milliseconds: 1500),
+                                  action: SnackBarAction(
+                                    label: 'View',
+                                    textColor: Colors.white,
+                                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => CartScreen())),
+                                  ),
                                 ),
                               );
                             },
