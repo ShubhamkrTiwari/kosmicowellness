@@ -332,7 +332,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Container(
+    return Material(
       color: colorScheme.surface,
       child: SafeArea(
         top: false, // AppBar is already handled by HomeScreen
@@ -435,23 +435,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
                             overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: colorScheme.secondary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.5)),
-                            ),
-                            child: const Text(
-                              'Pitta Dosha',
-                              style: TextStyle(
-                                color: Color(0xFF1B264F),
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -525,7 +508,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 20),
               
               _buildSectionHeader('Wellness Profile', colorScheme),
-              _buildMenuItem(Icons.health_and_safety_outlined, 'My Dosha Profile', 'View your Ayurvedic constitution', colorScheme),
               _buildMenuItem(Icons.history_outlined, 'Consultation History', 'Previous sessions with doctors', colorScheme),
 
               const SizedBox(height: 20),
@@ -533,34 +515,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _buildSectionHeader('Support & Preferences', colorScheme),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4),
-                child: ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primary.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(12),
+                child: Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        ThemeManager().isDarkMode ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+                        color: colorScheme.primary,
+                        size: 22,
+                      ),
                     ),
-                    child: Icon(
-                      ThemeManager().isDarkMode ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
-                      color: colorScheme.primary,
-                      size: 22,
+                    title: const Text(
+                      'Dark Mode',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
                     ),
-                  ),
-                  title: const Text(
-                    'Dark Mode',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-                  ),
-                  subtitle: Text(
-                    ThemeManager().isDarkMode ? 'Currently Dark' : 'Currently Light',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                  trailing: Switch(
-                    value: ThemeManager().isDarkMode,
-                    onChanged: (value) async {
-                      await ThemeManager().toggleTheme();
-                      setState(() {});
-                    },
-                    activeTrackColor: colorScheme.primary,
+                    subtitle: Text(
+                      ThemeManager().isDarkMode ? 'Currently Dark' : 'Currently Light',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                    trailing: Switch(
+                      value: ThemeManager().isDarkMode,
+                      onChanged: (value) async {
+                        await ThemeManager().toggleTheme();
+                        setState(() {});
+                      },
+                      activeTrackColor: colorScheme.primary,
+                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                 ),
               ),
@@ -673,25 +659,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildMenuItem(IconData icon, String title, String subtitle, ColorScheme colorScheme, {VoidCallback? onTap}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4),
-      child: ListTile(
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: colorScheme.primary.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(12),
+      child: Material(
+        color: Colors.transparent,
+        child: ListTile(
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: colorScheme.primary, size: 22),
           ),
-          child: Icon(icon, color: colorScheme.primary, size: 22),
+          title: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+          ),
+          subtitle: Text(
+            subtitle,
+            style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+          ),
+          trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+          onTap: onTap ?? () {},
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
-        title: Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
-        ),
-        trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
-        onTap: onTap ?? () {},
       ),
     );
   }

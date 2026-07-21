@@ -191,12 +191,16 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                               _focusNodes[index - 1].requestFocus();
                             }
                           },
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 20, 
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
+                          ),
                           keyboardType: TextInputType.number,
                           textAlign: TextAlign.center,
                           decoration: InputDecoration(
                             filled: true,
-                            fillColor: Colors.white,
+                            fillColor: colorScheme.surfaceContainerHighest,
                             contentPadding: EdgeInsets.zero,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -204,7 +208,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide: BorderSide(color: colorScheme.outline.withOpacity(0.2)),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),

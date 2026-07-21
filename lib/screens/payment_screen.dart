@@ -179,7 +179,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   Expanded(
                     child: _buildTypeCard(
                       title: 'Bank Account',
-                      icon: Icons.account_balance_outlined,
+                      logo: Image.network(
+                        'https://cdn-icons-png.flaticon.com/512/2830/2830284.png', // Professional Bank/Building Icon
+                        height: 32,
+                        width: 32,
+                        color: _selectedMethod == 'Bank' ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                        errorBuilder: (context, error, stackTrace) => Icon(
+                          Icons.account_balance, 
+                          size: 32,
+                          color: _selectedMethod == 'Bank' ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                       isSelected: _selectedMethod == 'Bank',
                       onTap: _isSavingLocal ? () {} : () => setState(() => _selectedMethod = 'Bank'),
                     ),
@@ -188,7 +198,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   Expanded(
                     child: _buildTypeCard(
                       title: 'UPI ID',
-                      icon: Icons.vibration_outlined,
+                      logo: Image.network(
+                        'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/UPI-Logo-vector.svg/640px-UPI-Logo-vector.svg.png', // Official UPI Logo
+                        height: 32,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => Icon(
+                          Icons.qr_code_scanner, 
+                          size: 32,
+                          color: _selectedMethod == 'UPI' ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                       isSelected: _selectedMethod == 'UPI',
                       onTap: _isSavingLocal ? () {} : () => setState(() => _selectedMethod = 'UPI'),
                     ),
@@ -283,7 +302,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   Widget _buildTypeCard({
     required String title,
-    required IconData icon,
+    required Widget logo,
     required bool isSelected,
     required VoidCallback onTap,
   }) {
@@ -305,10 +324,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
         ),
         child: Column(
           children: [
-            Icon(
-              icon,
-              size: 32,
-              color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+            SizedBox(
+              height: 32,
+              child: logo,
             ),
             const SizedBox(height: 8),
             Text(

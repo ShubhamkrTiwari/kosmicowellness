@@ -71,8 +71,16 @@ class MyApp extends StatelessWidget {
               brightness: Brightness.dark,
               primary: const Color(0xFF00833E),
               secondary: const Color(0xFF4CBB17),
-              surface: const Color(0xFF1A1C18),
-              onSurface: const Color(0xFFE2E3DC),
+              surface: const Color(0xFF262626), // Even lighter matte black/grey
+              surfaceContainerHighest: const Color(0xFF333333), // Lighter Grey for cards
+              onSurface: Colors.white,
+              onSurfaceVariant: Colors.grey[400],
+            ),
+            scaffoldBackgroundColor: const Color(0xFF262626),
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Color(0xFF262626),
+              elevation: 0,
+              centerTitle: true,
             ),
             textTheme: const TextTheme(
               displayLarge: TextStyle(fontFamily: 'Serif', fontWeight: FontWeight.bold, color: Colors.white),
