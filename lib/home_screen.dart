@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'screens/splash_screen.dart';
 import 'screens/cart_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/ai_consultant_screen.dart';
 import 'screens/notification_screen.dart';
 import 'screens/product_details_screen.dart';
 import 'screens/product_list_screen.dart';
@@ -931,6 +932,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             Expanded(child: _buildNavItem(1, Icons.category_outlined, Icons.category_rounded, 'Products', colorScheme)),
             Expanded(child: _buildNavItem(2, Icons.person_outline_rounded, Icons.person_rounded, 'Profile', colorScheme)),
           ],
+        ),
+      ),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 20.0),
+        child: FloatingActionButton(
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => const AiConsultantScreen()),
+            );
+          },
+          backgroundColor: colorScheme.secondary,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: const Icon(Icons.assistant, color: Colors.white),
         ),
       ),
     );
