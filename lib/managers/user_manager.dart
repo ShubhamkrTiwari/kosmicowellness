@@ -36,7 +36,11 @@ class UserManager {
     _userName = user['name'] ?? user['userName'] ?? manualName;
     _userEmail = user['email'];
     _userPhone = user['phone'] ?? user['mobile'] ?? user['phoneNumber'];
-    _profilePicture = user['profilePicture'] ?? _profilePicture;
+    
+    // Explicitly check for profilePicture key to handle null/removal
+    if (user.containsKey('profilePicture')) {
+      _profilePicture = user['profilePicture'];
+    }
 
     // Update token if it's provided in the response (check multiple possible locations)
     String? newToken = userData['token'] ?? userData['data']?['token'] ?? userData['authToken'] ?? user['token'];
@@ -48,13 +52,21 @@ class UserManager {
     if (_userName != null) await prefs.setString('user_name', _userName!);
     if (_userEmail != null) await prefs.setString('user_email', _userEmail!);
     if (_userPhone != null) await prefs.setString('user_phone', _userPhone!);
-    if (_profilePicture != null) await prefs.setString('profile_picture', _profilePicture!);
+    if (_profilePicture != null) {
+      await prefs.setString('profile_picture', _profilePicture!);
+    } else {
+      await prefs.remove('profile_picture');
+    }
   }
 
-  Future<void> updateProfilePicture(String imageUrl) async {
+  Future<void> updateProfilePicture(String? imageUrl) async {
     final prefs = await SharedPreferences.getInstance();
     _profilePicture = imageUrl;
-    await prefs.setString('profile_picture', imageUrl);
+    if (imageUrl != null) {
+      await prefs.setString('profile_picture', imageUrl);
+    } else {
+      await prefs.remove('profile_picture');
+    }
   }
 
   Future<void> updateProfile(String name, String email, String phone) async {

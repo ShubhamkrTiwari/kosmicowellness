@@ -5,6 +5,7 @@ import '../managers/user_manager.dart';
 import '../services/api_service.dart';
 import 'shipping_addresses_screen.dart';
 import 'payment_methods_screen.dart';
+import 'coupons_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -16,8 +17,48 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   Map<String, dynamic>? _selectedAddress;
   Map<String, dynamic>? _selectedPaymentMethod;
+  Map<String, dynamic>? _appliedCoupon;
+  double _discountAmount = 0.0;
   bool _isLoading = false;
   bool _isPlacingOrder = false;
+
+  double get _finalTotal => CartManager().totalPrice - _discountAmount;
+
+  Future<void> _applyCouponCode(String code) async {
+    setState(() => _isLoading = true);
+    final token = UserManager().token;
+    if (token != null) {
+      final result = await ApiService.applyCoupon(
+        code: code,
+        orderAmount: CartManager().totalPrice,
+        token: token,
+      );
+
+      if (result['success'] && result['data'] != null) {
+        final data = result['data'];
+        setState(() {
+          _discountAmount = (data['discountAmount'] ?? 0.0).toDouble();
+          _appliedCoupon = data['couponDetails'];
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(result['message'] ?? 'Coupon applied!'), backgroundColor: Colors.green),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(result['message'] ?? 'Invalid coupon'), backgroundColor: Colors.red),
+          );
+        }
+        setState(() {
+          _appliedCoupon = null;
+          _discountAmount = 0.0;
+        });
+      }
+    }
+    setState(() => _isLoading = false);
+  }
 
   @override
   void initState() {
@@ -85,8 +126,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         items: cartItems,
         addressId: addressId,
         paymentMethodId: paymentMethodId,
-        totalPrice: CartManager().totalPrice,
+        totalPrice: _finalTotal,
         token: token,
+        couponCode: _appliedCoupon?['code'],
       );
 
       if (result['success']) {
@@ -147,6 +189,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         centerTitle: true,
         elevation: 0,
         backgroundColor: colorScheme.surface,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ),
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator())
@@ -177,6 +223,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 _buildPaymentCard(colorScheme),
                 const SizedBox(height: 24),
 
+                _buildSectionHeader('Apply Coupon', () async {
+                  final result = await Navigator.of(context).push(
+                    MaterialPageRoute(builder: (context) => const CouponsScreen(isSelectionMode: true))
+                  );
+                  if (result != null && result is Map<String, dynamic>) {
+                    _applyCouponCode(result['code']);
+                  }
+                }),
+                _buildCouponCard(colorScheme),
+                const SizedBox(height: 24),
+
                 const Text('Order Summary', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 16),
                 _buildOrderSummary(cartManager, colorScheme),
@@ -202,7 +259,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             child: _isPlacingOrder 
               ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-              : Text('Place Order - ₹${cartManager.totalPrice.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              : Text('Place Order - ₹${_finalTotal.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ),
         ),
       ),
@@ -325,6 +382,76 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  Widget _buildCouponCard(ColorScheme colorScheme) {
+    if (_appliedCoupon == null) {
+      return InkWell(
+        onTap: () async {
+          final result = await Navigator.of(context).push(
+            MaterialPageRoute(builder: (context) => const CouponsScreen(isSelectionMode: true))
+          );
+          if (result != null && result is Map<String, dynamic>) {
+            _applyCouponCode(result['code']);
+          }
+        },
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.confirmation_number_outlined, color: colorScheme.primary),
+              const SizedBox(width: 12),
+              const Text('Select a coupon code', style: TextStyle(color: Colors.grey)),
+              const Spacer(),
+              const Icon(Icons.chevron_right, color: Colors.grey),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final String title = _appliedCoupon!['title'] ?? 'OFFER';
+    final String code = _appliedCoupon!['code'] ?? '';
+    final String type = _appliedCoupon!['discountType'] ?? 'fixed';
+    Color couponColor = colorScheme.primary;
+    if (type == 'percentage') couponColor = const Color(0xFF00833E);
+    if (type == 'fixed') couponColor = const Color(0xFF1B264F);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: couponColor.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: couponColor.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.stars_rounded, color: couponColor),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(code, style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(title, style: TextStyle(color: couponColor, fontSize: 12, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () => setState(() {
+              _appliedCoupon = null;
+              _discountAmount = 0.0;
+            }),
+            child: const Text('Remove', style: TextStyle(color: Colors.red, fontSize: 12)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildOrderSummary(CartManager cartManager, ColorScheme colorScheme) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -352,6 +479,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               Text('₹${cartManager.totalPrice.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w500)),
             ],
           ),
+          if (_appliedCoupon != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Coupon Discount', style: TextStyle(color: Colors.grey)),
+                Text('- ₹${_discountAmount.toStringAsFixed(0)}', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ],
           const SizedBox(height: 8),
           const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -366,7 +503,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             children: [
               const Text('Total Amount', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               Text(
-                '₹${cartManager.totalPrice.toStringAsFixed(0)}', 
+                '₹${_finalTotal.toStringAsFixed(0)}',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: colorScheme.primary)
               ),
             ],

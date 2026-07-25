@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geocoding/geocoding.dart';
 
 import '../managers/user_manager.dart';
 import '../services/api_service.dart';
+import 'map_picker_screen.dart';
 
 class ShippingAddressesScreen extends StatefulWidget {
   final bool isSelectionMode;
@@ -86,9 +88,59 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    isEditing ? 'Edit Address' : 'Add New Address',
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        isEditing ? 'Edit Address' : 'Add New Address',
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                      TextButton.icon(
+                        onPressed: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const MapPickerScreen()),
+                          );
+
+                          if (result != null && result is Map) {
+                            if (result['placemark'] != null) {
+                              Placemark place = result['placemark'];
+                              setModalState(() {
+                                // Intelligent merging of Landmark (name) and Street
+                                String landmark = place.name ?? '';
+                                String street = place.street ?? '';
+                                
+                                List<String> addressParts = [];
+                                
+                                // If name is same as street or house number, don't duplicate
+                                if (landmark.isNotEmpty && landmark != street) {
+                                  addressParts.add(landmark);
+                                }
+                                
+                                if (street.isNotEmpty) {
+                                  addressParts.add(street);
+                                }
+                                
+                                if (place.subLocality != null && place.subLocality!.isNotEmpty) {
+                                  addressParts.add(place.subLocality!);
+                                }
+
+                                addressController.text = addressParts.join(', ');
+                                cityController.text = place.locality ?? place.subAdministrativeArea ?? '';
+                                pincodeController.text = place.postalCode ?? '';
+                              });
+                            } else if (result['address'] != null) {
+                              // Web fallback
+                              setModalState(() {
+                                addressController.text = result['address'];
+                              });
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.map_outlined, size: 18),
+                        label: const Text("Locate on Map", style: TextStyle(fontSize: 12)),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 24),
               TextField(
@@ -140,7 +192,7 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
                 onChanged: (val) {
                   setModalState(() => isDefaultValue = val);
                 },
-                activeColor: Theme.of(context).colorScheme.primary,
+                activeThumbColor: Theme.of(context).colorScheme.primary,
                 contentPadding: EdgeInsets.zero,
               ),
               const SizedBox(height: 32),
@@ -326,15 +378,15 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: colorScheme.surfaceVariant,
+          color: colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: isDefault ? colorScheme.primary : colorScheme.primary.withOpacity(0.1),
+            color: isDefault ? colorScheme.primary : colorScheme.primary.withValues(alpha: 0.1),
             width: isDefault ? 2 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: colorScheme.primary.withOpacity(0.05),
+              color: colorScheme.primary.withValues(alpha: 0.05),
               blurRadius: 15,
               offset: const Offset(0, 8),
             ),
@@ -349,7 +401,7 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: isDefault ? colorScheme.primary : colorScheme.surfaceVariant,
+                    color: isDefault ? colorScheme.primary : colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -392,7 +444,7 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
                           final addressId = address['id'];
 
                           if (token != null && token.isNotEmpty && addressId != null && addressId.isNotEmpty) {
-                            print('Deleting Address with ID: $addressId'); // Debug print
+                            debugPrint('Deleting Address with ID: $addressId'); // Debug print
                             final result = await ApiService.deleteAddress(addressId, token);
                             
                             if (result['success']) {
@@ -498,7 +550,7 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: colorScheme.primary.withOpacity(0.2), width: 1.5, style: BorderStyle.solid),
+          border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2), width: 1.5, style: BorderStyle.solid),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

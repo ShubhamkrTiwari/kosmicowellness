@@ -30,13 +30,13 @@ class NotificationManager extends ChangeNotifier {
 
     try {
       final result = await ApiService.getNotifications(token);
-      print('DEBUG: Fetch Notifications API Response -> $result');
+      debugPrint('DEBUG: Fetch Notifications API Response -> $result');
       
       if (result['success'] && result['data'] != null) {
         final List<dynamic> apiData = result['data'];
         final List<Map<String, String>> apiNotifications = apiData.map((item) {
           final String id = item['_id']?.toString() ?? item['id']?.toString() ?? '';
-          print('DEBUG: Notification Item ID -> $id');
+          debugPrint('DEBUG: Notification Item ID -> $id');
           
           return {
             'id': id,
@@ -55,7 +55,7 @@ class NotificationManager extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      print('Error fetching notifications: $e');
+      debugPrint('Error fetching notifications: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -96,7 +96,7 @@ class NotificationManager extends ChangeNotifier {
         try {
           await ApiService.markNotificationRead(id, token);
         } catch (e) {
-          print('Error marking notification as read on API: $e');
+          debugPrint('Error marking notification as read on API: $e');
         }
       }
     }
@@ -121,7 +121,7 @@ class NotificationManager extends ChangeNotifier {
       try {
         await ApiService.clearAllNotifications(token);
       } catch (e) {
-        print('Error clearing all notifications from API: $e');
+        debugPrint('Error clearing all notifications from API: $e');
       }
     }
   }
@@ -141,22 +141,22 @@ class NotificationManager extends ChangeNotifier {
     final token = UserManager().token;
     if (token != null) {
       try {
-        print('DEBUG: Attempting to delete notification with ID: $id');
+        debugPrint('DEBUG: Attempting to delete notification with ID: $id');
         final result = await ApiService.deleteNotification(id, token);
         
         if (result['success'] == true) {
-          print('DEBUG: Server deletion successful for ID: $id');
+          debugPrint('DEBUG: Server deletion successful for ID: $id');
           await saveNotifications();
         } else {
           // 2. Rollback if server failed
-          print('DEBUG: Server deletion failed, rolling back UI. Error: ${result['message']}');
+          debugPrint('DEBUG: Server deletion failed, rolling back UI. Error: ${result['message']}');
           if (!_notifications.any((n) => n['id'] == id)) {
             _notifications.insert(index, backup);
             notifyListeners();
           }
         }
       } catch (e) {
-        print('DEBUG: Exception during deletion: $e');
+        debugPrint('DEBUG: Exception during deletion: $e');
         // Rollback on exception
         if (!_notifications.any((n) => n['id'] == id)) {
           _notifications.insert(index, backup);

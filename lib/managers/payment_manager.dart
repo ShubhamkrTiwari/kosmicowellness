@@ -30,7 +30,7 @@ class PaymentManager extends ChangeNotifier {
 
     try {
       final response = await ApiService.getPaymentMethods(token);
-      print('DEBUG: Fetch Payment Methods Response -> $response');
+      debugPrint('DEBUG: Fetch Payment Methods Response -> $response');
       
       if (response['success'] == true) {
         final dynamic data = response['data'];
@@ -57,7 +57,7 @@ class PaymentManager extends ChangeNotifier {
         }
       }
     } catch (e) {
-      print('DEBUG: Manager Fetch Error -> $e');
+      debugPrint('DEBUG: Manager Fetch Error -> $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -85,7 +85,7 @@ class PaymentManager extends ChangeNotifier {
         if (data != null && data['savedPaymentMethods'] is List) {
           _paymentMethods.clear();
           _paymentMethods.addAll(List<Map<String, dynamic>>.from(data['savedPaymentMethods']));
-          print('DEBUG: Updated list from POST response. Count: ${_paymentMethods.length}');
+          debugPrint('DEBUG: Updated list from POST response. Count: ${_paymentMethods.length}');
         } else {
           // Fallback: manually add if list not returned
           if (method['isDefault'] == true) _resetDefaults();
@@ -99,7 +99,7 @@ class PaymentManager extends ChangeNotifier {
         return false;
       }
     } catch (e) {
-      print('DEBUG: Manager Save Error -> $e');
+      debugPrint('DEBUG: Manager Save Error -> $e');
       _lastError = "Connection error: $e";
       return false;
     } finally {

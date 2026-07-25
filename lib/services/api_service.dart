@@ -60,7 +60,7 @@ class ApiService {
       
       return _processResponse(response);
     } catch (e) {
-      print('API Error: $e');
+      debugPrint('API Error: $e');
       return _handleError(e);
     }
   }
@@ -68,7 +68,7 @@ class ApiService {
   static Future<Map<String, dynamic>> register(String name, String email) async {
     try {
       final url = _getUri('/api/auth/register');
-      print('DEBUG: Requesting Register -> $url');
+      debugPrint('DEBUG: Requesting Register -> $url');
       
       final response = await http.post(
         url,
@@ -84,10 +84,10 @@ class ApiService {
         }),
       ).timeout(const Duration(seconds: 95));
       
-      print('DEBUG: Response received. Status: ${response.statusCode}');
+      debugPrint('DEBUG: Response received. Status: ${response.statusCode}');
       return _processResponse(response);
     } catch (e) {
-      print('DEBUG: Register Error -> $e');
+      debugPrint('DEBUG: Register Error -> $e');
       return _handleError(e);
     }
   }
@@ -95,7 +95,7 @@ class ApiService {
   static Future<Map<String, dynamic>> login(String email) async {
     try {
       final url = _getUri('/api/auth/login');
-      print('DEBUG: Requesting Login -> $url');
+      debugPrint('DEBUG: Requesting Login -> $url');
       
       final response = await http.post(
         url,
@@ -110,10 +110,10 @@ class ApiService {
         }),
       ).timeout(const Duration(seconds: 95));
       
-      print('DEBUG: Response received. Status: ${response.statusCode}');
+      debugPrint('DEBUG: Response received. Status: ${response.statusCode}');
       return _processResponse(response);
     } catch (e) {
-      print('DEBUG: Login Error -> $e');
+      debugPrint('DEBUG: Login Error -> $e');
       return _handleError(e);
     }
   }
@@ -295,8 +295,8 @@ class ApiService {
   static Future<Map<String, dynamic>> savePaymentMethod(Map<String, dynamic> methodData, String token) async {
     try {
       final url = _getUri('/api/payment/save-method');
-      print('DEBUG: Requesting Save Payment Method -> $url');
-      print('DEBUG: Body -> ${jsonEncode(methodData)}');
+      debugPrint('DEBUG: Requesting Save Payment Method -> $url');
+      debugPrint('DEBUG: Body -> ${jsonEncode(methodData)}');
 
       final response = await http.post(
         url,
@@ -309,12 +309,12 @@ class ApiService {
         body: jsonEncode(methodData),
       ).timeout(const Duration(seconds: 30));
       
-      print('DEBUG: Response Status: ${response.statusCode}');
-      print('DEBUG: Response Body: ${response.body}');
+      debugPrint('DEBUG: Response Status: ${response.statusCode}');
+      debugPrint('DEBUG: Response Body: ${response.body}');
       
       return _processResponse(response);
     } catch (e) {
-      print('DEBUG: Save Payment Method Error -> $e');
+      debugPrint('DEBUG: Save Payment Method Error -> $e');
       return _handleError(e);
     }
   }
@@ -322,8 +322,8 @@ class ApiService {
   static Future<Map<String, dynamic>> updatePaymentMethod(String methodId, Map<String, dynamic> methodData, String token) async {
     try {
       final url = _getUri('/api/payment/save-method/$methodId');
-      print('DEBUG: Requesting Update Payment Method -> $url');
-      print('DEBUG: Body -> ${jsonEncode(methodData)}');
+      debugPrint('DEBUG: Requesting Update Payment Method -> $url');
+      debugPrint('DEBUG: Body -> ${jsonEncode(methodData)}');
 
       final response = await http.put(
         url,
@@ -336,12 +336,12 @@ class ApiService {
         body: jsonEncode(methodData),
       ).timeout(const Duration(seconds: 30));
 
-      print('DEBUG: Response Status: ${response.statusCode}');
-      print('DEBUG: Response Body: ${response.body}');
+      debugPrint('DEBUG: Response Status: ${response.statusCode}');
+      debugPrint('DEBUG: Response Body: ${response.body}');
 
       return _processResponse(response);
     } catch (e) {
-      print('DEBUG: Update Payment Method Error -> $e');
+      debugPrint('DEBUG: Update Payment Method Error -> $e');
       return _handleError(e);
     }
   }
@@ -349,7 +349,7 @@ class ApiService {
   static Future<Map<String, dynamic>> deletePaymentMethod(String methodId, String token) async {
     try {
       final url = _getUri('/api/payment/save-method/$methodId');
-      print('DEBUG: Requesting Delete Payment Method -> $url');
+      debugPrint('DEBUG: Requesting Delete Payment Method -> $url');
 
       final response = await http.delete(
         url,
@@ -360,12 +360,12 @@ class ApiService {
         },
       ).timeout(const Duration(seconds: 30));
 
-      print('DEBUG: Response Status: ${response.statusCode}');
-      print('DEBUG: Response Body: ${response.body}');
+      debugPrint('DEBUG: Response Status: ${response.statusCode}');
+      debugPrint('DEBUG: Response Body: ${response.body}');
 
       return _processResponse(response);
     } catch (e) {
-      print('DEBUG: Delete Payment Method Error -> $e');
+      debugPrint('DEBUG: Delete Payment Method Error -> $e');
       return _handleError(e);
     }
   }
@@ -411,7 +411,7 @@ class ApiService {
         uri = _getUri('/api/notifications/$notificationId');
       }
       
-      print('DEBUG: Requesting DELETE -> $uri');
+      debugPrint('DEBUG: Requesting DELETE -> $uri');
       
       final response = await http.delete(
         uri,
@@ -422,12 +422,12 @@ class ApiService {
         },
       ).timeout(const Duration(seconds: 20));
 
-      print('DEBUG: DELETE Status -> ${response.statusCode}');
-      print('DEBUG: DELETE Body -> ${response.body}');
+      debugPrint('DEBUG: DELETE Status -> ${response.statusCode}');
+      debugPrint('DEBUG: DELETE Body -> ${response.body}');
 
       return _processResponse(response);
     } catch (e) {
-      print('DEBUG: DELETE Exception -> $e');
+      debugPrint('DEBUG: DELETE Exception -> $e');
       return _handleError(e);
     }
   }
@@ -440,6 +440,44 @@ class ApiService {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
         },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> getCoupons(String token) async {
+    try {
+      final response = await http.get(
+        _getUri('/api/coupons'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> applyCoupon({
+    required String code,
+    required double orderAmount,
+    required String token,
+  }) async {
+    try {
+      final response = await http.post(
+        _getUri('/api/coupons/apply'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'code': code,
+          'orderAmount': orderAmount,
+        }),
       ).timeout(const Duration(seconds: 30));
       return _processResponse(response);
     } catch (e) {
@@ -504,22 +542,41 @@ class ApiService {
     required String paymentMethodId,
     required double totalPrice,
     required String token,
+    String? couponCode,
   }) async {
     try {
       final url = _getUri('/api/orders/place');
+      final body = {
+        'items': items,
+        'addressId': addressId,
+        'paymentMethodId': paymentMethodId,
+        'totalPrice': totalPrice,
+      };
+      if (couponCode != null) body['couponCode'] = couponCode;
+
       final response = await http.post(
         url,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: jsonEncode({
-          'items': items,
-          'addressId': addressId,
-          'paymentMethodId': paymentMethodId,
-          'totalPrice': totalPrice,
-        }),
+        body: jsonEncode(body),
       );
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> removeProfilePicture(String token) async {
+    try {
+      final response = await http.delete(
+        _getUri('/api/auth/remove-profile-picture'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 20));
       return _processResponse(response);
     } catch (e) {
       return _handleError(e);

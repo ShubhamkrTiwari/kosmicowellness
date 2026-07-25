@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import '../managers/notification_manager.dart';
+import '../models/filter_options.dart';
+import '../widgets/filter_bottom_sheet.dart';
 import 'cart_screen.dart';
 import 'product_details_screen.dart';
 import '../managers/cart_manager.dart';
@@ -20,6 +22,8 @@ class ProductListScreenState extends State<ProductListScreen> {
   String _searchQuery = '';
   List<String> _categories = ['All'];
 
+  late FilterOptions _filterOptions;
+
   List<Map<String, dynamic>> _apiProducts = [];
   bool _isLoading = false;
   Timer? _refreshTimer;
@@ -31,6 +35,12 @@ class ProductListScreenState extends State<ProductListScreen> {
   @override
   void initState() {
     super.initState();
+    _filterOptions = FilterOptions(
+      sortBy: 'Popularity',
+      minPrice: 0,
+      maxPrice: 5000,
+      minRating: 0,
+    );
     _fetchCategories();
     _fetchProducts();
     
@@ -72,7 +82,7 @@ class ProductListScreenState extends State<ProductListScreen> {
         });
       }
     } catch (e) {
-      print('DEBUG: Error fetching categories: $e');
+      debugPrint('DEBUG: Error fetching categories: $e');
     }
   }
 
@@ -86,19 +96,41 @@ class ProductListScreenState extends State<ProductListScreen> {
         });
       }
     } catch (e) {
-      print('DEBUG: Error fetching products: $e');
+      debugPrint('DEBUG: Error fetching products: $e');
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
   List<Map<String, dynamic>> get _filteredProducts {
-    return _apiProducts.where((product) {
+    List<Map<String, dynamic>> products = _apiProducts.where((product) {
       final matchesCategory = _selectedCategory == 'All' || 
           (product['category']?.toString().toLowerCase() == _selectedCategory.toLowerCase());
+      
       final matchesSearch = (product['name'] ?? '').toString().toLowerCase().contains(_searchQuery.toLowerCase());
-      return matchesCategory && matchesSearch;
+      
+      final double price = double.tryParse(product['price']?.toString() ?? '0') ?? 0;
+      final matchesPrice = price >= _filterOptions.minPrice && price <= _filterOptions.maxPrice;
+      
+      final double rating = double.tryParse(product['rating']?.toString() ?? '0') ?? 0;
+      final matchesRating = rating >= _filterOptions.minRating;
+
+      return matchesCategory && matchesSearch && matchesPrice && matchesRating;
     }).toList();
+
+    // Sorting
+    if (_filterOptions.sortBy == 'Price: Low to High') {
+      products.sort((a, b) => (double.tryParse(a['price']?.toString() ?? '0') ?? 0)
+          .compareTo(double.tryParse(b['price']?.toString() ?? '0') ?? 0));
+    } else if (_filterOptions.sortBy == 'Price: High to Low') {
+      products.sort((a, b) => (double.tryParse(b['price']?.toString() ?? '0') ?? 0)
+          .compareTo(double.tryParse(a['price']?.toString() ?? '0') ?? 0));
+    } else if (_filterOptions.sortBy == 'Newest') {
+      // Assuming _id exists as is common in Mongo-based APIs
+      products.sort((a, b) => (b['_id']?.toString() ?? '').compareTo(a['_id']?.toString() ?? ''));
+    }
+
+    return products;
   }
 
   @override
@@ -119,7 +151,7 @@ class ProductListScreenState extends State<ProductListScreen> {
               SliverToBoxAdapter(
                 child: _buildHeader(colorScheme),
               ),
-              // Search Bar
+              // Search Bar & Filter Button
               SliverToBoxAdapter(
                 child: _buildSearchBar(colorScheme),
               ),
@@ -194,23 +226,61 @@ class ProductListScreenState extends State<ProductListScreen> {
   Widget _buildSearchBar(ColorScheme colorScheme) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: TextField(
-        onChanged: (value) {
-          setState(() {
-            _searchQuery = value;
-          });
-        },
-        decoration: InputDecoration(
-          hintText: 'Search products...',
-          prefixIcon: const Icon(Icons.search),
-          filled: true,
-          fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+              decoration: InputDecoration(
+                hintText: 'Search products...',
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+              ),
+            ),
           ),
-          contentPadding: const EdgeInsets.symmetric(vertical: 0),
-        ),
+          const SizedBox(width: 12),
+          GestureDetector(
+            onTap: () async {
+              final FilterOptions? result = await showModalBottomSheet<FilterOptions>(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) => FilterBottomSheet(initialOptions: _filterOptions),
+              );
+              
+              if (result != null) {
+                setState(() {
+                  _filterOptions = result;
+                });
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _filterOptions.minPrice > 0 || _filterOptions.sortBy != 'Popularity' || _filterOptions.minRating > 0
+                  ? colorScheme.primary 
+                  : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                Icons.tune,
+                color: _filterOptions.minPrice > 0 || _filterOptions.sortBy != 'Popularity' || _filterOptions.minRating > 0
+                  ? Colors.white
+                  : colorScheme.primary,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

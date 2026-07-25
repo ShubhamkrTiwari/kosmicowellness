@@ -25,16 +25,49 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateMixin {
   late String userName;
   late String userEmail;
   late String userPhone;
   XFile? _pickedImage;
+  int _couponCount = 0;
+
+  AnimationController? _logoutAnimController;
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    _fetchCouponCount();
+
+    _logoutAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _logoutAnimController?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchCouponCount() async {
+    try {
+      final token = UserManager().token;
+      if (token != null) {
+        final result = await ApiService.getCoupons(token);
+        if (result['success'] && result['data'] is List) {
+          if (mounted) {
+            setState(() {
+              _couponCount = (result['data'] as List).length;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching coupon count: $e');
+    }
   }
 
   Future<void> _loadUserData() async {
@@ -64,6 +97,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _pickImage() async {
+    final messenger = ScaffoldMessenger.of(context);
     final ImagePicker picker = ImagePicker();
     try {
       final XFile? pickedFile = await picker.pickImage(
@@ -82,16 +116,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
         await UserManager().init();
         final token = UserManager().token;
         
+        if (!mounted) return;
+
         if (token == null || token.isEmpty) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Authentication error. Please login again.'),
-                backgroundColor: Colors.red,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          }
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text('Authentication error. Please login again.'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
           return;
         }
 
@@ -103,6 +137,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           token: token,
         );
 
+        if (!mounted) return;
+
         if (result['success']) {
           await UserManager().saveUser(result['data']);
           
@@ -113,24 +149,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
             type: 'profile',
           );
 
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Profile picture updated successfully!'),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          }
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text('Profile picture updated successfully!'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
         } else {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Failed to sync with server: ${result['message']}'),
-                backgroundColor: Colors.orange,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          }
+          messenger.showSnackBar(
+            SnackBar(
+              content: Text('Failed to sync with server: ${result['message']}'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
         }
       }
     } catch (e) {
@@ -144,6 +176,182 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         );
       }
+    }
+  }
+
+  void _showProfilePicOptions() {
+    final colorScheme = Theme.of(context).colorScheme;
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
+                    child: Icon(Icons.visibility_outlined, color: colorScheme.primary),
+                  ),
+                  title: const Text('Preview Picture', style: TextStyle(fontWeight: FontWeight.w600)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _previewProfilePic();
+                  },
+                ),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
+                    child: Icon(Icons.photo_library_outlined, color: colorScheme.primary),
+                  ),
+                  title: const Text('Change Picture', style: TextStyle(fontWeight: FontWeight.w600)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage();
+                  },
+                ),
+                if (UserManager().profilePicture != null || _pickedImage != null)
+                  ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.red.withValues(alpha: 0.1),
+                      child: const Icon(Icons.delete_outline, color: Colors.red),
+                    ),
+                    title: const Text('Remove Picture', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.red)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _removeProfilePic();
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _removeProfilePic() async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      // Ensure token is loaded
+      await UserManager().init();
+      final token = UserManager().token;
+
+      if (!mounted) return;
+
+      if (token == null || token.isEmpty) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Authentication error. Please login again.'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
+      final result = await ApiService.removeProfilePicture(token);
+
+      if (!mounted) return;
+
+      if (result['success']) {
+        await UserManager().saveUser(result['data']);
+        setState(() {
+          _pickedImage = null;
+        });
+
+        NotificationManager().addNotification(
+          title: 'Profile Updated',
+          message: 'Your profile picture has been removed.',
+          icon: '🗑️',
+          type: 'profile',
+        );
+
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Profile picture removed successfully!'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Failed to remove: ${result['message']}'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error removing image: $e');
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Could not remove image: ${e.toString()}'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  void _previewProfilePic() {
+    final imageUrl = _pickedImage?.path ?? UserManager().profilePicture;
+    if (imageUrl != null) {
+      showDialog(
+        context: context,
+        builder: (context) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.zero,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: double.infinity,
+                  height: double.infinity,
+                  color: Colors.black.withValues(alpha: 0.9),
+                ),
+              ),
+              Hero(
+                tag: 'profile-pic',
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: _pickedImage != null
+                      ? (kIsWeb
+                          ? Image.network(_pickedImage!.path, fit: BoxFit.contain)
+                          : Image.file(File(_pickedImage!.path), fit: BoxFit.contain))
+                      : Image.network(UserManager().profilePicture!, fit: BoxFit.contain),
+                ),
+              ),
+              Positioned(
+                top: 40,
+                right: 20,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
   }
 
@@ -224,22 +432,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         if (newName.isNotEmpty) {
                           setModalState(() => isSaving = true);
                           
+                          final messenger = ScaffoldMessenger.of(context);
+                          final navigator = Navigator.of(context);
+
                           // Ensure token is loaded
                           await UserManager().init();
                           final token = UserManager().token;
                           
+                          if (!mounted) return;
+
                           if (token == null || token.isEmpty) {
                             setModalState(() => isSaving = false);
-                            if (mounted) {
-                              final messenger = ScaffoldMessenger.of(context);
-                              messenger.showSnackBar(
-                                const SnackBar(
-                                  content: Text('Authentication error. Please login again.'),
-                                  backgroundColor: Colors.red,
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                            }
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                content: Text('Authentication error. Please login again.'),
+                                backgroundColor: Colors.red,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
                             return;
                           }
                           
@@ -249,6 +459,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             imageFile: _pickedImage, // Use the currently picked image if any
                             token: token,
                           );
+
+                          if (!mounted) return;
 
                           if (result['success']) {
                             // Backend returns the new user data including image URL
@@ -267,26 +479,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               userPhone = UserManager().userPhone ?? (newPhone.isEmpty ? 'Add phone number' : newPhone);
                             });
                             
-                            if (mounted) {
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Profile updated successfully!'),
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                            }
+                            navigator.pop();
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                content: Text('Profile updated successfully!'),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
                           } else {
                             setModalState(() => isSaving = false);
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(result['message']),
-                                  backgroundColor: Colors.redAccent,
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                            }
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text(result['message']),
+                                backgroundColor: Colors.redAccent,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
                           }
                         }
                       },
@@ -366,30 +574,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       color: colorScheme.primary,
                                     ),
                                   )
-                                : ClipOval(
-                                    child: _pickedImage != null
-                                        ? (kIsWeb
-                                            ? Image.network(
-                                                _pickedImage!.path,
+                                : GestureDetector(
+                                    onTap: _showProfilePicOptions,
+                                    child: Hero(
+                                      tag: 'profile-pic',
+                                      child: ClipOval(
+                                        child: _pickedImage != null
+                                            ? (kIsWeb
+                                                ? Image.network(
+                                                    _pickedImage!.path,
+                                                    fit: BoxFit.cover,
+                                                    width: 80,
+                                                    height: 80,
+                                                  )
+                                                : Image.file(
+                                                    File(_pickedImage!.path),
+                                                    fit: BoxFit.cover,
+                                                    width: 80,
+                                                    height: 80,
+                                                  ))
+                                            : Image.network(
+                                                UserManager().profilePicture!,
                                                 fit: BoxFit.cover,
                                                 width: 80,
                                                 height: 80,
-                                              )
-                                            : Image.file(
-                                                File(_pickedImage!.path),
-                                                fit: BoxFit.cover,
-                                                width: 80,
-                                                height: 80,
-                                              ))
-                                        : Image.network(
-                                            UserManager().profilePicture!,
-                                            fit: BoxFit.cover,
-                                            width: 80,
-                                            height: 80,
-                                            errorBuilder: (context, error, stackTrace) {
-                                              return Text(_getInitials(userName));
-                                            },
-                                          ),
+                                                errorBuilder: (context, error, stackTrace) {
+                                                  return Text(_getInitials(userName));
+                                                },
+                                              ),
+                                      ),
+                                    ),
                                   ),
                           ),
                         ),
@@ -397,7 +611,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           bottom: 0,
                           right: 0,
                           child: GestureDetector(
-                            onTap: _pickImage,
+                            onTap: _showProfilePicOptions,
                             child: Container(
                               padding: const EdgeInsets.all(4),
                               decoration: BoxDecoration(
@@ -476,9 +690,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(builder: (context) => const CouponsScreen()),
-                        );
+                        ).then((_) => _fetchCouponCount());
                       },
-                      child: _buildStatItem('Coupons', '3', Icons.confirmation_number_outlined, colorScheme),
+                      child: _buildStatItem('Coupons', _couponCount.toString(), Icons.confirmation_number_outlined, colorScheme),
                     ),
                   ),
                 ],
@@ -563,32 +777,73 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 30),
 
-              // Logout Button
+                // Logout Button
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      await UserManager().logout();
-                      if (mounted) {
-                        Navigator.of(context).pushAndRemoveUntil(
-                          MaterialPageRoute(builder: (context) => const AuthScreen()),
-                          (route) => false,
-                        );
-                      }
-                    },
-                    icon: const Icon(Icons.logout, size: 20),
-                    label: const Text('Logout'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.redAccent,
-                      side: const BorderSide(color: Colors.redAccent),
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Animated Line Progress Outside
+                    if (_logoutAnimController != null)
+                      AnimatedBuilder(
+                        animation: _logoutAnimController!,
+                        builder: (context, child) {
+                          return CustomPaint(
+                            size: const Size(double.infinity, 65),
+                            painter: BorderLinePainter(
+                              progress: _logoutAnimController!.value,
+                              color: Colors.redAccent,
+                            ),
+                            child: const SizedBox(
+                              width: double.infinity,
+                              height: 65,
+                            ),
+                          );
+                        },
+                      ),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 55,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final navigator = Navigator.of(context);
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Logout'),
+                              content: const Text('Are you sure you want to logout?'),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, true), 
+                                  child: const Text('Logout', style: TextStyle(color: Colors.red))
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) {
+                            await UserManager().logout();
+                            if (mounted) {
+                              navigator.pushAndRemoveUntil(
+                                MaterialPageRoute(builder: (context) => const AuthScreen()),
+                                (route) => false,
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.logout, size: 20),
+                        label: const Text('Logout'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.redAccent,
+                          side: const BorderSide(color: Colors.redAccent, width: 1.5),
+                          backgroundColor: colorScheme.surface,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ),
               const SizedBox(height: 140), // Bottom padding for floating nav bar
@@ -685,6 +940,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+}
+
+class BorderLinePainter extends CustomPainter {
+  final double progress;
+  final Color color;
+
+  BorderLinePainter({required this.progress, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final path = Path();
+    path.addRRect(RRect.fromRectAndRadius(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      const Radius.circular(16),
+    ));
+
+    final metrics = path.computeMetrics();
+    for (final metric in metrics) {
+      final length = metric.length;
+      final start = length * progress;
+      final end = (start + (length * 0.4)) % length;
+
+      if (start < end) {
+        canvas.drawPath(metric.extractPath(start, end), paint);
+      } else {
+        canvas.drawPath(metric.extractPath(start, length), paint);
+        canvas.drawPath(metric.extractPath(0, end), paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(BorderLinePainter oldDelegate) => true;
 }
 
 class AboutKosmicoScreen extends StatelessWidget {
@@ -816,7 +1110,12 @@ class AboutKosmicoScreen extends StatelessWidget {
                 color: colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Icon(Icons.spa_rounded, color: colorScheme.primary, size: 32),
+              child: Image.asset(
+                'assets/images/kosmicologo.png',
+                height: 32,
+                width: 32,
+                errorBuilder: (context, error, stackTrace) => Icon(Icons.spa_rounded, color: colorScheme.primary, size: 32),
+              ),
             ),
             const SizedBox(width: 16),
             const Expanded(

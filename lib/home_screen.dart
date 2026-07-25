@@ -17,6 +17,7 @@ import 'managers/theme_manager.dart';
 import 'managers/notification_manager.dart';
 import 'managers/payment_manager.dart';
 import 'services/api_service.dart';
+import 'widgets/banner_carousel.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -108,6 +109,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _selectedIndex = 0;
   String _selectedHomeCategory = 'All';
   List<String> _homeCategories = ['All'];
+  String _homeSearchQuery = '';
   
   Map<String, dynamic>? _updateData;
   bool _showUpdateBanner = false;
@@ -142,18 +144,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      print('DEBUG: App resumed, auto-refreshing data...');
+      debugPrint('DEBUG: App resumed, auto-refreshing data...');
       _refreshAllData();
     }
   }
 
   List<Map<String, dynamic>> get _filteredHomeProducts {
-    if (_selectedHomeCategory == 'All') {
-      return _apiProducts;
+    List<Map<String, dynamic>> products = _apiProducts;
+    
+    // Filter by Category
+    if (_selectedHomeCategory != 'All') {
+      products = products.where((product) {
+        return product['category']?.toString().toLowerCase() == _selectedHomeCategory.toLowerCase();
+      }).toList();
     }
-    return _apiProducts.where((product) {
-      return product['category']?.toString().toLowerCase() == _selectedHomeCategory.toLowerCase();
-    }).toList();
+
+    // Filter by Search Query
+    if (_homeSearchQuery.isNotEmpty) {
+      products = products.where((product) {
+        final name = product['name']?.toString().toLowerCase() ?? '';
+        return name.contains(_homeSearchQuery.toLowerCase());
+      }).toList();
+    }
+
+    return products;
   }
 
   Future<void> _refreshAllData() async {
@@ -181,7 +195,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         });
       }
     } catch (e) {
-      print('DEBUG: Error fetching categories: $e');
+      debugPrint('DEBUG: Error fetching categories: $e');
     }
   }
 
@@ -195,7 +209,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         });
       }
     } catch (e) {
-      print('DEBUG: Error fetching products: $e');
+      debugPrint('DEBUG: Error fetching products: $e');
     } finally {
       setState(() => _isLoadingProducts = false);
     }
@@ -203,15 +217,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _checkForUpdates() async {
     try {
-      print('DEBUG: Starting update check...');
+      debugPrint('DEBUG: Starting update check...');
       final result = await ApiService.getLatestUpdate();
-      print('DEBUG: Update Check API Response -> $result');
+      debugPrint('DEBUG: Update Check API Response -> $result');
       
       if (result['success'] == true && result['data'] != null) {
         final data = result['data'];
         final updateInfo = data['update'];
         
-        print('DEBUG: Extracted Update Info -> $updateInfo');
+        debugPrint('DEBUG: Extracted Update Info -> $updateInfo');
         
         if (updateInfo != null && (updateInfo['isUpdateAvailable'] == true || updateInfo['isUpdateAvailable'].toString() == 'true')) {
           if (mounted) {
@@ -219,7 +233,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               _updateData = updateInfo;
               _showUpdateBanner = true;
             });
-            print('DEBUG: State updated, banner should show');
+            debugPrint('DEBUG: State updated, banner should show');
             
             // Show a SnackBar to confirm we found it
             ScaffoldMessenger.of(context).showSnackBar(
@@ -233,13 +247,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             _showUpdateDialog(updateInfo);
           }
         } else {
-          print('DEBUG: isUpdateAvailable is false or null');
+          debugPrint('DEBUG: isUpdateAvailable is false or null');
         }
       } else {
-        print('DEBUG: API call failed or data is null. Message: ${result['message']}');
+        debugPrint('DEBUG: API call failed or data is null. Message: ${result['message']}');
       }
     } catch (e) {
-      print('DEBUG: Update Check Exception -> $e');
+      debugPrint('DEBUG: Update Check Exception -> $e');
     }
   }
 
@@ -350,80 +364,45 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           if (_showUpdateBanner && _updateData != null)
             _buildUpdateBanner(colorScheme),
 
-          // Search Bar
+          // Enhanced Search Bar
           Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search products...',
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+            child: Container(
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: TextField(
+                onChanged: (value) {
+                  setState(() {
+                    _homeSearchQuery = value;
+                  });
+                },
+                decoration: InputDecoration(
+                  hintText: 'Search ayurvedic products...',
+                  hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+                  prefixIcon: Icon(Icons.search_rounded, color: colorScheme.primary),
+                  filled: true,
+                  fillColor: Colors.transparent,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 15),
                 ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
               ),
             ),
           ),
 
-          // Hero Banner
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: colorScheme.primary,
-              borderRadius: BorderRadius.circular(20),
-              image: DecorationImage(
-                image: const NetworkImage('https://images.unsplash.com/photo-1615485290382-441e4d0c9cb5?auto=format&fit=crop&q=80&w=800'),
-                fit: BoxFit.cover,
-                colorFilter: ColorFilter.mode(
-                  colorScheme.primary.withValues(alpha: 0.8),
-                  BlendMode.srcOver,
-                ),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Ancient Wisdom,\nModern Wellness',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    height: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Discover the healing power of Ayurveda',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _selectedIndex = 1;
-                    });
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colorScheme.secondary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: const Text('Shop Now'),
-                ),
-              ],
-            ),
-          ),
+          // Hero Carousel
+          const BannerCarousel(),
 
           // Categories
           const Padding(
@@ -463,10 +442,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                 ),
                 TextButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    setState(() {
+                      _selectedIndex = 1;
+                    });
+                    _productListKey.currentState?.refreshData();
+                  },
                   child: Text('View All', style: TextStyle(color: colorScheme.secondary)),
                 ),
-              ],
+                ],
             ),
           ),
 
@@ -742,8 +726,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      extendBody: false,
+    return PopScope(
+      canPop: _selectedIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _selectedIndex != 0) {
+          setState(() {
+            _selectedIndex = 0;
+          });
+        }
+      },
+      child: Scaffold(
+        extendBody: false,
       appBar: AppBar(
         backgroundColor: colorScheme.surface,
         surfaceTintColor: Colors.transparent,
@@ -908,11 +901,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ],
       ),
       bottomNavigationBar: Container(
-        margin: const EdgeInsets.fromLTRB(20, 0, 20, 30),
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(30),
+          borderRadius: BorderRadius.circular(26),
           border: Border.all(
             color: colorScheme.primary.withValues(alpha: 0.15),
             width: 1.5,
@@ -947,7 +940,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           child: const Icon(Icons.assistant, color: Colors.white),
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildNavItem(int index, IconData icon, IconData activeIcon, String label, ColorScheme colorScheme) {
@@ -972,12 +965,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       highlightColor: Colors.transparent,
       child: AnimatedScale(
         scale: isSelected ? 1.08 : 1.0,
-        duration: const Duration(milliseconds: 350),
+        duration: const Duration(milliseconds: 600),
         curve: Curves.elasticOut,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 450),
+          duration: const Duration(milliseconds: 800),
           curve: Curves.easeInOutCubic,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
             color: isSelected ? colorScheme.primary : Colors.transparent,
             borderRadius: BorderRadius.circular(22),
@@ -998,16 +991,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             children: [
               AnimatedRotation(
                 turns: isSelected ? 0.15 : 0,
-                duration: const Duration(milliseconds: 500),
+                duration: const Duration(milliseconds: 900),
                 curve: Curves.elasticOut,
                 child: AnimatedScale(
                   scale: isSelected ? 1.2 : 1.0,
-                  duration: const Duration(milliseconds: 300),
+                  duration: const Duration(milliseconds: 500),
                   curve: Curves.elasticOut,
                   child: Icon(
                     isSelected ? activeIcon : icon,
                     color: isSelected ? Colors.white : Colors.grey[500],
-                    size: 24,
+                    size: 22,
                   ),
                 ),
               ),
@@ -1016,18 +1009,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 Flexible(
                   child: AnimatedSlide(
                     offset: isSelected ? Offset.zero : const Offset(-0.3, 0),
-                    duration: const Duration(milliseconds: 350),
+                    duration: const Duration(milliseconds: 600),
                     curve: Curves.easeOutBack,
                     child: AnimatedOpacity(
                       opacity: isSelected ? 1.0 : 0.0,
-                      duration: const Duration(milliseconds: 250),
+                      duration: const Duration(milliseconds: 400),
                       curve: Curves.easeOut,
                       child: Text(
                         label,
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
-                          fontSize: 14,
+                          fontSize: 13,
                           letterSpacing: 0.2,
                         ),
                         maxLines: 1,

@@ -88,94 +88,69 @@ class _AiConsultantScreenState extends State<AiConsultantScreen> {
   String _getAiResponse(String message) {
     message = message.toLowerCase();
     
-    // 1. Digestion & Stomach Issues (Pet ki samasya)
+    // Check for specific price query first if context exists
+    if ((message.contains('price') || message.contains('cost') || message.contains('kitne ka')) && _lastTopic != null) {
+      if (_lastTopic == 'digestion') return 'Digestion products jaise Liver Care ₹399 aur Triphala ₹249 se shuru hote hain. Aap "Products" tab mein check kar sakte hain.';
+      if (_lastTopic == 'hair') return 'Hair care range ₹299 (Oils) se lekar ₹899 (Combo kits) tak aati hai. Current deals ke liye "Products" section dekhein.';
+      if (_lastTopic == 'skin') return 'Kumkumadi Tailam ₹549 ka hai aur serums ₹499 se shuru hote hain. Offers ke liye "Coupons" section check karein.';
+      if (_lastTopic == 'weight') return 'Slim Detox tea ₹349 ki hai aur ACV ₹450 ka. Dono saath lene par 10% off mil sakta hai.';
+    }
+
+    // 1. Digestion & Stomach Issues
     if (message.contains('pet') || message.contains('stomach') || message.contains('pait') || 
-        message.contains('digestion') || message.contains('gas') || message.contains('acidity') || 
-        message.contains('constipation') || message.contains('kabz') || message.contains('pachan')) {
-      return 'Pet ki samasyaon (Digestion) ke liye hamara "Digestion Care" range best hai. Acidity aur gas ke liye hamara Triphala Churan ya Liver Care Syrup try karein. Ye natural tarike se pet saaf rakhta hai aur bhukh badhata hai.';
+        message.contains('digestion') || message.contains('gas') || message.contains('acidity')) {
+      _lastTopic = 'digestion';
+      return 'Pet ki samasyaon ke liye hamara "Digestion Care" range best hai. Acidity aur gas ke liye hamara Triphala Churan ya Liver Care Syrup try karein. Ye natural tarike se pet saaf rakhta hai.';
     }
 
-    // 2. Hair Care (Baalo ki dekhbhal)
-    if (message.contains('hair') || message.contains('baal') || message.contains('bal') || 
-        message.contains('kesh') || message.contains('oil') || message.contains('jhadna') || 
-        message.contains('dandruff') || message.contains('fall')) {
-      return 'Baalo ke jhadne (Hair fall) ya dandruff ke liye hamara Ayurvedic Hair Oil aur Onion Shampoo kaafi effective hai. Isme Bhringraj aur Amla hai jo jadon ko mazboot banata hai. Kya aapko dandruff ki bhi samasya hai?';
+    // 2. Hair Care
+    if (message.contains('hair') || message.contains('baal') || message.contains('kesh') || message.contains('fall')) {
+      _lastTopic = 'hair';
+      return 'Baalo ke jhadne (Hair fall) ya dandruff ke liye hamara Ayurvedic Hair Oil aur Onion Shampoo kaafi effective hai. Isme Bhringraj aur Amla hai jo jadon ko mazboot banata hai.';
     }
 
-    // 3. Skin, Face & Glow
-    if (message.contains('skin') || message.contains('twacha') || message.contains('chehra') || 
-        message.contains('glow') || message.contains('face') || message.contains('pimple') || 
-        message.contains('daag') || message.contains('dark spot')) {
-      return 'Skin glow ke liye hamara Kumkumadi Tailam aur Vitamin C Face Serum recommend kiye jaate hain. Ye pimples aur dark spots kam karne mein madad karte hain. Hamare products 100% chemical-free hain.';
+    // 3. Skin & Glow
+    if (message.contains('skin') || message.contains('twacha') || message.contains('chehra') || message.contains('glow') || message.contains('face')) {
+      _lastTopic = 'skin';
+      return 'Skin glow ke liye hamara Kumkumadi Tailam aur Face Serums recommend kiye jaate hain. Ye pimples aur dark spots kam karne mein madad karte hain. Hamare products 100% chemical-free hain.';
     }
 
-    // 4. Joint & Muscle Pain (Dard)
-    if (message.contains('dard') || message.contains('pain') || message.contains('joint') || 
-        message.contains('ghutna') || message.contains('back') || message.contains('peeth') || message.contains('muscle')) {
-      return 'Joint ya muscle pain ke liye hamara "Orthovedic Oil" bahut prabhavi hai. Ye ghutno aur peeth ke dard mein turant rahat deta hai. Kya aapko dard purana hai ya chot lagi hai?';
+    // 4. Weight Management
+    if (message.contains('weight') || message.contains('vajan') || message.contains('fat') || message.contains('motapa') || message.contains('slim')) {
+      _lastTopic = 'weight';
+      return 'Vajan ghatane ke liye hamara "Slim Detox" powder aur Apple Cider Vinegar (ACV) kaafi asardaar hai. Ye metabolism badhata hai. Kya aap yoga ya exercise karte hain?';
     }
 
-    // 5. Energy, Stress, Sleep & Vitality
-    if (message.contains('neend') || message.contains('sleep') || message.contains('stress') || 
-        message.contains('tension') || message.contains('thakavat') || message.contains('energy') || 
-        message.contains('kamzori') || message.contains('stamina') || message.contains('vigour') || message.contains('ashwagandha')) {
-      return 'Ashwagandha aur Shilajit Gold capsules stress kam karne aur stamina badhane mein bahut madadgar hain. Ye energy level sudharte hain aur acchi neend lane mein madad karte hain. Hamara Ashwagandha 100% organic hai.';
+    // 5. Pricing general
+    if (message.contains('price') || message.contains('keemat') || message.contains('daam') || message.contains('cost') || message.contains('kitne ka')) {
+      return 'Hamare products ki keemat unki quality aur ingredients par depend karti hai. Zyadatar items ₹249 se ₹999 ke beech hain. Aap "Products" tab mein sabhi rates dekh sakte hain.';
     }
 
-    // 6. Immunity & Seasonal Health (Sardi-Khansi)
-    if (message.contains('sardi') || message.contains('cold') || message.contains('khansi') || 
-        message.contains('cough') || message.contains('immunity') || message.contains('bukhaar') || 
-        message.contains('fever') || message.contains('gala')) {
-      return 'Immunity badhane ke liye hamara Giloy juice aur Tulsi drops lijiye. Agar gala kharab hai ya khansi hai toh hamara Ayurvedic Cough Syrup (Honey-based) turant rahat dega.';
+    // 6. Order Tracking
+    if (message.contains('order') || message.contains('track') || message.contains('saman') || message.contains('kab aayega')) {
+      return 'Aap apna order "Profile" > "My Orders" par jaakar live track kar sakte hain. Delivery mein aam taur par 3-5 business days lagte hain.';
     }
 
-    // 7. Diabetes & Sugar Management
-    if (message.contains('sugar') || message.contains('diabetes') || message.contains('madhumeh') || message.contains('meetha')) {
-      return 'Sugar control karne ke liye hamara "DiabeCare" juice aur capsules hain. Isme Jamun, Karela aur Gurmar ke extracts hain jo natural tarike se glucose level maintain karte hain.';
+    // 7. Energy & Stress
+    if (message.contains('energy') || message.contains('stress') || message.contains('tension') || message.contains('kamzori') || message.contains('ashwagandha')) {
+      _lastTopic = 'vitality';
+      return 'Energy aur stress relief ke liye Ashwagandha best hai. Hamara Ashwagandha Gold stamina badhane aur dimaag ko shant rakhne mein madad karta hai.';
     }
 
-    // 8. Weight Management (Vajan)
-    if (message.contains('weight') || message.contains('vajan') || message.contains('fat') || 
-        message.contains('motapa') || message.contains('lose') || message.contains('slim')) {
-      return 'Vajan ghatane ke liye hamara "Slim Detox" powder aur Apple Cider Vinegar (ACV) kaafi asardaar hai. Ye metabolism badhata hai. Kya aap morning walk ya yoga karte hain?';
+    // 8. Immunity & Health
+    if (message.contains('sardi') || message.contains('cold') || message.contains('cough') || message.contains('immunity') || message.contains('fever')) {
+      _lastTopic = 'immunity';
+      return 'Immunity ke liye hamara Giloy aur Tulsi Drops bahut acche hain. Khansi ke liye hamara Ayurvedic Cough Syrup turant rahat deta hai.';
     }
 
-    // 9. Detox & Liver Health
-    if (message.contains('liver') || message.contains('detox') || message.contains('sharab') || message.contains('pait saaf')) {
-      return 'Liver detox ke liye hamara "Livo-Clean" syrup sabse accha hai. Ye liver function ko improve karta hai aur toxins ko sharir se bahar nikalta hai.';
-    }
-
-    // 10. Pricing, Offers & Discount
-    if (message.contains('price') || message.contains('keemat') || message.contains('daam') || 
-        message.contains('cost') || message.contains('sasta')) {
-      return 'Hamare products ki keemat (price) unki quantity aur type par depend karti hai. Aap "Products" tab mein jaakar sabhi items ke rate aur current offers dekh sakte hain. Kya aap kisi specific product ka price jaanna chahte hain?';
-    }
-
-    // 11. Order, Tracking & Delivery
-    if (message.contains('order') || message.contains('track') || message.contains('saman') || 
-        message.contains('delivered') || message.contains('kab aayega') || message.contains('ship') || 
-        message.contains('status') || message.contains('pohnchega')) {
-      return 'Aap apna order "Profile" > "My Orders" par jaakar live track kar sakte hain. Order dispatch hone ke baad saadharan taur par 3-5 business days mein mil jata hai.';
-    }
-
-    // 12. Offers & Coupons
-    if (message.contains('offer') || message.contains('discount') || message.contains('coupon') || message.contains('chooth')) {
-      return 'Ji haan! Hum aksar naye offers nikaalte rehte hain. Aap "Profile" mein "Coupons" section check karein, wahan aapko extra discount mil sakta hai.';
-    }
-
-    // 13. About Kosmico Wellness
-    if (message.contains('kosmico') || message.contains('company') || message.contains('brand') || message.contains('kya hai')) {
-      return 'Kosmico Wellness ek premium Ayurvedic brand hai jo ancient wisdom aur modern science ko mila kar 100% natural products banata hai. Hamara maksad har ghar tak shuddh ayurveda pahunchana hai.';
-    }
-
-    // 13. Greetings (Universal)
-    final List<String> greetings = ['hello', 'namaste', 'namaskar', 'hey', 'kaise ho', 'good morning', 'hi', 'hola'];
+    // 9. Greetings
+    final List<String> greetings = ['hello', 'namaste', 'hey', 'kaise ho', 'hi'];
     if (greetings.any((g) => message.contains(g)) || RegExp(r'\bhi\b').hasMatch(message)) {
-      return 'Namaste! Main Kosmico AI Consultant hoon. Main aapki health, products aur orders se jude har sawal ka jawab de sakta hoon. Bataiye, aaj main aapki kya seva kar sakta hoon?';
+      return 'Namaste! Main Kosmico AI Consultant hoon. Main aapki health, products aur orders se jude sawalon ke jawab de sakta hoon. Bataiye, main kaise madad karoon?';
     }
 
-    // Default Fallback (Smart)
-    return 'Main aapki baat puri tarah samajh nahi paaya. Kya aap is baare mein thoda sa aur vistaar (detail) se batayenge? Taki main aapko sahi jaankari de sakoon.';
+    // Default response
+    return 'Main samajh gaya. Kya aap apni query ke baare mein thoda aur detail mein bata sakte hain? Taki main aapko behtar advice de sakoon.';
   }
 
   @override
