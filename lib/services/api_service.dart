@@ -536,23 +536,55 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> placeOrder({
-    required List<Map<String, dynamic>> items,
+  static Future<Map<String, dynamic>> placeCodOrder({
+    required double amount,
     required String addressId,
-    required String paymentMethodId,
-    required double totalPrice,
+    required List<Map<String, dynamic>> items,
     required String token,
     String? couponCode,
+    double? discountAmount,
   }) async {
     try {
-      final url = _getUri('/api/orders/place');
-      final body = {
+      final response = await http.post(
+        _getUri('/api/payment/cod'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'amount': amount,
+          'deliveryAddressId': addressId,
+          'items': items,
+          if (couponCode != null) 'couponCode': couponCode,
+          if (discountAmount != null) 'discountAmount': discountAmount,
+        }),
+      );
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> createRazorpayOrder({
+    required double amount,
+    required String addressId,
+    required List<Map<String, dynamic>> items,
+    required String token,
+    String? couponCode,
+    double? discountAmount,
+  }) async {
+    try {
+      final url = _getUri('/api/payment/razorpay/create');
+      final body = jsonEncode({
+        'amount': amount,
+        'deliveryAddressId': addressId,
         'items': items,
-        'addressId': addressId,
-        'paymentMethodId': paymentMethodId,
-        'totalPrice': totalPrice,
-      };
-      if (couponCode != null) body['couponCode'] = couponCode;
+        if (couponCode != null) 'couponCode': couponCode,
+        if (discountAmount != null) 'discountAmount': discountAmount,
+      });
+      
+      debugPrint('API: Creating Razorpay Order at $url');
+      debugPrint('API: Request Body: $body');
 
       final response = await http.post(
         url,
@@ -560,8 +592,327 @@ class ApiService {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: jsonEncode(body),
+        body: body,
+      ).timeout(const Duration(seconds: 30));
+
+      debugPrint('API: Razorpay Response Status: ${response.statusCode}');
+      debugPrint('API: Razorpay Response Body: ${response.body}');
+
+      return _processResponse(response);
+    } catch (e) {
+      debugPrint('API: Razorpay Order Creation Error: $e');
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> cancelPendingRazorpayOrder({
+    required String razorpayOrderId,
+    required String token,
+  }) async {
+    try {
+      final url = _getUri('/api/payment/razorpay/cancel-pending');
+      final body = jsonEncode({
+        'razorpay_order_id': razorpayOrderId,
+      });
+
+      debugPrint('API: Cancelling Pending Razorpay Order at $url');
+      debugPrint('API: Request Body: $body');
+
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: body,
+      ).timeout(const Duration(seconds: 20));
+
+      debugPrint('API: Razorpay Cancellation Response Status: ${response.statusCode}');
+      return _processResponse(response);
+    } catch (e) {
+      debugPrint('API: Razorpay Cancellation Error: $e');
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> placeOrder({
+    required List<Map<String, dynamic>> items,
+    required String addressId,
+    required String paymentMethodId,
+    required double totalPrice,
+    required String token,
+    String? couponCode,
+    String? razorpayPaymentId,
+  }) async {
+    final body = {
+      'items': items,
+      'addressId': addressId,
+      'paymentMethodId': paymentMethodId,
+      'totalPrice': totalPrice,
+    };
+    if (couponCode != null) body['couponCode'] = couponCode;
+    if (razorpayPaymentId != null) body['razorpayPaymentId'] = razorpayPaymentId;
+
+    // List of potential endpoints to try
+    final endpoints = [
+      '/api/orders/place',
+      '/api/orders',
+      '/api/order/place',
+      '/api/order',
+      '/api/user/orders/place',
+      '/api/orders/create',
+      '/api/order/create',
+      '/api/user/order/place',
+      '/api/user/orders/create',
+      '/api/user/order/create',
+      '/api/orders/user/place',
+      '/api/orders/user/create',
+      '/api/v1/orders/place',
+      '/api/v1/order/place',
+      '/api/order/add',
+      '/api/orders/add',
+      '/api/order/checkout',
+      '/api/orders/checkout',
+      '/api/order/place-order',
+      '/api/orders/place-order',
+    ];
+
+    for (String path in endpoints) {
+      try {
+        final url = _getUri(path);
+        debugPrint('DEBUG: Attempting Place Order to $url');
+        
+        final response = await http.post(
+          url,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode(body),
+        ).timeout(const Duration(seconds: 30));
+
+        debugPrint('DEBUG: $path response: ${response.statusCode}');
+        
+        if (response.statusCode != 404) {
+          debugPrint('DEBUG: Found working or erroring endpoint at $path (not 404)');
+          return _processResponse(response);
+        }
+      } catch (e) {
+        debugPrint('DEBUG: Error trying $path: $e');
+      }
+    }
+
+    return {'success': false, 'message': 'Could not find order placement endpoint (404 on all attempts)'};
+  }
+
+  static Future<Map<String, dynamic>> verifyPayment({
+    required String paymentId,
+    required String orderId,
+    required String signature,
+    required String token,
+  }) async {
+    try {
+      final response = await http.post(
+        _getUri('/api/payment/verify'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'razorpay_payment_id': paymentId,
+          'razorpay_order_id': orderId,
+          'razorpay_signature': signature,
+        }),
       );
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> getUserOrders(String token) async {
+    try {
+      final response = await http.get(
+        _getUri('/api/payment/myorders'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> trackOrder(String orderId, String token) async {
+    try {
+      final response = await http.get(
+        _getUri('/api/order/track/$orderId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> cancelOrder(String orderId, String token) async {
+    try {
+      final response = await http.post(
+        _getUri('/api/order/cancel/$orderId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> returnOrder(String orderId, String reason, String token) async {
+    try {
+      final response = await http.post(
+        _getUri('/api/order/return/$orderId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'reason': reason}),
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  // Refund Module (Paise wapas chahiye)
+  static Future<Map<String, dynamic>> initiateRefund({
+    required String orderId,
+    required String reason,
+    required String token,
+  }) async {
+    try {
+      final response = await http.post(
+        _getUri('/api/refund/initiate'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'orderId': orderId,
+          'reason': reason,
+        }),
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> getMyRefunds(String token) async {
+    try {
+      final response = await http.get(
+        _getUri('/api/refund/my-refunds'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  // Return / Replacement Module (Product exchange karna hai)
+  static Future<Map<String, dynamic>> initiateReplacement({
+    required String orderId,
+    required String reason,
+    required String token,
+  }) async {
+    try {
+      final response = await http.post(
+        _getUri('/api/return/initiate'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'orderId': orderId,
+          'reason': reason,
+        }),
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> getMyReturns(String token) async {
+    try {
+      final response = await http.get(
+        _getUri('/api/return/my-returns'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> estimateDelivery({
+    required String deliveryPincode,
+    required double weight,
+    required String paymentMethod,
+    required String token,
+  }) async {
+    try {
+      final response = await http.post(
+        _getUri('/api/shiprocket/estimate-delivery'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'deliveryPincode': deliveryPincode,
+          'weight': weight,
+          'paymentMethod': paymentMethod,
+        }),
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> submitProductReview({
+    required String productId,
+    required double rating,
+    String? comment,
+    required String token,
+  }) async {
+    try {
+      final response = await http.post(
+        _getUri('/api/products/$productId/reviews'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'rating': rating,
+          if (comment != null) 'comment': comment,
+        }),
+      ).timeout(const Duration(seconds: 30));
       return _processResponse(response);
     } catch (e) {
       return _handleError(e);

@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../managers/cart_manager.dart';
 import '../managers/payment_manager.dart';
 import '../managers/user_manager.dart';
 import '../services/api_service.dart';
+import '../services/razorpay_service.dart';
+import '../services/shiprocket_service.dart';
 import 'shipping_addresses_screen.dart';
 import 'payment_methods_screen.dart';
 import 'coupons_screen.dart';
+import 'my_orders_screen.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:intl/intl.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -21,6 +27,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   double _discountAmount = 0.0;
   bool _isLoading = false;
   bool _isPlacingOrder = false;
+  bool _isCOD = false;
+  String? _expectedDeliveryDate;
+  bool _isEstimatingDelivery = false;
+  late RazorpayService _razorpayService;
+  String? _currentRazorpayOrderId;
 
   double get _finalTotal => CartManager().totalPrice - _discountAmount;
 
@@ -64,85 +75,421 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   void initState() {
     super.initState();
     _loadInitialData();
+    _initRazorpay();
+  }
+
+  void _initRazorpay() {
+    _razorpayService = RazorpayService(
+      onSuccess: _handlePaymentSuccess,
+      onFailure: _handlePaymentFailure,
+      onExternalWallet: _handleExternalWallet,
+    );
+  }
+
+  @override
+  void dispose() {
+    _razorpayService.dispose();
+    super.dispose();
+  }
+
+  void _handlePaymentSuccess(PaymentSuccessResponse response) {
+    debugPrint('Payment Success: ${response.paymentId}');
+    _currentRazorpayOrderId = null;
+    _finalizeOrder(response.paymentId);
+  }
+
+  void _handlePaymentFailure(PaymentFailureResponse response) {
+    setState(() => _isPlacingOrder = false);
+    
+    // Call backend to cancel pending order if we have the order ID
+    if (_currentRazorpayOrderId != null) {
+      final token = UserManager().token;
+      if (token != null) {
+        ApiService.cancelPendingRazorpayOrder(
+          razorpayOrderId: _currentRazorpayOrderId!,
+          token: token,
+        );
+      }
+      _currentRazorpayOrderId = null;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Payment Failed: ${response.message ?? 'Unknown Error'}'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    debugPrint('External Wallet: ${response.walletName}');
+  }
+
+  Future<void> _fetchDeliveryEstimation() async {
+    if (_selectedAddress == null || _selectedAddress!['pincode'] == null || _selectedAddress!['pincode'].toString().isEmpty) {
+      debugPrint('Checkout: Pincode missing, skipping estimation');
+      return;
+    }
+    
+    final token = UserManager().token;
+    if (token == null) return;
+
+    setState(() {
+      _isEstimatingDelivery = true;
+      _expectedDeliveryDate = null;
+    });
+
+    try {
+      final pincode = _selectedAddress!['pincode'].toString();
+      debugPrint('Checkout: Fetching delivery estimation for $pincode via Backend');
+      
+      final result = await ApiService.estimateDelivery(
+        deliveryPincode: pincode,
+        weight: 0.5,
+        paymentMethod: _isCOD ? 'COD' : 'Prepaid',
+        token: token,
+      );
+
+      if (result['success'] && result['data'] != null) {
+        final data = result['data'];
+        final String? etd = data['estimatedDeliveryDate']?.toString();
+        
+        if (etd != null) {
+          setState(() {
+            _expectedDeliveryDate = etd;
+          });
+          debugPrint('Checkout: Estimated delivery date from backend: $_expectedDeliveryDate');
+        } else {
+          debugPrint('Checkout: No estimatedDeliveryDate found in backend response');
+          setState(() => _expectedDeliveryDate = 'Date unavailable');
+        }
+      } else {
+        debugPrint('Checkout: Backend estimation returned failure: ${result['message']}');
+        setState(() => _expectedDeliveryDate = 'Delivery check failed');
+      }
+    } catch (e) {
+      debugPrint('Checkout: Backend Estimation Error: $e');
+      setState(() => _expectedDeliveryDate = 'Error checking delivery');
+    } finally {
+      if (mounted) setState(() => _isEstimatingDelivery = false);
+    }
   }
 
   Future<void> _loadInitialData() async {
-    setState(() => _isLoading = true);
-    final token = UserManager().token;
-    if (token != null) {
-      // Load addresses
-      final addressResult = await ApiService.getAddresses(token);
-      if (addressResult['success'] && addressResult['data'] is List && (addressResult['data'] as List).isNotEmpty) {
-        final List rawAddresses = addressResult['data'];
-        final List<Map<String, String>> addresses = rawAddresses.map((addr) => {
-          'id': addr['_id']?.toString() ?? addr['id']?.toString() ?? '',
-          'label': addr['addressLabel']?.toString() ?? 'Home',
-          'name': addr['fullName']?.toString() ?? '',
-          'address': addr['streetAddress']?.toString() ?? '',
-          'city': addr['city']?.toString() ?? '',
-          'pincode': addr['pincode']?.toString() ?? '',
-          'phone': addr['phoneNumber']?.toString() ?? '',
-          'isDefault': addr['isDefault']?.toString() ?? 'false',
-        }).toList();
+    try {
+      setState(() => _isLoading = true);
+      final token = UserManager().token;
+      if (token != null) {
+        debugPrint('Checkout: Loading initial data...');
+        
+        // Load addresses
+        final addressResult = await ApiService.getAddresses(token).timeout(const Duration(seconds: 15));
+        if (addressResult['success'] && addressResult['data'] is List && (addressResult['data'] as List).isNotEmpty) {
+          final List rawAddresses = addressResult['data'];
+          final List<Map<String, String>> addresses = rawAddresses.map((addr) => {
+            'id': addr['_id']?.toString() ?? addr['id']?.toString() ?? '',
+            'label': addr['addressLabel']?.toString() ?? 'Home',
+            'name': addr['fullName']?.toString() ?? '',
+            'address': addr['streetAddress']?.toString() ?? '',
+            'city': addr['city']?.toString() ?? '',
+            'pincode': addr['pincode']?.toString() ?? '',
+            'phone': addr['phoneNumber']?.toString() ?? '',
+            'isDefault': addr['isDefault']?.toString() ?? 'false',
+          }).toList();
 
-        // Try to find default address
-        _selectedAddress = addresses.firstWhere(
-          (addr) => addr['isDefault'] == 'true',
-          orElse: () => addresses.first,
+          setState(() {
+            _selectedAddress = addresses.firstWhere(
+              (addr) => addr['isDefault'] == 'true',
+              orElse: () => addresses.first,
+            );
+          });
+          debugPrint('Checkout: Addresses loaded');
+          
+          // Fetch delivery estimation for initial address
+          _fetchDeliveryEstimation();
+        }
+
+        // Load payment methods
+        debugPrint('Checkout: Loading payment methods...');
+        await PaymentManager().fetchPaymentMethods().timeout(const Duration(seconds: 15));
+        final methods = PaymentManager().paymentMethods;
+        if (methods.isNotEmpty) {
+          setState(() {
+            _selectedPaymentMethod = methods.firstWhere(
+              (m) => m['isDefault'] == true || m['isDefault'].toString() == 'true',
+              orElse: () => methods.first,
+            );
+          });
+          debugPrint('Checkout: Payment methods loaded');
+        }
+      }
+    } catch (e) {
+      debugPrint('Checkout Error during load: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load checkout data: $e')),
         );
       }
-
-      // Load payment methods
-      await PaymentManager().fetchPaymentMethods();
-      final methods = PaymentManager().paymentMethods;
-      if (methods.isNotEmpty) {
-        _selectedPaymentMethod = methods.firstWhere(
-          (m) => m['isDefault'] == true || m['isDefault'].toString() == 'true',
-          orElse: () => methods.first,
-        );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
-    setState(() => _isLoading = false);
   }
 
   Future<void> _placeOrder() async {
+    if (_isPlacingOrder) {
+      debugPrint('Checkout: _placeOrder already in progress, ignoring duplicate call');
+      return;
+    }
+    debugPrint('Checkout: _placeOrder called');
     if (_selectedAddress == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a shipping address')));
       return;
     }
-    if (_selectedPaymentMethod == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a payment method')));
+    if (!_isCOD && _selectedPaymentMethod == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select an online payment method')));
       return;
     }
 
-    setState(() => _isPlacingOrder = true);
+    if (!_isCOD && kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Razorpay is not supported on Web. Please use the Android app.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      setState(() => _isPlacingOrder = true);
+      final token = UserManager().token;
+      if (token == null) {
+        setState(() => _isPlacingOrder = false);
+        return;
+      }
+      final addressId = _selectedAddress!['_id']?.toString() ?? _selectedAddress!['id']?.toString() ?? '';
+      
+      // Validate items have IDs before proceeding
+      final List<Map<String, dynamic>> items = CartManager().items;
+      if (items.any((item) => (item['id'] ?? '').toString().isEmpty)) {
+        setState(() => _isPlacingOrder = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Some items in your cart are invalid. Please clear your cart and re-add items.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Format items for backend: expect "product" (id) and "qty"
+      final apiItems = items.map((item) => {
+        'product': item['id'],
+        'qty': item['quantity'],
+        'price': item['price'],
+        'name': item['name'],
+      }).toList();
+
+      if (_isCOD) {
+        debugPrint('Checkout: Calling /api/payment/cod');
+        final result = await ApiService.placeCodOrder(
+          amount: _finalTotal,
+          addressId: addressId,
+          items: apiItems,
+          token: token,
+          couponCode: _appliedCoupon?['code'],
+          discountAmount: _discountAmount,
+        );
+        _handleOrderResponse(result);
+      } else {
+        debugPrint('Checkout: Calling /api/payment/razorpay/create');
+        final result = await ApiService.createRazorpayOrder(
+          amount: _finalTotal,
+          addressId: addressId,
+          items: apiItems,
+          token: token,
+          couponCode: _appliedCoupon?['code'],
+          discountAmount: _discountAmount,
+        );
+
+        if (result['success'] && result['data'] != null) {
+          debugPrint('Checkout: API Response Data: ${result['data']}');
+          final razorpayOrderId = result['data']['id'] ?? 
+                                  result['data']['orderId'] ?? 
+                                  result['data']['razorpay_order_id'] ??
+                                  result['data']['order']?['id'] ??
+                                  result['data']['order']?['_id'] ??
+                                  result['data']['order']?['orderId'];
+          debugPrint('Checkout: Extracted Razorpay Order ID: $razorpayOrderId');
+          
+          if (razorpayOrderId == null) {
+            debugPrint('Checkout: Error - Razorpay Order ID is null in response');
+            setState(() => _isPlacingOrder = false);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Server error: Order ID not generated'), backgroundColor: Colors.red),
+              );
+            }
+            return;
+          }
+          
+          setState(() => _isPlacingOrder = false); // Reset before opening UI
+          _currentRazorpayOrderId = razorpayOrderId;
+          
+          _razorpayService.openCheckout(
+            amount: _finalTotal,
+            contact: UserManager().userPhone ?? '9999999999',
+            email: UserManager().userEmail ?? 'test@example.com',
+            description: 'Order Payment for Kosmico Wellness Private Limited',
+            orderId: razorpayOrderId,
+            items: apiItems,
+          );
+        } else {
+          debugPrint('Checkout: Razorpay creation failed: ${result['message']}');
+          setState(() => _isPlacingOrder = false);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(result['message'] ?? 'Failed to initiate payment'), backgroundColor: Colors.red),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Checkout: Error in _placeOrder: $e');
+      setState(() => _isPlacingOrder = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  void _handleOrderResponse(Map<String, dynamic> result) {
+    if (result['success']) {
+      // Step 3: Sync with Shiprocket Dashboard
+      final orderId = result['data']?['order']?['_id']?.toString() ?? 
+                      result['data']?['orderId']?.toString() ?? 
+                      'KOSMICO_${DateTime.now().millisecondsSinceEpoch}';
+      _syncOrderToShiprocket(orderId, null);
+
+      // Success!
+      if (mounted) {
+        _showSuccessDialog();
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result['message'] ?? 'Failed to place order')));
+      }
+    }
+    setState(() => _isPlacingOrder = false);
+  }
+
+  Future<void> _finalizeOrder(String? razorpayPaymentId) async {
+    // This is now used after Razorpay success
     final token = UserManager().token;
     if (token != null) {
+      // For online orders, we still call the backend to finalize/verify
+      // In some backends, payment verification is a separate step.
+      // For now, I'll assume we still need to call placeOrder with the payment ID
+      // or a verification endpoint if provided.
+      
       final cartItems = CartManager().items;
       final addressId = _selectedAddress!['_id']?.toString() ?? _selectedAddress!['id']?.toString() ?? '';
-      final paymentMethodId = _selectedPaymentMethod!['_id']?.toString() ?? _selectedPaymentMethod!['id']?.toString() ?? '';
+      final paymentMethodId = _selectedPaymentMethod?['_id']?.toString() ?? _selectedPaymentMethod?['id']?.toString() ?? 'RAZORPAY';
+      
+      // Format items for backend
+      final apiItems = CartManager().items.map((item) => {
+        'product': item['id'],
+        'qty': item['quantity'],
+        'price': item['price'],
+        'name': item['name'],
+      }).toList();
       
       final result = await ApiService.placeOrder(
-        items: cartItems,
+        items: apiItems,
         addressId: addressId,
         paymentMethodId: paymentMethodId,
         totalPrice: _finalTotal,
         token: token,
         couponCode: _appliedCoupon?['code'],
+        razorpayPaymentId: razorpayPaymentId,
       );
 
-      if (result['success']) {
-        // Success!
-        if (mounted) {
-          _showSuccessDialog();
+      _handleOrderResponse(result);
+    } else {
+      setState(() => _isPlacingOrder = false);
+    }
+  }
+
+  Future<void> _syncOrderToShiprocket(String orderId, String? paymentId) async {
+    try {
+      final user = UserManager();
+      final cart = CartManager();
+      
+      // Split name into first and last for Shiprocket
+      List<String> nameParts = (_selectedAddress?['name'] ?? user.userName ?? 'Customer').toString().split(' ');
+      String firstName = nameParts.first;
+      String lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : 'User';
+
+      final Map<String, dynamic> shiprocketData = {
+        'order_id': orderId,
+        'order_date': DateTime.now().toString().split('.').first, // YYYY-MM-DD HH:mm:ss
+        'pickup_location': ShiprocketService.pickupLocation,
+        'billing_customer_name': firstName,
+        'billing_last_name': lastName,
+        'billing_address': _selectedAddress?['address'] ?? 'No Address',
+        'billing_city': _selectedAddress?['city'] ?? 'City',
+        'billing_pincode': _selectedAddress?['pincode'] ?? '',
+        'billing_state': 'Maharashtra', // Fallback as app doesn't have state field
+        'billing_country': 'India',
+        'billing_email': user.userEmail ?? 'test@example.com',
+        'billing_phone': _selectedAddress?['phone'] ?? user.userPhone ?? '',
+        'shipping_is_billing': true,
+        'order_items': cart.items.map((item) => {
+          'name': item['name'],
+          'sku': item['name'].toString().replaceAll(' ', '_'),
+          'units': item['quantity'],
+          'selling_price': item['price'],
+          'discount': '',
+          'tax': '',
+          'hsn': '',
+        }).toList(),
+        'payment_method': _isCOD ? 'COD' : 'Prepaid',
+        'sub_total': _finalTotal,
+        'length': 10,
+        'breadth': 10,
+        'height': 10,
+        'weight': 0.5,
+      };
+
+      debugPrint('Shiprocket: Syncing order $orderId...');
+      final response = await ShiprocketService.createOrder(shiprocketData);
+      
+      if (response['success'] == true) {
+        debugPrint('Shiprocket: Order synced successfully!');
+        
+        // Step 5: Automatically Assign AWB (Optional but recommended for automation)
+        final shipmentId = response['data']?['shipment_id'];
+        if (shipmentId != null) {
+          debugPrint('Shiprocket: Assigning AWB for shipment $shipmentId...');
+          final awbResponse = await ShiprocketService.assignAwb(shipmentId: shipmentId);
+          if (awbResponse['success'] == true) {
+            debugPrint('Shiprocket: AWB Assigned successfully: ${awbResponse['data']?['response']?['data']?['awb_code']}');
+          } else {
+            debugPrint('Shiprocket: AWB Assignment failed: ${awbResponse['message']}');
+          }
         }
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result['message'] ?? 'Failed to place order')));
-        }
+        debugPrint('Shiprocket Sync Failed: ${response['message']}');
       }
+    } catch (e) {
+      debugPrint('Shiprocket Sync Exception: $e');
     }
-    setState(() => _isPlacingOrder = false);
   }
 
   void _showSuccessDialog() {
@@ -160,16 +507,30 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             const SizedBox(height: 8),
             const Text('Your order has been placed successfully.', textAlign: TextAlign.center),
             const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  // Clear cart and go home
-                  CartManager().clearCart();
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                },
-                child: const Text('Back to Home'),
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      CartManager().clearCart();
+                      Navigator.of(context).popUntil((route) => route.isFirst);
+                    },
+                    child: const Text('Home'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      CartManager().clearCart();
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(builder: (context) => const MyOrdersScreen())
+                      );
+                    },
+                    child: const Text('My Orders'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -206,22 +567,43 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     MaterialPageRoute(builder: (context) => const ShippingAddressesScreen(isSelectionMode: true))
                   );
                   if (result != null && result is Map<String, dynamic>) {
-                    setState(() => _selectedAddress = result);
+                    setState(() {
+                      _selectedAddress = result;
+                      _expectedDeliveryDate = null; // Clear old date
+                    });
+                    _fetchDeliveryEstimation(); // Fetch for new address
                   }
                 }),
                 _buildAddressCard(colorScheme),
                 const SizedBox(height: 24),
                 
-                _buildSectionHeader('Payment Method', () async {
-                  final result = await Navigator.of(context).push(
-                    MaterialPageRoute(builder: (context) => const PaymentMethodsScreen(isSelectionMode: true))
-                  );
-                  if (result != null && result is Map<String, dynamic>) {
-                    setState(() => _selectedPaymentMethod = result);
-                  }
-                }),
-                _buildPaymentCard(colorScheme),
+                const Text('Payment Mode', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildModeChip('Online', !_isCOD, Icons.payment, colorScheme),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildModeChip('Cash on Delivery', _isCOD, Icons.delivery_dining, colorScheme),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 24),
+
+                if (!_isCOD) ...[
+                  _buildSectionHeader('Payment Method', () async {
+                    final result = await Navigator.of(context).push(
+                      MaterialPageRoute(builder: (context) => const PaymentMethodsScreen(isSelectionMode: true))
+                    );
+                    if (result != null && result is Map<String, dynamic>) {
+                      setState(() => _selectedPaymentMethod = result);
+                    }
+                  }),
+                  _buildPaymentCard(colorScheme),
+                  const SizedBox(height: 24),
+                ],
 
                 _buildSectionHeader('Apply Coupon', () async {
                   final result = await Navigator.of(context).push(
@@ -276,6 +658,53 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  Widget _buildModeChip(String label, bool isSelected, IconData icon, ColorScheme colorScheme) {
+    return GestureDetector(
+      onTap: () {
+        final bool newIsCOD = label == 'Cash on Delivery';
+        if (newIsCOD != _isCOD) {
+          setState(() => _isCOD = newIsCOD);
+          _fetchDeliveryEstimation(); // Re-fetch estimation when payment mode changes
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: isSelected ? colorScheme.primary : colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? colorScheme.primary : colorScheme.outline.withValues(alpha: 0.2),
+            width: 2,
+          ),
+          boxShadow: isSelected ? [
+            BoxShadow(
+              color: colorScheme.primary.withValues(alpha: 0.2),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            )
+          ] : null,
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? Colors.white : colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildAddressCard(ColorScheme colorScheme) {
     if (_selectedAddress == null) {
       return Container(
@@ -319,6 +748,33 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           Text('${_selectedAddress!['address']}, ${_selectedAddress!['city']} - ${_selectedAddress!['pincode']}', style: const TextStyle(color: Colors.grey)),
           const SizedBox(height: 4),
           Text(_selectedAddress!['phone'] ?? '', style: const TextStyle(fontWeight: FontWeight.w500)),
+          const Divider(height: 24, thickness: 0.5),
+          Row(
+            children: [
+              Icon(
+                Icons.local_shipping_outlined, 
+                size: 16, 
+                color: _isEstimatingDelivery ? Colors.grey : colorScheme.primary
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _isEstimatingDelivery 
+                      ? 'Calculating delivery date...' 
+                      : (_expectedDeliveryDate != null 
+                          ? 'Expected Delivery: $_expectedDeliveryDate' 
+                          : 'Checking delivery availability...'),
+                  style: TextStyle(
+                    fontSize: 13, 
+                    color: _expectedDeliveryDate == 'Pincode not serviceable' || _expectedDeliveryDate?.contains('failed') == true 
+                        ? Colors.red[400] 
+                        : Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

@@ -15,7 +15,12 @@ class CartManager extends ChangeNotifier {
   void addItem(Map<String, dynamic> item) {
     // Standardize product name (handle both 'name' and 'items' keys)
     final String name = (item['name'] ?? item['items'] ?? 'Unknown Product').toString();
+    final String id = (item['_id'] ?? item['id'] ?? '').toString();
     
+    if (id.isEmpty) {
+      debugPrint('WARNING: Adding item to cart without a valid ID: $name');
+    }
+
     // Standardize price
     int price = 0;
     if (item['price'] is int) {
@@ -33,6 +38,7 @@ class CartManager extends ChangeNotifier {
       _items[index]['quantity'] = (_items[index]['quantity'] ?? 0) + 1;
     } else {
       _items.add({
+        'id': id,
         'name': name,
         'price': price,
         'quantity': 1,

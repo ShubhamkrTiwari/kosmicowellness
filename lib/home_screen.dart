@@ -45,7 +45,7 @@ class MyApp extends StatelessWidget {
       builder: (context, _) {
         final bool isDark = ThemeManager().isDarkMode == true;
         return MaterialApp(
-          title: 'Kosmico Wellness',
+          title: 'Kosmico Wellness Private Limited',
           navigatorKey: navigatorKey,
           debugShowCheckedModeBanner: false,
           themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
@@ -487,6 +487,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 onTap: () {
                   // Standardize for details screen which might expect Map<String, String>
                   final detailsProduct = {
+                    '_id': product['_id']?.toString() ?? product['id']?.toString() ?? '',
                     'name': name,
                     'description': (product['description'] ?? '').toString(),
                     'price': price,

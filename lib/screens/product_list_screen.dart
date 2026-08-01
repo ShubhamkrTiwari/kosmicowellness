@@ -336,6 +336,7 @@ class ProductListScreenState extends State<ProductListScreen> {
       onTap: () {
         // Standardize for details screen
         final detailsProduct = {
+          '_id': product['_id']?.toString() ?? product['id']?.toString() ?? '',
           'name': name,
           'description': (product['description'] ?? '').toString(),
           'price': price,

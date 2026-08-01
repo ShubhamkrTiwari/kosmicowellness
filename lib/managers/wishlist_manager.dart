@@ -17,6 +17,7 @@ class WishlistManager extends ChangeNotifier {
       _items.removeAt(index);
     } else {
       _items.add({
+        'id': item['_id']?.toString() ?? item['id']?.toString() ?? '',
         'name': name,
         'price': item['price'] is int ? item['price'] : int.parse(item['price'].toString().replaceAll('₹', '').replaceAll(',', '').trim()),
         'icon': (item['icon'] ?? '🌿').toString(),

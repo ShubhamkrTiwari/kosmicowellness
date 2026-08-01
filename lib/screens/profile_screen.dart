@@ -14,6 +14,7 @@ import 'auth_screen.dart';
 import 'coupons_screen.dart';
 import 'help_center_screen.dart';
 import 'my_orders_screen.dart';
+import 'returns_history_screen.dart';
 import 'payment_methods_screen.dart';
 import 'shipping_addresses_screen.dart';
 import 'wishlist_screen.dart';
@@ -26,11 +27,12 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateMixin {
-  late String userName;
-  late String userEmail;
-  late String userPhone;
+  String userName = 'Loading...';
+  String userEmail = 'Loading...';
+  String userPhone = '';
   XFile? _pickedImage;
   int _couponCount = 0;
+  int _orderCount = 0;
 
   AnimationController? _logoutAnimController;
 
@@ -39,6 +41,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     super.initState();
     _loadUserData();
     _fetchCouponCount();
+    _fetchOrderCount();
 
     _logoutAnimController = AnimationController(
       vsync: this,
@@ -55,9 +58,9 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   Future<void> _fetchCouponCount() async {
     try {
       final token = UserManager().token;
-      if (token != null) {
+      if (token != null && token.isNotEmpty) {
         final result = await ApiService.getCoupons(token);
-        if (result['success'] && result['data'] is List) {
+        if (result != null && result['success'] == true && result['data'] is List) {
           if (mounted) {
             setState(() {
               _couponCount = (result['data'] as List).length;
@@ -67,6 +70,32 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       }
     } catch (e) {
       debugPrint('Error fetching coupon count: $e');
+    }
+  }
+
+  Future<void> _fetchOrderCount() async {
+    try {
+      final token = UserManager().token;
+      if (token != null && token.isNotEmpty) {
+        final result = await ApiService.getUserOrders(token);
+        if (result != null && result['success'] == true && result['data'] != null) {
+          final dynamic data = result['data'];
+          List allOrders = [];
+          if (data is List) {
+            allOrders = data;
+          } else if (data is Map && data['orders'] is List) {
+            allOrders = data['orders'];
+          }
+          
+          if (mounted) {
+            setState(() {
+              _orderCount = allOrders.length;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching order count: $e');
     }
   }
 
@@ -368,6 +397,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       ),
       builder: (context) {
         bool isSaving = false;
+        final formKey = GlobalKey<FormState>();
         return StatefulBuilder(
           builder: (context, setModalState) {
             final colorScheme = Theme.of(context).colorScheme;
@@ -383,142 +413,151 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                     left: 24,
                     right: 24,
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Edit Profile',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 24),
-                      TextField(
-                        controller: nameController,
-                        decoration: _inputDecoration('Full Name', Icons.person_outline),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: emailController,
-                        readOnly: true,
-                        enabled: false,
-                        style: TextStyle(color: colorScheme.onSurfaceVariant),
-                        decoration: _inputDecoration('Email Address', Icons.email_outlined).copyWith(
-                          filled: true,
-                          fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Edit Profile',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: phoneController,
-                        keyboardType: TextInputType.phone,
-                        decoration: _inputDecoration('Phone Number', Icons.phone_outlined),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(10),
-                        ],
-                      ),
-                      const SizedBox(height: 32),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 55,
-                        child: ElevatedButton(
-                      onPressed: isSaving ? null : () async {
-                        final newName = nameController.text.trim();
-                        final newPhone = phoneController.text.trim();
-
-                        if (newName.isNotEmpty) {
-                          setModalState(() => isSaving = true);
-                          
-                          final messenger = ScaffoldMessenger.of(context);
-                          final navigator = Navigator.of(context);
-
-                          // Ensure token is loaded
-                          await UserManager().init();
-                          final token = UserManager().token;
-                          
-                          if (!mounted) return;
-
-                          if (token == null || token.isEmpty) {
-                            setModalState(() => isSaving = false);
-                            messenger.showSnackBar(
-                              const SnackBar(
-                                content: Text('Authentication error. Please login again.'),
-                                backgroundColor: Colors.red,
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                            return;
-                          }
-                          
-                          final result = await ApiService.updateProfileWithImage(
-                            name: newName,
-                            phoneNumber: newPhone,
-                            imageFile: _pickedImage, // Use the currently picked image if any
-                            token: token,
-                          );
-
-                          if (!mounted) return;
-
-                          if (result['success']) {
-                            // Backend returns the new user data including image URL
-                            await UserManager().saveUser(result['data']);
-                            
-                            NotificationManager().addNotification(
-                              title: 'Profile Updated',
-                              message: 'Your personal details have been updated.',
-                              icon: '👤',
-                              type: 'profile',
-                            );
-
-                            setState(() {
-                              userName = UserManager().userName ?? newName;
-                              userEmail = UserManager().userEmail ?? userEmail;
-                              userPhone = UserManager().userPhone ?? (newPhone.isEmpty ? 'Add phone number' : newPhone);
-                            });
-                            
-                            navigator.pop();
-                            messenger.showSnackBar(
-                              const SnackBar(
-                                content: Text('Profile updated successfully!'),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          } else {
-                            setModalState(() => isSaving = false);
-                            messenger.showSnackBar(
-                              SnackBar(
-                                content: Text(result['message']),
-                                backgroundColor: Colors.redAccent,
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
-                        }
-                      },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Theme.of(context).colorScheme.primary,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        const SizedBox(height: 24),
+                        TextFormField(
+                          controller: nameController,
+                          decoration: _inputDecoration('Full Name', Icons.person_outline),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                          ],
+                          validator: (value) => value?.isEmpty == true ? 'Name is required' : null,
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: emailController,
+                          readOnly: true,
+                          enabled: false,
+                          style: TextStyle(color: colorScheme.onSurfaceVariant),
+                          decoration: _inputDecoration('Email Address', Icons.email_outlined).copyWith(
+                            filled: true,
+                            fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                           ),
-                          child: isSaving 
-                              ? const SizedBox(
-                                  height: 20, 
-                                  width: 20, 
-                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                                )
-                              : const Text('Save Changes'),
                         ),
-                      ),
-                      const SizedBox(height: 30),
-                    ],
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: phoneController,
+                          keyboardType: TextInputType.phone,
+                          decoration: _inputDecoration('Phone Number', Icons.phone_outlined),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(10),
+                          ],
+                          validator: (value) {
+                            if (value != null && value.isNotEmpty && value.length != 10) {
+                              return 'Enter a valid 10-digit number';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 32),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 55,
+                          child: ElevatedButton(
+                            onPressed: isSaving ? null : () async {
+                              if (!formKey.currentState!.validate()) return;
+                              
+                              final newName = nameController.text.trim();
+                              final newPhone = phoneController.text.trim();
+                              setModalState(() => isSaving = true);
+                              
+                              final messenger = ScaffoldMessenger.of(context);
+                              final navigator = Navigator.of(context);
+
+                              // Ensure token is loaded
+                              await UserManager().init();
+                              final token = UserManager().token;
+                              
+                              if (!mounted) return;
+
+                              if (token == null || token.isEmpty) {
+                                setModalState(() => isSaving = false);
+                                messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Authentication error. Please login again.'),
+                                    backgroundColor: Colors.red,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                                return;
+                              }
+                              
+                              final result = await ApiService.updateProfileWithImage(
+                                name: newName,
+                                phoneNumber: newPhone,
+                                imageFile: _pickedImage, // Use the currently picked image if any
+                                token: token,
+                              );
+
+                              if (!mounted) return;
+
+                              if (result['success']) {
+                                // Backend returns the new user data including image URL
+                                await UserManager().saveUser(result['data']);
+                                
+                                NotificationManager().addNotification(
+                                  title: 'Profile Updated',
+                                  message: 'Your personal details have been updated.',
+                                  icon: '👤',
+                                  type: 'profile',
+                                );
+
+                                setState(() {
+                                  userName = UserManager().userName ?? newName;
+                                  userEmail = UserManager().userEmail ?? userEmail;
+                                  userPhone = UserManager().userPhone ?? (newPhone.isEmpty ? 'Add phone number' : newPhone);
+                                });
+                                
+                                navigator.pop();
+                                messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Profile updated successfully!'),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              } else {
+                                setModalState(() => isSaving = false);
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text(result['message']),
+                                    backgroundColor: Colors.redAccent,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(context).colorScheme.primary,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            ),
+                            child: isSaving 
+                                ? const SizedBox(
+                                    height: 20, 
+                                    width: 20, 
+                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                                  )
+                                : const Text('Save Changes'),
+                          ),
+                        ),
+                        const SizedBox(height: 30),
+                      ],
+                    ),
                   ),
                 ),
               ),
             );
-          }
+          },
         );
       },
     );
@@ -565,46 +604,31 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                             border: Border.all(color: colorScheme.primary, width: 2),
                           ),
                           child: Center(
-                            child: _pickedImage == null && UserManager().profilePicture == null
-                                ? Text(
-                                    _getInitials(userName),
-                                    style: TextStyle(
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.bold,
-                                      color: colorScheme.primary,
-                                    ),
+                            child: _pickedImage != null
+                                ? ClipOval(
+                                    child: kIsWeb
+                                        ? Image.network(_pickedImage!.path, width: 80, height: 80, fit: BoxFit.cover)
+                                        : Image.file(File(_pickedImage!.path), width: 80, height: 80, fit: BoxFit.cover),
                                   )
-                                : GestureDetector(
-                                    onTap: _showProfilePicOptions,
-                                    child: Hero(
-                                      tag: 'profile-pic',
-                                      child: ClipOval(
-                                        child: _pickedImage != null
-                                            ? (kIsWeb
-                                                ? Image.network(
-                                                    _pickedImage!.path,
-                                                    fit: BoxFit.cover,
-                                                    width: 80,
-                                                    height: 80,
-                                                  )
-                                                : Image.file(
-                                                    File(_pickedImage!.path),
-                                                    fit: BoxFit.cover,
-                                                    width: 80,
-                                                    height: 80,
-                                                  ))
-                                            : Image.network(
-                                                UserManager().profilePicture!,
-                                                fit: BoxFit.cover,
-                                                width: 80,
-                                                height: 80,
-                                                errorBuilder: (context, error, stackTrace) {
-                                                  return Text(_getInitials(userName));
-                                                },
-                                              ),
-                                      ),
-                                    ),
-                                  ),
+                                : (UserManager().profilePicture != null && UserManager().profilePicture!.isNotEmpty
+                                    ? GestureDetector(
+                                        onTap: _showProfilePicOptions,
+                                        child: Hero(
+                                          tag: 'profile-pic',
+                                          child: ClipOval(
+                                            child: Image.network(
+                                              UserManager().profilePicture!,
+                                              fit: BoxFit.cover,
+                                              width: 80,
+                                              height: 80,
+                                              errorBuilder: (context, error, stackTrace) {
+                                                return Center(child: Text(_getInitials(userName)));
+                                              },
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                    : Center(child: Text(_getInitials(userName)))),
                           ),
                         ),
                         Positioned(
@@ -641,12 +665,12 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                           const SizedBox(height: 4),
                           Text(
                             userEmail,
-                            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
+                            style: TextStyle(color: colorScheme.onSurfaceVariant ?? Colors.grey, fontSize: 14),
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
                             userPhone,
-                            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
+                            style: TextStyle(color: colorScheme.onSurfaceVariant ?? Colors.grey, fontSize: 14),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ],
@@ -667,7 +691,16 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 padding: const EdgeInsets.symmetric(horizontal: 20.0),
                 child: Row(
                   children: [
-                    Expanded(child: _buildStatItem('Orders', '12', Icons.local_shipping_outlined, colorScheme)),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(builder: (context) => const MyOrdersScreen()),
+                          ).then((_) => _fetchOrderCount());
+                        },
+                        child: _buildStatItem('Orders', _orderCount.toString(), Icons.local_shipping_outlined, colorScheme),
+                      ),
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: ListenableBuilder(
@@ -706,6 +739,11 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
               _buildMenuItem(Icons.shopping_bag_outlined, 'My Orders', 'Track and manage your orders', colorScheme, onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (context) => const MyOrdersScreen()),
+                );
+              }),
+              _buildMenuItem(Icons.assignment_return_outlined, 'Returns & Refunds', 'Status of your refund/replacement requests', colorScheme, onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const ReturnsHistoryScreen()),
                 );
               }),
               _buildMenuItem(Icons.location_on_outlined, 'Shipping Addresses', 'Manage your delivery locations', colorScheme, onTap: () {
@@ -877,12 +915,12 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
-              value,
+              value.toString(),
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
           ),
           Text(
-            label,
+            label.toString(),
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -1016,6 +1054,7 @@ class AboutKosmicoScreen extends StatelessWidget {
                   Image.network(
                     'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=1000',
                     fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(color: colorScheme.primary),
                   ),
                   DecoratedBox(
                     decoration: BoxDecoration(
@@ -1123,7 +1162,7 @@ class AboutKosmicoScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'KOSMICO WELLNESS',
+                    'KOSMICO WELLNESS PRIVATE LIMITED',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1),
                   ),
                   Text(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../managers/payment_manager.dart';
 
 class PaymentScreen extends StatefulWidget {
@@ -13,6 +14,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   late String _selectedMethod;
   late bool _isDefault;
   bool _isSavingLocal = false;
+  final _formKey = GlobalKey<FormState>();
 
   final _bankAccountController = TextEditingController();
   final _ifscController = TextEditingController();
@@ -55,17 +57,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   void _savePaymentMethod() async {
     if (_isSavingLocal) return;
+    if (!_formKey.currentState!.validate()) return;
 
     Map<String, dynamic> method;
     if (_selectedMethod == 'Bank') {
-      if (_bankAccountController.text.trim().isEmpty || 
-          _ifscController.text.trim().isEmpty || 
-          _holderNameController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please fill all required fields')),
-        );
-        return;
-      }
       method = {
         "type": "BANK_ACCOUNT",
         "accountHolderName": _holderNameController.text.trim(),
@@ -75,12 +70,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
         "isDefault": _isDefault,
       };
     } else {
-      if (_upiIdController.text.trim().isEmpty || _holderNameController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please fill all required fields')),
-        );
-        return;
-      }
       method = {
         "type": "UPI",
         "upiId": _upiIdController.text.trim(),
@@ -161,9 +150,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             if (!isEditing) ...[
               Text(
                 'Select Payment Type',
@@ -180,7 +171,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     child: _buildTypeCard(
                       title: 'Bank Account',
                       logo: Image.network(
-                        'https://cdn-icons-png.flaticon.com/512/2830/2830284.png', // Professional Bank/Building Icon
+                        'https://cdn-icons-png.flaticon.com/512/2830/2830284.png', 
                         height: 32,
                         width: 32,
                         color: _selectedMethod == 'Bank' ? colorScheme.primary : colorScheme.onSurfaceVariant,
@@ -199,7 +190,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     child: _buildTypeCard(
                       title: 'UPI ID',
                       logo: Image.network(
-                        'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/UPI-Logo-vector.svg/640px-UPI-Logo-vector.svg.png', // Official UPI Logo
+                        'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/UPI-Logo-vector.svg/640px-UPI-Logo-vector.svg.png', 
                         height: 32,
                         fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) => Icon(
@@ -225,13 +216,43 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       children: [
                         Text('Bank Account Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
                         const SizedBox(height: 20),
-                        _buildTextField(controller: _holderNameController, label: 'Account Holder Name', icon: Icons.person_outline, enabled: !_isSavingLocal),
+                        _buildTextField(
+                          controller: _holderNameController, 
+                          label: 'Account Holder Name', 
+                          icon: Icons.person_outline, 
+                          enabled: !_isSavingLocal,
+                          validator: (v) => v?.isEmpty == true ? 'Name is required' : null,
+                        ),
                         const SizedBox(height: 16),
-                        _buildTextField(controller: _bankNameController, label: 'Bank Name', icon: Icons.business_outlined, enabled: !_isSavingLocal),
+                        _buildTextField(
+                          controller: _bankNameController, 
+                          label: 'Bank Name', 
+                          icon: Icons.business_outlined, 
+                          enabled: !_isSavingLocal,
+                          validator: (v) => v?.isEmpty == true ? 'Bank name is required' : null,
+                        ),
                         const SizedBox(height: 16),
-                        _buildTextField(controller: _bankAccountController, label: 'Account Number', icon: Icons.numbers_outlined, keyboardType: TextInputType.number, enabled: !_isSavingLocal),
+                        _buildTextField(
+                          controller: _bankAccountController, 
+                          label: 'Account Number', 
+                          icon: Icons.numbers_outlined, 
+                          keyboardType: TextInputType.number, 
+                          enabled: !_isSavingLocal,
+                          validator: (v) => (v == null || v.isEmpty) ? 'Account number required' : null,
+                        ),
                         const SizedBox(height: 16),
-                        _buildTextField(controller: _ifscController, label: 'IFSC Code', icon: Icons.code_outlined, capitalization: TextCapitalization.characters, enabled: !_isSavingLocal),
+                        _buildTextField(
+                          controller: _ifscController, 
+                          label: 'IFSC Code', 
+                          icon: Icons.code_outlined, 
+                          capitalization: TextCapitalization.characters, 
+                          enabled: !_isSavingLocal,
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return 'IFSC is required';
+                            if (v.length < 11) return 'Invalid IFSC (11 chars)';
+                            return null;
+                          },
+                        ),
                       ],
                     )
                   : Column(
@@ -240,9 +261,25 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       children: [
                         Text('UPI Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
                         const SizedBox(height: 20),
-                        _buildTextField(controller: _holderNameController, label: 'Display Name', icon: Icons.person_outline, enabled: !_isSavingLocal),
+                        _buildTextField(
+                          controller: _holderNameController, 
+                          label: 'Display Name', 
+                          icon: Icons.person_outline, 
+                          enabled: !_isSavingLocal,
+                          validator: (v) => v?.isEmpty == true ? 'Display name required' : null,
+                        ),
                         const SizedBox(height: 16),
-                        _buildTextField(controller: _upiIdController, label: 'UPI ID (e.g. name@bank)', icon: Icons.alternate_email_outlined, enabled: !_isSavingLocal),
+                        _buildTextField(
+                          controller: _upiIdController, 
+                          label: 'UPI ID (e.g. name@bank)', 
+                          icon: Icons.alternate_email_outlined, 
+                          enabled: !_isSavingLocal,
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return 'UPI ID is required';
+                            if (!v.contains('@')) return 'Invalid UPI ID format';
+                            return null;
+                          },
+                        ),
                         const SizedBox(height: 12),
                         Container(
                           padding: const EdgeInsets.all(12),
@@ -297,8 +334,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildTypeCard({
     required String title,
@@ -349,13 +387,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
     TextInputType keyboardType = TextInputType.text,
     TextCapitalization capitalization = TextCapitalization.none,
     bool enabled = true,
+    String? Function(String?)? validator,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
-    return TextField(
+    return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       textCapitalization: capitalization,
       enabled: enabled,
+      validator: validator,
       style: TextStyle(color: colorScheme.onSurface),
       decoration: InputDecoration(
         labelText: label,
@@ -374,6 +414,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: colorScheme.primary, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Colors.red, width: 1),
         ),
       ),
     );

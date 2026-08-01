@@ -152,6 +152,16 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                                     color: colorScheme.primary,
                                   ),
                                 ),
+                                if (product['reviews'] != null) ...[
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '(${product['reviews']})',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),

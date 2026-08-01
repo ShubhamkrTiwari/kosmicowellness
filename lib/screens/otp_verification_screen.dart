@@ -97,16 +97,82 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     }
   }
 
+  void _showLoadingDialog() {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierLabel: '',
+      barrierColor: Colors.black.withOpacity(0.5),
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, anim1, anim2) => const SizedBox(),
+      transitionBuilder: (context, anim1, anim2, child) {
+        return ScaleTransition(
+          scale: CurvedAnimation(parent: anim1, curve: Curves.easeInOut),
+          child: FadeTransition(
+            opacity: anim1,
+            child: Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  color: Theme.of(context).colorScheme.surface,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(
+                      height: 50,
+                      width: 50,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 4,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Verifying OTP',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Please wait a moment...',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _verifyOtp() async {
     String otp = _controllers.map((e) => e.text).join();
     if (otp.length == 6) {
-      setState(() => _isLoading = true);
+      _showLoadingDialog();
       
-      final result = widget.isLogin 
-          ? await ApiService.verifyLogin(widget.email, otp)
-          : await ApiService.verifySignup(widget.email, otp);
+      // Start both the API call and a 3-second timer
+      final resultFuture = widget.isLogin 
+          ? ApiService.verifyLogin(widget.email, otp)
+          : ApiService.verifySignup(widget.email, otp);
       
-      setState(() => _isLoading = false);
+      final delayFuture = Future.delayed(const Duration(seconds: 3));
+
+      // Wait for both to complete
+      final results = await Future.wait([resultFuture, delayFuture]);
+      final result = results[0] as Map<String, dynamic>;
+      
+      if (mounted) Navigator.pop(context);
 
       if (result['success']) {
         // Save user data
@@ -115,7 +181,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         if (mounted) {
           // Navigate to Home
           Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const HomeScreen(title: 'Kosmico Wellness')),
+            MaterialPageRoute(builder: (context) => const HomeScreen(title: 'Kosmico Wellness Private Limited')),
             (route) => false,
           );
         }
@@ -229,23 +295,17 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                   width: double.infinity,
                   height: 55,
                   child: ElevatedButton(
-                    onPressed: _isLoading ? null : _verifyOtp,
+                    onPressed: _verifyOtp,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: colorScheme.primary,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       elevation: 0,
                     ),
-                    child: _isLoading 
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Text(
-                            'Verify',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
+                    child: const Text(
+                      'Verify',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 32),

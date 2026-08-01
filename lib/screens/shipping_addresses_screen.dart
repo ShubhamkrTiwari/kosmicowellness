@@ -75,6 +75,8 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
       builder: (context) {
         bool isSaving = false;
         bool isDefaultValue = address?['isDefault'] == 'true';
+        final formKey = GlobalKey<FormState>();
+
         return StatefulBuilder(
           builder: (context, setModalState) => Padding(
             padding: EdgeInsets.only(
@@ -84,218 +86,243 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
               right: 24,
             ),
             child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        isEditing ? 'Edit Address' : 'Add New Address',
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                      ),
-                      TextButton.icon(
-                        onPressed: () async {
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const MapPickerScreen()),
-                          );
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          isEditing ? 'Edit Address' : 'Add New Address',
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        ),
+                        TextButton.icon(
+                          onPressed: () async {
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const MapPickerScreen()),
+                            );
 
-                          if (result != null && result is Map) {
-                            if (result['placemark'] != null) {
-                              Placemark place = result['placemark'];
-                              setModalState(() {
-                                // Intelligent merging of Landmark (name) and Street
-                                String landmark = place.name ?? '';
-                                String street = place.street ?? '';
-                                
-                                List<String> addressParts = [];
-                                
-                                // If name is same as street or house number, don't duplicate
-                                if (landmark.isNotEmpty && landmark != street) {
-                                  addressParts.add(landmark);
-                                }
-                                
-                                if (street.isNotEmpty) {
-                                  addressParts.add(street);
-                                }
-                                
-                                if (place.subLocality != null && place.subLocality!.isNotEmpty) {
-                                  addressParts.add(place.subLocality!);
-                                }
+                            if (result != null && result is Map) {
+                              if (result['placemark'] != null) {
+                                Placemark place = result['placemark'];
+                                setModalState(() {
+                                  // Intelligent merging of Landmark (name) and Street
+                                  String landmark = place.name ?? '';
+                                  String street = place.street ?? '';
+                                  
+                                  List<String> addressParts = [];
+                                  
+                                  // If name is same as street or house number, don't duplicate
+                                  if (landmark.isNotEmpty && landmark != street) {
+                                    addressParts.add(landmark);
+                                  }
+                                  
+                                  if (street.isNotEmpty) {
+                                    addressParts.add(street);
+                                  }
+                                  
+                                  if (place.subLocality != null && place.subLocality!.isNotEmpty) {
+                                    addressParts.add(place.subLocality!);
+                                  }
 
-                                addressController.text = addressParts.join(', ');
-                                cityController.text = place.locality ?? place.subAdministrativeArea ?? '';
-                                pincodeController.text = place.postalCode ?? '';
-                              });
-                            } else if (result['address'] != null) {
-                              // Web fallback
-                              setModalState(() {
-                                addressController.text = result['address'];
-                              });
+                                  addressController.text = addressParts.join(', ');
+                                  cityController.text = place.locality ?? place.subAdministrativeArea ?? '';
+                                  pincodeController.text = place.postalCode ?? '';
+                                });
+                              } else if (result['address'] != null) {
+                                // Web fallback
+                                setModalState(() {
+                                  addressController.text = result['address'];
+                                });
+                              }
+                            }
+                          },
+                          icon: const Icon(Icons.map_outlined, size: 18),
+                          label: const Text("Locate on Map", style: TextStyle(fontSize: 12)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    TextFormField(
+                      controller: labelController,
+                      decoration: _inputDecoration('Address Label (e.g. Home, Office)'),
+                      validator: (value) => value?.isEmpty == true ? 'Label is required' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: nameController,
+                      decoration: _inputDecoration('Full Name'),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                      ],
+                      validator: (value) => value?.isEmpty == true ? 'Name is required' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: addressController,
+                      decoration: _inputDecoration('Street Address / Landmark'),
+                      validator: (value) => value?.isEmpty == true ? 'Address is required' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: cityController,
+                            decoration: _inputDecoration('City'),
+                            validator: (value) => value?.isEmpty == true ? 'City required' : null,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: TextFormField(
+                            controller: pincodeController,
+                            keyboardType: TextInputType.number,
+                            decoration: _inputDecoration('Pincode'),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(6),
+                            ],
+                            validator: (value) {
+                              if (value == null || value.isEmpty) return 'Pincode required';
+                              if (value.length != 6) return 'Enter 6 digits';
+                              return null;
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: phoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: _inputDecoration('Phone Number'),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(10),
+                      ],
+                      validator: (value) {
+                        if (value == null || value.isEmpty) return 'Phone required';
+                        if (value.length != 10) return 'Enter 10 digits';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    SwitchListTile(
+                      title: const Text('Set as Default Address'),
+                      value: isDefaultValue,
+                      onChanged: (val) {
+                        setModalState(() => isDefaultValue = val);
+                      },
+                      activeThumbColor: Theme.of(context).colorScheme.primary,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 55,
+                      child: ElevatedButton(
+                        onPressed: isSaving ? null : () async {
+                          if (!formKey.currentState!.validate()) return;
+                          
+                          final label = labelController.text.trim();
+                          final name = nameController.text.trim();
+                          final street = addressController.text.trim();
+                          final city = cityController.text.trim();
+                          final pincode = pincodeController.text.trim();
+                          final phone = phoneController.text.trim();
+
+                          setModalState(() => isSaving = true);
+                          
+                          await userManager.init();
+                          final token = userManager.token;
+                          
+                          if (token == null || token.isEmpty) {
+                            setModalState(() => isSaving = false);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Authentication error. Please login again.'),
+                                  backgroundColor: Colors.red,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                            return;
+                          }
+
+                          final Map<String, dynamic> result;
+                          if (isEditing) {
+                            result = await ApiService.updateAddress(
+                              addressId: address!['id']!,
+                              addressLabel: label,
+                              fullName: name,
+                              streetAddress: street,
+                              city: city,
+                              pincode: pincode,
+                              phoneNumber: phone,
+                              token: token,
+                              isDefault: isDefaultValue,
+                            );
+                          } else {
+                            result = await ApiService.saveAddress(
+                              addressLabel: label,
+                              fullName: name,
+                              streetAddress: street,
+                              city: city,
+                              pincode: pincode,
+                              phoneNumber: phone,
+                              token: token,
+                              isDefault: isDefaultValue,
+                            );
+                          }
+
+                          if (result['success']) {
+                            await _loadAddresses();
+                            if (mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(isEditing ? 'Address updated successfully!' : 'Address saved successfully!'),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          } else {
+                            setModalState(() => isSaving = false);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(result['message'] ?? 'Failed to save address'),
+                                  backgroundColor: Colors.redAccent,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
                             }
                           }
                         },
-                        icon: const Icon(Icons.map_outlined, size: 18),
-                        label: const Text("Locate on Map", style: TextStyle(fontSize: 12)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        child: isSaving 
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              )
+                            : Text(isEditing ? 'Update Address' : 'Save Address'),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-              TextField(
-                controller: labelController,
-                decoration: _inputDecoration('Address Label (e.g. Home, Office)'),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: nameController,
-                decoration: _inputDecoration('Full Name'),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: addressController,
-                decoration: _inputDecoration('Street Address / Landmark'),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: cityController,
-                      decoration: _inputDecoration('City'),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: TextField(
-                      controller: pincodeController,
-                      keyboardType: TextInputType.number,
-                      decoration: _inputDecoration('Pincode'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: _inputDecoration('Phone Number'),
-              ),
-              const SizedBox(height: 16),
-              SwitchListTile(
-                title: const Text('Set as Default Address'),
-                value: isDefaultValue,
-                onChanged: (val) {
-                  setModalState(() => isDefaultValue = val);
-                },
-                activeThumbColor: Theme.of(context).colorScheme.primary,
-                contentPadding: EdgeInsets.zero,
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                height: 55,
-                child: ElevatedButton(
-                  onPressed: isSaving ? null : () async {
-                    final label = labelController.text.trim();
-                    final name = nameController.text.trim();
-                    final street = addressController.text.trim();
-                    final city = cityController.text.trim();
-                    final pincode = pincodeController.text.trim();
-                    final phone = phoneController.text.trim();
-
-                    if (label.isNotEmpty && name.isNotEmpty && street.isNotEmpty && 
-                        city.isNotEmpty && pincode.isNotEmpty && phone.isNotEmpty) {
-                      setModalState(() => isSaving = true);
-                      
-                      await userManager.init();
-                      final token = userManager.token;
-                      
-                      if (token == null || token.isEmpty) {
-                        setModalState(() => isSaving = false);
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Authentication error. Please login again.'),
-                              backgroundColor: Colors.red,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                        return;
-                      }
-
-                      final Map<String, dynamic> result;
-                      if (isEditing) {
-                        result = await ApiService.updateAddress(
-                          addressId: address!['id']!,
-                          addressLabel: label,
-                          fullName: name,
-                          streetAddress: street,
-                          city: city,
-                          pincode: pincode,
-                          phoneNumber: phone,
-                          token: token,
-                          isDefault: isDefaultValue,
-                        );
-                      } else {
-                        result = await ApiService.saveAddress(
-                          addressLabel: label,
-                          fullName: name,
-                          streetAddress: street,
-                          city: city,
-                          pincode: pincode,
-                          phoneNumber: phone,
-                          token: token,
-                          isDefault: isDefaultValue,
-                        );
-                      }
-
-                      if (result['success']) {
-                        await _loadAddresses();
-                        if (mounted) {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(isEditing ? 'Address updated successfully!' : 'Address saved successfully!'),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      } else {
-                        setModalState(() => isSaving = false);
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(result['message'] ?? 'Failed to save address'),
-                              backgroundColor: Colors.redAccent,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      }
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                  child: isSaving 
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                        )
-                      : Text(isEditing ? 'Update Address' : 'Save Address'),
+                    const SizedBox(height: 30),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 30),
-                ],
               ),
             ),
           ),
