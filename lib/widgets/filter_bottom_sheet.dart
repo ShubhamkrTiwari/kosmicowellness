@@ -61,11 +61,13 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                 onPressed: () {
                   setState(() {
                     _tempSortBy = 'Popularity';
-                    _tempMinPrice = 0;
-                    _tempMaxPrice = 5000;
-                    _tempMinRating = 0;
+                    _tempMinPrice = 0.0;
+                    _tempMaxPrice = 5000.0;
+                    _tempMinRating = 0.0;
                   });
+                  debugPrint('DEBUG: Filter Reset to defaults');
                 },
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
                 child: const Text('Reset All'),
               ),
             ],
@@ -127,44 +129,50 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
           // Rating
           const Text('Minimum Rating', style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
-          Row(
-            children: List.generate(5, (index) {
-              final ratingValue = index + 1.0;
-              final isSelected = _tempMinRating == ratingValue;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: InkWell(
-                  onTap: () => setState(() => _tempMinRating = ratingValue),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isSelected ? colorScheme.primary : colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isSelected ? colorScheme.primary : colorScheme.primary.withValues(alpha: 0.1),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: List.generate(5, (index) {
+                final ratingValue = index.toDouble();
+                final isSelected = _tempMinRating == ratingValue;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: InkWell(
+                    onTap: () => setState(() => _tempMinRating = ratingValue),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isSelected ? colorScheme.primary : colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isSelected ? colorScheme.primary : colorScheme.primary.withValues(alpha: 0.1),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${index.toInt()}+',
+                            style: TextStyle(
+                              color: isSelected ? Colors.white : colorScheme.onSurface,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          Icon(
+                            Icons.star,
+                            size: 12,
+                            color: isSelected ? Colors.white : Colors.amber,
+                          ),
+                        ],
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        Text(
-                          '$index+',
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : colorScheme.onSurface,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.star,
-                          size: 14,
-                          color: isSelected ? Colors.white : Colors.amber,
-                        ),
-                      ],
-                    ),
                   ),
-                ),
-              );
-            }),
+                );
+              }),
+            ),
           ),
           
           const SizedBox(height: 32),

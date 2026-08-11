@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
-import '../home_screen.dart';
+import '../main.dart';
 import '../screens/maintenance_screen.dart';
 
 class ApiService {
@@ -370,10 +370,10 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> getNotifications(String token) async {
+  static Future<Map<String, dynamic>> getNotifications(String token, {int page = 1, int limit = 20}) async {
     try {
       final response = await http.get(
-        _getUri('/api/notifications'),
+        _getUri('/api/notifications?page=$page&limit=$limit'),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -543,6 +543,8 @@ class ApiService {
     required String token,
     String? couponCode,
     double? discountAmount,
+    double? deliveryFee,
+    double? gstCharge,
   }) async {
     try {
       final response = await http.post(
@@ -557,6 +559,8 @@ class ApiService {
           'items': items,
           if (couponCode != null) 'couponCode': couponCode,
           if (discountAmount != null) 'discountAmount': discountAmount,
+          if (deliveryFee != null) 'deliveryFee': deliveryFee,
+          if (gstCharge != null) 'gstCharge': gstCharge,
         }),
       );
       return _processResponse(response);
@@ -572,6 +576,8 @@ class ApiService {
     required String token,
     String? couponCode,
     double? discountAmount,
+    double? deliveryFee,
+    double? gstCharge,
   }) async {
     try {
       final url = _getUri('/api/payment/razorpay/create');
@@ -581,6 +587,8 @@ class ApiService {
         'items': items,
         if (couponCode != null) 'couponCode': couponCode,
         if (discountAmount != null) 'discountAmount': discountAmount,
+        if (deliveryFee != null) 'deliveryFee': deliveryFee,
+        if (gstCharge != null) 'gstCharge': gstCharge,
       });
       
       debugPrint('API: Creating Razorpay Order at $url');
@@ -731,10 +739,10 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> getUserOrders(String token) async {
+  static Future<Map<String, dynamic>> getUserOrders(String token, {int page = 1, int limit = 10}) async {
     try {
       final response = await http.get(
-        _getUri('/api/payment/myorders'),
+        _getUri('/api/payment/myorders?page=$page&limit=$limit'),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -919,6 +927,75 @@ class ApiService {
     }
   }
 
+  // GlucoRhythm Module
+  static Future<Map<String, dynamic>> logGlucoseReading({
+    required double level,
+    required String timeOfDay,
+    required String readingType,
+    String? notes,
+    required String token,
+  }) async {
+    try {
+      final response = await http.post(
+        _getUri('/api/gluco/reading'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'glucoseLevel': level,
+          'timeOfDay': timeOfDay,
+          'readingTime': DateTime.now().toIso8601String(),
+          'readingType': readingType,
+          'notes': notes,
+        }),
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> logMeal({
+    required String mealType,
+    required double carbs,
+    required String token,
+  }) async {
+    try {
+      final response = await http.post(
+        _getUri('/api/gluco/meal'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'mealType': mealType,
+          'carbs': carbs,
+          'logTime': DateTime.now().toIso8601String(),
+          'status': 'Logged',
+        }),
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> getGlucoDashboard(String token) async {
+    try {
+      final response = await http.get(
+        _getUri('/api/gluco/dashboard'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
   static Future<Map<String, dynamic>> removeProfilePicture(String token) async {
     try {
       final response = await http.delete(
@@ -934,10 +1011,27 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> getProducts() async {
+  static Future<Map<String, dynamic>> getProducts({
+    int page = 1,
+    int limit = 12,
+    String? category,
+    String? search,
+    String? sortBy,
+    double? minPrice,
+    double? maxPrice,
+    double? minRating,
+  }) async {
     try {
+      String query = 'page=$page&limit=$limit';
+      if (category != null && category != 'All') query += '&category=${Uri.encodeComponent(category)}';
+      if (search != null && search.isNotEmpty) query += '&search=${Uri.encodeComponent(search)}';
+      if (sortBy != null) query += '&sortBy=${Uri.encodeComponent(sortBy)}';
+      if (minPrice != null) query += '&minPrice=$minPrice';
+      if (maxPrice != null) query += '&maxPrice=$maxPrice';
+      if (minRating != null) query += '&minRating=$minRating';
+
       final response = await http.get(
-        _getUri('/api/products/user/list'),
+        _getUri('/api/products/user/list?$query'),
         headers: {
           'Accept': 'application/json',
           'User-Agent': 'KosmicoApp/1.0',
@@ -1023,8 +1117,11 @@ class ApiService {
         return {'success': false, 'message': 'System Under Maintenance'};
       }
 
+      final String body = response.body;
+      final bool hasBody = body.isNotEmpty && body != 'undefined' && body != 'null';
+
       if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 204) {
-        final data = response.body.isNotEmpty ? jsonDecode(response.body) : null;
+        final data = hasBody ? jsonDecode(body) : null;
         
         // Check if the response itself contains maintenance flag
         if (data is Map && data['isMaintenanceMode'] == true) {
@@ -1033,13 +1130,14 @@ class ApiService {
 
         return {'success': true, 'data': data};
       } else {
-        final data = response.body.isNotEmpty ? jsonDecode(response.body) : null;
+        final data = hasBody ? jsonDecode(body) : null;
         return {
           'success': false, 
-          'message': (data != null && data['message'] != null) ? data['message'] : 'Something went wrong'
+          'message': (data != null && data is Map && data['message'] != null) ? data['message'] : 'Something went wrong'
         };
       }
     } catch (e) {
+      debugPrint('ApiService ProcessResponse Error: $e');
       return {
         'success': false, 
         'message': 'Server Error (${response.statusCode}).'

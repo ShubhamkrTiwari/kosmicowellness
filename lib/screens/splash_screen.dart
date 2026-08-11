@@ -3,6 +3,8 @@ import 'dart:async';
 import 'onboarding_screen.dart';
 import 'maintenance_screen.dart';
 import '../services/api_service.dart';
+import '../managers/user_manager.dart';
+import '../main.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -49,9 +51,24 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     await Future.delayed(const Duration(seconds: 2));
 
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (context) => const OnboardingScreen()),
-    );
+
+    // 4. Check if user is already logged in
+    final userManager = UserManager();
+    await userManager.init();
+
+    if (userManager.isLoggedIn) {
+      debugPrint('SplashScreen: User logged in, navigating to Home');
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => const HomeScreen(title: 'Kosmico Wellness Private Limited'),
+        ),
+      );
+    } else {
+      debugPrint('SplashScreen: User not logged in, navigating to Onboarding');
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+      );
+    }
   }
 
   @override

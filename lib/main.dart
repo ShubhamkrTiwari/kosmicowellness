@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter/services.dart';
-import 'main.dart';
 import 'screens/splash_screen.dart';
 import 'screens/cart_screen.dart';
 import 'screens/profile_screen.dart';
@@ -17,10 +16,12 @@ import 'managers/theme_manager.dart';
 
 import 'managers/notification_manager.dart';
 import 'managers/payment_manager.dart';
+import 'managers/care_manager.dart';
 import 'services/api_service.dart';
 import 'widgets/banner_carousel.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,6 +29,7 @@ void main() async {
   await ThemeManager().init();
   await NotificationManager().init();
   await PaymentManager().init();
+  await CareManager().init();
   runApp(const MyApp());
 }
 
@@ -43,6 +45,7 @@ class MyApp extends StatelessWidget {
         return MaterialApp(
           title: 'Kosmico Wellness Private Limited',
           navigatorKey: navigatorKey,
+          scaffoldMessengerKey: scaffoldMessengerKey,
           debugShowCheckedModeBanner: false,
           themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
           theme: ThemeData(
@@ -322,7 +325,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
                 Text(
                   'Version ${_updateData?['version'] ?? ''} is now available.',
-                  style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ],
             ),
@@ -385,7 +388,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 },
                 decoration: InputDecoration(
                   hintText: 'Search ayurvedic products...',
-                  hintStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
+                  hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
                   prefixIcon: Icon(Icons.search_rounded, color: colorScheme.primary),
                   filled: true,
                   fillColor: Colors.transparent,
@@ -400,14 +403,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
 
           // Hero Carousel
-          BannerCarousel(
-            onTap: () {
-              setState(() {
-                _selectedIndex = 1;
-              });
-              _productListKey.currentState?.refreshData();
-            },
-          ),
+          const BannerCarousel(),
 
           // Categories
           const Padding(
@@ -468,7 +464,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(40.0),
-                    child: Text('No products found in this category', style: TextStyle(color: colorScheme.onSurfaceVariant)),
+                    child: Text('No products found in this category', style: TextStyle(color: Colors.grey[500])),
                   ),
                 )
               : GridView.builder(
@@ -576,7 +572,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           (product['description'] ?? '').toString(),
                           style: TextStyle(
                             fontSize: 11,
-                            color: colorScheme.onSurfaceVariant,
+                            color: Colors.grey[600],
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -592,8 +588,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
                                   color: colorScheme.primary,
-                                  letterSpacing: 0.5,
                                 ),
+                                maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -607,17 +603,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                     final cart = CartManager();
                                     if (cart.canAddMore(product, 1)) {
                                       cart.addItem(product);
-                                      scaffoldMessengerKey.currentState?.hideCurrentSnackBar();
-                                      scaffoldMessengerKey.currentState?.showSnackBar(
+                                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                      ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(
-                                          content: Row(
-                                            children: [
-                                              const Icon(Icons.shopping_cart_outlined, color: Colors.white, size: 20),
-                                              const SizedBox(width: 12),
-                                              Expanded(child: Text('$name added to cart!')),
-                                            ],
-                                          ),
-                                          duration: const Duration(milliseconds: 1500),
+                                          content: const Text('Added to cart!'),
+                                          duration: const Duration(milliseconds: 2000),
                                           behavior: SnackBarBehavior.floating,
                                           backgroundColor: colorScheme.primary,
                                           margin: const EdgeInsets.all(16),
@@ -627,27 +617,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                     } else {
                                       final dynamic stockRaw = product['countInStock'] ?? product['stock'] ?? product['inventory'] ?? product['quantity'] ?? product['qty'];
                                       final int availableStock = stockRaw != null ? (int.tryParse(stockRaw.toString()) ?? 999) : 999;
-                                      final int inCart = cart.getProductQuantity(name);
+                                      final int inCart = cart.getProductQuantity(product['name'] ?? '');
 
-                                      scaffoldMessengerKey.currentState?.hideCurrentSnackBar();
-                                      scaffoldMessengerKey.currentState?.showSnackBar(
+                                      ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(
-                                          content: Row(
-                                            children: [
-                                              const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
-                                              const SizedBox(width: 12),
-                                              Expanded(
-                                                child: Text(
-                                                  'Stock Limit Reached! ($inCart in cart, $availableStock total)',
-                                                  style: const TextStyle(fontWeight: FontWeight.bold),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
+                                          content: Text('Limit reached! Only $availableStock in stock and $inCart already in cart.'),
                                           backgroundColor: Colors.redAccent,
                                           behavior: SnackBarBehavior.floating,
-                                          margin: const EdgeInsets.all(16),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                         ),
                                       );
                                     }
@@ -1030,7 +1006,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   curve: Curves.elasticOut,
                   child: Icon(
                     isSelected ? activeIcon : icon,
-                    color: isSelected ? Colors.white : colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                    color: isSelected ? Colors.white : Colors.grey[500],
                     size: 22,
                   ),
                 ),

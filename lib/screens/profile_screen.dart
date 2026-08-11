@@ -227,7 +227,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 20),
                   decoration: BoxDecoration(
-                    color: Colors.grey[300],
+                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -388,31 +388,26 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     final nameController = TextEditingController(text: userName);
     final emailController = TextEditingController(text: userEmail);
     final phoneController = TextEditingController(text: userPhone == 'Add phone number' ? '' : userPhone);
+    bool isSaving = false;
+    final formKey = GlobalKey<FormState>();
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-      ),
+      backgroundColor: Colors.transparent, // Allow custom rounded corners
       builder: (context) {
-        bool isSaving = false;
-        final formKey = GlobalKey<FormState>();
         return StatefulBuilder(
           builder: (context, setModalState) {
             final colorScheme = Theme.of(context).colorScheme;
             return Container(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.85,
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
               ),
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
               child: SingleChildScrollView(
                 child: Padding(
-                  padding: EdgeInsets.only(
-                    bottom: MediaQuery.of(context).viewInsets.bottom + 30,
-                    top: 30,
-                    left: 24,
-                    right: 24,
-                  ),
+                  padding: const EdgeInsets.fromLTRB(24, 30, 24, 30),
                   child: Form(
                     key: formKey,
                     child: Column(
@@ -427,6 +422,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                         TextFormField(
                           controller: nameController,
                           decoration: _inputDecoration('Full Name', Icons.person_outline),
+                          keyboardType: TextInputType.name,
+                          textInputAction: TextInputAction.next,
                           inputFormatters: [
                             FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
                           ],
@@ -757,10 +754,6 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 );
               }),
               
-              const SizedBox(height: 20),
-              
-              _buildSectionHeader('Wellness Profile', colorScheme),
-              _buildMenuItem(Icons.history_outlined, 'Consultation History', 'Previous sessions with doctors', colorScheme),
 
               const SizedBox(height: 20),
 
@@ -788,7 +781,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                     ),
                     subtitle: Text(
                       ThemeManager().isDarkMode ? 'Currently Dark' : 'Currently Light',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
                     ),
                     trailing: Switch(
                       value: ThemeManager().isDarkMode,
@@ -924,7 +917,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: Colors.grey[600], fontSize: 11),
+            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11),
           ),
         ],
       ),
@@ -971,7 +964,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             subtitle,
             style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
           ),
-          trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+          trailing: Icon(Icons.chevron_right, size: 20, color: colorScheme.onSurfaceVariant),
           onTap: onTap ?? () {},
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
@@ -1157,17 +1150,17 @@ class AboutKosmicoScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 16),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     'KOSMICO WELLNESS PRIVATE LIMITED',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1),
                   ),
                   Text(
                     'Ancient Wisdom, Modern Living',
-                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                    style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
                   ),
                 ],
               ),
@@ -1221,7 +1214,7 @@ class AboutKosmicoScreen extends StatelessWidget {
           Text(
             label,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500),
+            style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500),
           ),
         ],
       ),
@@ -1284,7 +1277,7 @@ class AboutKosmicoScreen extends StatelessWidget {
                 ),
                 Text(
                   description,
-                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                  style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
                 ),
               ],
             ),

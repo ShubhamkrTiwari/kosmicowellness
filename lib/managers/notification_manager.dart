@@ -10,34 +10,50 @@ class NotificationManager extends ChangeNotifier {
   NotificationManager._internal();
 
   List<Map<String, String>> _notifications = [];
+  Set<String> _deletedIds = {};
   bool _isLoading = false;
+  bool _isFetchingMore = false;
+  bool _hasMore = true;
+  int _currentPage = 1;
 
   List<Map<String, String>> get notifications => _notifications;
   int get unreadCount => _notifications.where((n) => n['isRead'] == 'false').length;
   bool get isLoading => _isLoading;
+  bool get isFetchingMore => _isFetchingMore;
+  bool get hasMore => _hasMore;
 
   Future<void> init() async {
+    await loadDeletedIds();
     await loadNotifications();
-    fetchFromApi(); // Fetch from API in background
+    fetchFromApi(isInitial: true); // Fetch from API in background
   }
 
-  Future<void> fetchFromApi() async {
+  Future<void> fetchFromApi({bool isInitial = true}) async {
     final token = UserManager().token;
     if (token == null) return;
 
-    _isLoading = true;
+    if (isInitial) {
+      _isLoading = true;
+      _currentPage = 1;
+      _hasMore = true;
+    } else {
+      _isFetchingMore = true;
+    }
     notifyListeners();
 
     try {
-      final result = await ApiService.getNotifications(token);
+      final result = await ApiService.getNotifications(token, page: isInitial ? 1 : _currentPage + 1);
       debugPrint('DEBUG: Fetch Notifications API Response -> $result');
       
       if (result['success'] && result['data'] != null) {
         final List<dynamic> apiData = result['data'];
-        final List<Map<String, String>> apiNotifications = apiData.map((item) {
+        final List<Map<String, String>> apiNotifications = apiData
+            .where((item) {
+              final id = item['_id']?.toString() ?? item['id']?.toString() ?? '';
+              return !_deletedIds.contains(id); // Filter out deleted notifications
+            })
+            .map((item) {
           final String id = item['_id']?.toString() ?? item['id']?.toString() ?? '';
-          debugPrint('DEBUG: Notification Item ID -> $id');
-          
           return {
             'id': id,
             'title': item['title']?.toString() ?? '',
@@ -49,15 +65,22 @@ class NotificationManager extends ChangeNotifier {
           };
         }).toList();
 
-        // Merge or replace
-        _notifications = apiNotifications;
+        if (isInitial) {
+          _notifications = apiNotifications;
+          _currentPage = 1;
+        } else {
+          _notifications.addAll(apiNotifications);
+          _currentPage++;
+        }
+        
+        _hasMore = apiData.length >= 20; // Assuming limit is 20
         await saveNotifications();
-        notifyListeners();
       }
     } catch (e) {
       debugPrint('Error fetching notifications: $e');
     } finally {
       _isLoading = false;
+      _isFetchingMore = false;
       notifyListeners();
     }
   }
@@ -111,6 +134,12 @@ class NotificationManager extends ChangeNotifier {
   }
 
   void clearAll() async {
+    // Record all current IDs as deleted to prevent them from coming back from API
+    for (var n in _notifications) {
+      if (n['id'] != null) _deletedIds.add(n['id']!);
+    }
+    await saveDeletedIds();
+
     _notifications.clear();
     notifyListeners();
     await saveNotifications();
@@ -129,6 +158,10 @@ class NotificationManager extends ChangeNotifier {
   Future<void> removeNotification(String id) async {
     if (id.isEmpty) return;
     
+    // Add to deleted tracking to prevent reappearance from API
+    _deletedIds.add(id);
+    await saveDeletedIds();
+
     // Backup for rollback
     final index = _notifications.indexWhere((n) => n['id'] == id);
     if (index == -1) return;
@@ -166,18 +199,48 @@ class NotificationManager extends ChangeNotifier {
     }
   }
 
+  Future<void> clearAndReload() async {
+    _notifications.clear();
+    _deletedIds.clear();
+    notifyListeners();
+    
+    await init();
+  }
+
+  String _getStorageKey(String base) {
+    final email = UserManager().userEmail;
+    if (email == null) return base;
+    return '${base}_$email';
+  }
+
   Future<void> saveNotifications() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('notifications', jsonEncode(_notifications));
+    await prefs.setString(_getStorageKey('notifications'), jsonEncode(_notifications));
   }
 
   Future<void> loadNotifications() async {
     final prefs = await SharedPreferences.getInstance();
-    final String? data = prefs.getString('notifications');
+    final String? data = prefs.getString(_getStorageKey('notifications'));
     if (data != null) {
       final List<dynamic> decoded = jsonDecode(data);
-      _notifications = decoded.map((item) => Map<String, String>.from(item)).toList();
+      _notifications = decoded
+          .map((item) => Map<String, String>.from(item))
+          .where((n) => !_deletedIds.contains(n['id'])) // Double check against deleted tracking
+          .toList();
       notifyListeners();
+    }
+  }
+
+  Future<void> saveDeletedIds() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_getStorageKey('deleted_notification_ids'), _deletedIds.toList());
+  }
+
+  Future<void> loadDeletedIds() async {
+    final prefs = await SharedPreferences.getInstance();
+    final List<String>? ids = prefs.getStringList(_getStorageKey('deleted_notification_ids'));
+    if (ids != null) {
+      _deletedIds = ids.toSet();
     }
   }
 }

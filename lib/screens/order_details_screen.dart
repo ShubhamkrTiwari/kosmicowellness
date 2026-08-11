@@ -441,7 +441,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               width: 24,
               height: 24,
               decoration: BoxDecoration(
-                color: done ? colorScheme.primary : Colors.grey.shade300,
+                color: done ? colorScheme.primary : colorScheme.onSurfaceVariant.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
               child: done
@@ -452,7 +452,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               Container(
                 width: 2,
                 height: 40,
-                color: done ? colorScheme.primary : Colors.grey.shade300,
+                color: done ? colorScheme.primary : colorScheme.onSurfaceVariant.withValues(alpha: 0.2),
               ),
           ],
         ),
@@ -465,12 +465,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 title,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: done ? Colors.black87 : Colors.grey,
+                  color: done ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
                 ),
               ),
               Text(
                 date,
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
               ),
             ],
           ),
@@ -510,9 +510,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.05)),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [
@@ -544,7 +544,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   name,
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
-                Text('Quantity: $quantity', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                Text('Quantity: $quantity', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13)),
               ],
             ),
           ),
@@ -571,9 +571,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.05)),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -582,7 +582,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           const SizedBox(height: 4),
           Text(
             '$street\n$city - $pincode\n$phone',
-            style: TextStyle(color: Colors.grey.shade600, height: 1.4),
+            style: TextStyle(color: colorScheme.onSurfaceVariant, height: 1.4),
           ),
         ],
       ),
@@ -593,14 +593,18 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     final fullOrder = widget.order['full_order'] ?? {};
     final double total = (fullOrder['amount'] ?? fullOrder['totalPrice'] ?? 0).toDouble();
     final double discount = (fullOrder['discountAmount'] ?? 0).toDouble();
-    final double subtotal = total + discount;
+    final double deliveryFee = (fullOrder['deliveryFee'] ?? 0).toDouble();
+    final double gstAmount = (fullOrder['gstCharge'] ?? fullOrder['gstAmount'] ?? fullOrder['gst'] ?? 0).toDouble();
+    
+    // Subtotal here means the price of items before discount, delivery fee, and GST
+    final double subtotal = total + discount - deliveryFee - gstAmount;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.05)),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.1)),
       ),
       child: Column(
         children: [
@@ -608,7 +612,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           const SizedBox(height: 8),
           _buildSummaryRow('Subtotal', '₹${subtotal.toStringAsFixed(0)}', false, colorScheme),
           const SizedBox(height: 8),
-          _buildSummaryRow('Delivery Fee', 'FREE', false, colorScheme),
+          _buildSummaryRow(
+            'Delivery Fee', 
+            deliveryFee > 0 ? '₹${deliveryFee.toStringAsFixed(0)}' : 'FREE', 
+            deliveryFee == 0, 
+            colorScheme
+          ),
+          const SizedBox(height: 8),
+          _buildSummaryRow('GST', '₹${gstAmount.toStringAsFixed(0)}', false, colorScheme),
           if (discount > 0) ...[
             const SizedBox(height: 8),
             _buildSummaryRow('Discount', '-₹${discount.toStringAsFixed(0)}', true, colorScheme),
@@ -632,7 +643,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           style: TextStyle(
             fontSize: isTotal ? 16 : 14,
             fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-            color: isTotal ? Colors.black : Colors.grey.shade600,
+            color: isTotal ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
           ),
         ),
         Text(
@@ -640,7 +651,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           style: TextStyle(
             fontSize: isTotal ? 18 : 14,
             fontWeight: FontWeight.bold,
-            color: isDiscount ? Colors.green : (isTotal ? colorScheme.primary : Colors.black87),
+            color: isDiscount ? Colors.green : (isTotal ? colorScheme.primary : colorScheme.onSurface),
+            letterSpacing: 0.5,
           ),
         ),
       ],

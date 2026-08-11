@@ -12,7 +12,7 @@ class CartManager extends ChangeNotifier {
 
   int get itemCount => _items.fold(0, (sum, item) => sum + ((item['quantity'] ?? 0) as int));
 
-  void addItem(Map<String, dynamic> item) {
+  void addItem(Map<String, dynamic> item, {int qtyToAdd = 1}) {
     // Standardize product name (handle both 'name' and 'items' keys)
     final String name = (item['name'] ?? item['items'] ?? 'Unknown Product').toString();
     final String id = (item['_id'] ?? item['id'] ?? '').toString();
@@ -32,29 +32,46 @@ class CartManager extends ChangeNotifier {
     final String icon = (item['icon'] ?? '🌿').toString();
     final String image = (item['image'] ?? '').toString();
 
+    // Stock handling
+    final dynamic stockRaw = item['countInStock'] ?? item['stock'] ?? item['inventory'] ?? item['quantity'] ?? item['qty'];
+    final int availableStock = stockRaw != null ? (int.tryParse(stockRaw.toString()) ?? 999) : 999;
+
     // Check if item already exists
     int index = _items.indexWhere((element) => element['name'] == name);
     if (index != -1) {
-      _items[index]['quantity'] = (_items[index]['quantity'] ?? 0) + 1;
+      final int currentQty = (_items[index]['quantity'] ?? 0) as int;
+      if (currentQty + qtyToAdd <= availableStock) {
+        _items[index]['quantity'] = currentQty + qtyToAdd;
+      } else {
+        _items[index]['quantity'] = availableStock;
+      }
     } else {
       _items.add({
         'id': id,
         'name': name,
         'price': price,
-        'quantity': 1,
+        'quantity': qtyToAdd > availableStock ? availableStock : qtyToAdd,
         'icon': icon,
         'image': image,
+        'stock': availableStock, // Save for cart screen checks
       });
     }
 
-    NotificationManager().addNotification(
-      title: 'Cart Updated',
-      message: '$name added to your wellness cart.',
-      icon: '🛒',
-      type: 'cart',
-    );
-
     notifyListeners();
+  }
+
+  bool canAddMore(Map<String, dynamic> item, int qtyRequested) {
+    final String name = (item['name'] ?? item['items'] ?? '').toString();
+    final dynamic stockRaw = item['countInStock'] ?? item['stock'] ?? item['inventory'] ?? item['quantity'] ?? item['qty'];
+    final int availableStock = stockRaw != null ? (int.tryParse(stockRaw.toString()) ?? 999) : 999;
+
+    int inCart = 0;
+    int index = _items.indexWhere((element) => element['name'] == name);
+    if (index != -1) {
+      inCart = (_items[index]['quantity'] ?? 0) as int;
+    }
+
+    return (inCart + qtyRequested) <= availableStock;
   }
 
   void removeItem(int index) {
@@ -77,8 +94,13 @@ class CartManager extends ChangeNotifier {
 
   void incrementItem(int index) {
     if (index >= 0 && index < _items.length) {
-      _items[index]['quantity'] = (_items[index]['quantity'] ?? 0) + 1;
-      notifyListeners();
+      final int availableStock = (_items[index]['stock'] ?? 999) as int;
+      final int currentQty = (_items[index]['quantity'] ?? 0) as int;
+      
+      if (currentQty < availableStock) {
+        _items[index]['quantity'] = currentQty + 1;
+        notifyListeners();
+      }
     }
   }
 

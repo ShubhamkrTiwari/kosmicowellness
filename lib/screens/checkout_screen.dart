@@ -25,6 +25,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Map<String, dynamic>? _selectedPaymentMethod;
   Map<String, dynamic>? _appliedCoupon;
   double _discountAmount = 0.0;
+  double _deliveryFee = 0.0;
+  double _gstAmount = 0.0;
   bool _isLoading = false;
   bool _isPlacingOrder = false;
   bool _isCOD = false;
@@ -33,7 +35,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   late RazorpayService _razorpayService;
   String? _currentRazorpayOrderId;
 
-  double get _finalTotal => CartManager().totalPrice - _discountAmount;
+  double get _finalTotal => CartManager().totalPrice - _discountAmount + _deliveryFee + _gstAmount;
 
   Future<void> _applyCouponCode(String code) async {
     setState(() => _isLoading = true);
@@ -153,19 +155,31 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (result['success'] && result['data'] != null) {
         final data = result['data'];
         final String? etd = data['estimatedDeliveryDate']?.toString();
+        final double fee = (data['deliveryFee'] ?? 0.0).toDouble();
+        final double gst = (data['gstCharge'] ?? data['gstAmount'] ?? data['gst'] ?? 0.0).toDouble();
         
         if (etd != null) {
           setState(() {
             _expectedDeliveryDate = etd;
+            _deliveryFee = fee;
+            _gstAmount = gst;
           });
-          debugPrint('Checkout: Estimated delivery date from backend: $_expectedDeliveryDate');
+          debugPrint('Checkout: Estimated delivery date: $_expectedDeliveryDate, Fee: $_deliveryFee, GST: $_gstAmount');
         } else {
           debugPrint('Checkout: No estimatedDeliveryDate found in backend response');
-          setState(() => _expectedDeliveryDate = 'Date unavailable');
+          setState(() {
+            _expectedDeliveryDate = 'Date unavailable';
+            _deliveryFee = fee;
+            _gstAmount = gst;
+          });
         }
       } else {
         debugPrint('Checkout: Backend estimation returned failure: ${result['message']}');
-        setState(() => _expectedDeliveryDate = 'Delivery check failed');
+        setState(() {
+          _expectedDeliveryDate = 'Delivery check failed';
+          _deliveryFee = 0.0;
+          _gstAmount = 0.0;
+        });
       }
     } catch (e) {
       debugPrint('Checkout: Backend Estimation Error: $e');
@@ -295,7 +309,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }).toList();
 
       if (_isCOD) {
-        debugPrint('Checkout: Calling /api/payment/cod');
+        debugPrint('Checkout: Calling /api/payment/cod with fee: $_deliveryFee, GST: $_gstAmount');
         final result = await ApiService.placeCodOrder(
           amount: _finalTotal,
           addressId: addressId,
@@ -303,10 +317,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           token: token,
           couponCode: _appliedCoupon?['code'],
           discountAmount: _discountAmount,
+          deliveryFee: _deliveryFee,
+          gstCharge: _gstAmount,
         );
         _handleOrderResponse(result);
       } else {
-        debugPrint('Checkout: Calling /api/payment/razorpay/create');
+        debugPrint('Checkout: Calling /api/payment/razorpay/create with fee: $_deliveryFee, GST: $_gstAmount');
         final result = await ApiService.createRazorpayOrder(
           amount: _finalTotal,
           addressId: addressId,
@@ -314,6 +330,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           token: token,
           couponCode: _appliedCoupon?['code'],
           discountAmount: _discountAmount,
+          deliveryFee: _deliveryFee,
+          gstCharge: _gstAmount,
         );
 
         if (result['success'] && result['data'] != null) {
@@ -641,7 +659,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             child: _isPlacingOrder 
               ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-              : Text('Place Order - ₹${_finalTotal.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              : Text('Place Order - ₹${_finalTotal.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 0.5)),
           ),
         ),
       ),
@@ -708,74 +726,86 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget _buildAddressCard(ColorScheme colorScheme) {
     if (_selectedAddress == null) {
       return Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: colorScheme.primary.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: colorScheme.primary.withValues(alpha: 0.1)),
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
         ),
-        child: const Row(
+        child: Row(
           children: [
-            Icon(Icons.add_location_alt_outlined, color: Colors.grey),
-            SizedBox(width: 12),
-            Text('No address selected', style: TextStyle(color: Colors.grey)),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: colorScheme.primary.withValues(alpha: 0.1), shape: BoxShape.circle),
+              child: Icon(Icons.add_location_alt_rounded, color: colorScheme.primary, size: 20),
+            ),
+            const SizedBox(width: 16),
+            Text('No address selected', style: TextStyle(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
           ],
         ),
       );
     }
 
+    final String label = _selectedAddress!['label'] ?? 'Home';
+    final IconData labelIcon = label.toLowerCase().contains('home') ? Icons.home_rounded : Icons.business_rounded;
+
     return Container(
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.15), width: 1.5),
+        boxShadow: [BoxShadow(color: colorScheme.primary.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, 10))],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(_selectedAddress!['label'] ?? 'Home', style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 12)),
-              const Spacer(),
-              if (_selectedAddress!['isDefault'] == 'true')
-                const Icon(Icons.check_circle, color: Colors.green, size: 16),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(_selectedAddress!['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 4),
-          Text('${_selectedAddress!['address']}, ${_selectedAddress!['city']} - ${_selectedAddress!['pincode']}', style: const TextStyle(color: Colors.grey)),
-          const SizedBox(height: 4),
-          Text(_selectedAddress!['phone'] ?? '', style: const TextStyle(fontWeight: FontWeight.w500)),
-          const Divider(height: 24, thickness: 0.5),
-          Row(
-            children: [
-              Icon(
-                Icons.local_shipping_outlined, 
-                size: 16, 
-                color: _isEstimatingDelivery ? Colors.grey : colorScheme.primary
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  _isEstimatingDelivery 
-                      ? 'Calculating delivery date...' 
-                      : (_expectedDeliveryDate != null 
-                          ? 'Expected Delivery: $_expectedDeliveryDate' 
-                          : 'Checking delivery availability...'),
-                  style: TextStyle(
-                    fontSize: 13, 
-                    color: _expectedDeliveryDate == 'Pincode not serviceable' || _expectedDeliveryDate?.contains('failed') == true 
-                        ? Colors.red[400] 
-                        : Colors.grey[600],
-                    fontWeight: FontWeight.w500,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -10, top: -10,
+              child: Icon(labelIcon, size: 60, color: colorScheme.primary.withValues(alpha: 0.05)),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: colorScheme.primary, borderRadius: BorderRadius.circular(8)),
+                        child: Text(label.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+                      ),
+                      const SizedBox(width: 8),
+                      if (_selectedAddress!['isDefault'] == 'true')
+                        const Icon(Icons.verified_rounded, color: Colors.green, size: 16),
+                    ],
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  Text(_selectedAddress!['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17, letterSpacing: -0.5)),
+                  const SizedBox(height: 4),
+                  Text('${_selectedAddress!['address']}, ${_selectedAddress!['city']} - ${_selectedAddress!['pincode']}', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 8),
+                  Text(_selectedAddress!['phone'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const Divider(height: 24, thickness: 0.5),
+                  Row(
+                    children: [
+                      Icon(Icons.local_shipping_rounded, size: 16, color: colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _isEstimatingDelivery ? 'Calculating delivery date...' : (_expectedDeliveryDate != null ? 'Expected: $_expectedDeliveryDate' : 'Checking availability...'),
+                          style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -783,57 +813,72 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget _buildPaymentCard(ColorScheme colorScheme) {
     if (_selectedPaymentMethod == null) {
       return Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: colorScheme.primary.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: colorScheme.primary.withValues(alpha: 0.1)),
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
         ),
-        child: const Row(
+        child: Row(
           children: [
-            Icon(Icons.payment_outlined, color: Colors.grey),
-            SizedBox(width: 12),
-            Text('No payment method selected', style: TextStyle(color: Colors.grey)),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: colorScheme.secondary.withValues(alpha: 0.1), shape: BoxShape.circle),
+              child: Icon(Icons.payment_rounded, color: colorScheme.secondary, size: 20),
+            ),
+            const SizedBox(width: 16),
+            Text('Select payment method', style: TextStyle(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
           ],
         ),
       );
     }
 
     final bool isBank = _selectedPaymentMethod!['type'] == 'BANK_ACCOUNT';
+    final Color cardColor = isBank ? const Color(0xFF1B264F) : const Color(0xFF00833E);
+    
     return Container(
-      padding: const EdgeInsets.all(20),
+      width: double.infinity,
       decoration: BoxDecoration(
-        color: (isBank ? const Color(0xFF1B264F) : const Color(0xFF00833E)).withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: (isBank ? const Color(0xFF1B264F) : const Color(0xFF00833E)).withValues(alpha: 0.1)),
+        color: cardColor,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [BoxShadow(color: cardColor.withValues(alpha: 0.3), blurRadius: 15, offset: const Offset(0, 8))],
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: (isBank ? const Color(0xFF1B264F) : const Color(0xFF00833E)),
-              borderRadius: BorderRadius.circular(10),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Stack(
+          children: [
+            Positioned(right: -20, top: -20, child: CircleAvatar(radius: 50, backgroundColor: Colors.white.withValues(alpha: 0.05))),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(8)),
+                        child: Text(isBank ? 'BANK' : 'UPI', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                      ),
+                      const Icon(Icons.verified_rounded, color: Colors.white, size: 18),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    isBank ? (_selectedPaymentMethod!['accountNumber']?.toString() ?? 'XXXX') : (_selectedPaymentMethod!['upiId'] ?? '').toString(),
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    (isBank ? (_selectedPaymentMethod!['accountHolderName'] ?? 'NAME') : (_selectedPaymentMethod!['displayName'] ?? 'NAME')).toString().toUpperCase(),
+                    style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
             ),
-            child: Icon(isBank ? Icons.account_balance : Icons.vibration, color: Colors.white, size: 20),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(isBank ? 'Bank Account' : 'UPI ID', style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(
-                  isBank 
-                    ? (_selectedPaymentMethod!['accountNumber']?.toString() ?? 'XXXX') 
-                    : (_selectedPaymentMethod!['upiId'] ?? _selectedPaymentMethod!['upild'] ?? '').toString(),
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          const Icon(Icons.check_circle, color: Colors.green),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -860,9 +905,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             children: [
               Icon(Icons.confirmation_number_outlined, color: colorScheme.primary),
               const SizedBox(width: 12),
-              const Text('Select a coupon code', style: TextStyle(color: Colors.grey)),
+              Text('Select a coupon code', style: TextStyle(color: colorScheme.onSurfaceVariant)),
               const Spacer(),
-              const Icon(Icons.chevron_right, color: Colors.grey),
+              Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant),
             ],
           ),
         ),
@@ -922,8 +967,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             child: Row(
               children: [
                 Text('${item['quantity']}x ', style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold)),
-                Expanded(child: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.w500))),
-                Text('₹${((item['price'] as int) * (item['quantity'] as int))}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                Expanded(
+                  child: Text(
+                    item['name'],
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text('₹${((item['price'] as int) * (item['quantity'] as int))}', style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
               ],
             ),
           )),
@@ -931,8 +984,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Subtotal', style: TextStyle(color: Colors.grey)),
-              Text('₹${cartManager.totalPrice.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w500)),
+              Text('Subtotal', style: TextStyle(color: colorScheme.onSurfaceVariant)),
+              Text('₹${cartManager.totalPrice.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w500, letterSpacing: 0.5)),
             ],
           ),
           if (_appliedCoupon != null) ...[
@@ -940,17 +993,43 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Coupon Discount', style: TextStyle(color: Colors.grey)),
-                Text('- ₹${_discountAmount.toStringAsFixed(0)}', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                Text('Coupon Discount', style: TextStyle(color: colorScheme.onSurfaceVariant)),
+                Text('- ₹${_discountAmount.toStringAsFixed(0)}', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
               ],
             ),
           ],
           const SizedBox(height: 8),
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Delivery Fee', style: TextStyle(color: Colors.grey)),
-              Text('FREE', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+              Text('Delivery Fee', style: TextStyle(color: colorScheme.onSurfaceVariant)),
+              _isEstimatingDelivery 
+                ? const SizedBox(height: 12, width: 12, child: CircularProgressIndicator(strokeWidth: 2))
+                : Text(
+                    _deliveryFee > 0 ? '₹${_deliveryFee.toStringAsFixed(0)}' : 'FREE', 
+                    style: TextStyle(
+                      color: _deliveryFee > 0 ? colorScheme.onSurface : Colors.green, 
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    )
+                  ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('GST', style: TextStyle(color: colorScheme.onSurfaceVariant)),
+              _isEstimatingDelivery 
+                ? const SizedBox(height: 12, width: 12, child: CircularProgressIndicator(strokeWidth: 2))
+                : Text(
+                    _gstAmount > 0 ? '₹${_gstAmount.toStringAsFixed(0)}' : '₹0', 
+                    style: TextStyle(
+                      color: colorScheme.onSurface, 
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    )
+                  ),
             ],
           ),
           const Divider(height: 32),
@@ -960,7 +1039,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const Text('Total Amount', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               Text(
                 '₹${_finalTotal.toStringAsFixed(0)}',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: colorScheme.primary)
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: colorScheme.primary, letterSpacing: 0.5)
               ),
             ],
           ),

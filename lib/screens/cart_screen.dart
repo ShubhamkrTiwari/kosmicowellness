@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../main.dart'; // Add this for scaffoldMessengerKey
 import '../managers/cart_manager.dart';
 import 'checkout_screen.dart';
 
@@ -145,6 +146,7 @@ class _CartScreenState extends State<CartScreen> {
                                     style: TextStyle(
                                       color: colorScheme.secondary,
                                       fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
                                     ),
                                   ),
                                 ],
@@ -163,9 +165,34 @@ class _CartScreenState extends State<CartScreen> {
                                   style: const TextStyle(fontWeight: FontWeight.bold),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.add_circle_outline, size: 22),
+                                  icon: Icon(
+                                    Icons.add_circle_outline, 
+                                    size: 22,
+                                    color: (item['quantity'] ?? 0) >= (item['stock'] ?? 999) 
+                                        ? colorScheme.onSurface.withValues(alpha: 0.3) 
+                                        : null,
+                                  ),
                                   onPressed: () {
-                                    cartManager.incrementItem(index);
+                                    if ((item['quantity'] ?? 0) < (item['stock'] ?? 999)) {
+                                      cartManager.incrementItem(index);
+                                    } else {
+                                      scaffoldMessengerKey.currentState?.hideCurrentSnackBar();
+                                      scaffoldMessengerKey.currentState?.showSnackBar(
+                                        SnackBar(
+                                          content: Row(
+                                            children: [
+                                              const Icon(Icons.info_outline, color: Colors.white, size: 20),
+                                              const SizedBox(width: 12),
+                                              Expanded(child: Text('Only ${item['stock']} items available in stock.')),
+                                            ],
+                                          ),
+                                          backgroundColor: Colors.orange[800],
+                                          behavior: SnackBarBehavior.floating,
+                                          margin: const EdgeInsets.all(16),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                        ),
+                                      );
+                                    }
                                   },
                                 ),
                               ],
@@ -195,9 +222,9 @@ class _CartScreenState extends State<CartScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
+                          Text(
                             'Total Amount',
-                            style: TextStyle(fontSize: 16, color: Colors.grey),
+                            style: TextStyle(fontSize: 16, color: colorScheme.onSurfaceVariant),
                           ),
                           Text(
                             '₹${cartManager.totalPrice.toStringAsFixed(2)}',
@@ -205,6 +232,7 @@ class _CartScreenState extends State<CartScreen> {
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                               color: colorScheme.primary,
+                              letterSpacing: 0.5,
                             ),
                           ),
                         ],

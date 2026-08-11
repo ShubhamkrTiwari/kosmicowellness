@@ -159,7 +159,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: cardColor.withValues(alpha: 0.3),
+              color: cardColor.withValues(alpha: 0.4),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -170,16 +170,39 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
           child: Stack(
             children: [
               Positioned(
-                right: -50,
-                top: -50,
-                child: CircleAvatar(radius: 100, backgroundColor: Colors.white.withValues(alpha: 0.05)),
+                right: -40,
+                top: -40,
+                child: CircleAvatar(radius: 80, backgroundColor: Colors.white.withValues(alpha: 0.08)),
               ),
               Positioned(
-                left: -30,
-                bottom: -30,
-                child: CircleAvatar(radius: 80, backgroundColor: Colors.black.withValues(alpha: 0.05)),
+                left: -20,
+                bottom: -20,
+                child: CircleAvatar(radius: 60, backgroundColor: Colors.black.withValues(alpha: 0.1)),
               ),
-              
+              if (isDefault)
+                Positioned(
+                  right: 20,
+                  bottom: 20,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.verified_rounded, color: Colors.white, size: 12),
+                        SizedBox(width: 4),
+                        Text(
+                          'DEFAULT',
+                          style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 1),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               Padding(
                 padding: const EdgeInsets.all(24.0),
                 child: Column(
@@ -188,71 +211,75 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(isBank ? Icons.account_balance_rounded : Icons.qr_code_2_rounded, color: Colors.white, size: 14),
+                              const SizedBox(width: 8),
+                              Text(
                                 isBank ? 'BANK' : 'UPI',
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1),
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 1),
                               ),
-                            ),
-                            if (isDefault)
-                              Padding(
-                                padding: const EdgeInsets.only(left: 8.0),
-                                child: Icon(Icons.check_circle, color: Colors.white.withValues(alpha: 0.9), size: 20),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
                         if (!widget.isSelectionMode)
-                          IconButton(
-                            icon: const Icon(Icons.more_horiz, color: Colors.white),
-                            onPressed: () {
-                              showModalBottomSheet(
-                                context: context,
-                                shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-                                builder: (context) => Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    ListTile(
-                                      leading: const Icon(Icons.check_circle_outline), 
-                                      title: const Text('Set as Default'), 
-                                      onTap: () { 
-                                        final newMethod = Map<String, dynamic>.from(method);
-                                        newMethod['isDefault'] = true;
-                                        PaymentManager().updatePaymentMethod(index, newMethod);
-                                        Navigator.pop(context); 
-                                      }
-                                    ),
-                                    ListTile(
-                                      leading: const Icon(Icons.edit_outlined), 
-                                      title: const Text('Edit Details'), 
-                                      onTap: () { 
-                                        Navigator.pop(context); 
-                                        Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                            builder: (context) => PaymentScreen(editMethod: method),
-                                          ),
-                                        );
-                                      }
-                                    ),
-                                    ListTile(
-                                      leading: const Icon(Icons.delete_outline, color: Colors.red), 
-                                      title: const Text('Remove Method', style: TextStyle(color: Colors.red)), 
-                                      onTap: () { 
-                                        PaymentManager().removePaymentMethod(index);
-                                        Navigator.pop(context); 
-                                      }
-                                    ),
-                                    const SizedBox(height: 20),
-                                  ],
-                                ),
-                              );
-                            },
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: IconButton(
+                              icon: const Icon(Icons.more_horiz, color: Colors.white, size: 20),
+                              onPressed: () {
+                                showModalBottomSheet(
+                                  context: context,
+                                  shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+                                  builder: (context) => Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      ListTile(
+                                        leading: const Icon(Icons.check_circle_outline), 
+                                        title: const Text('Set as Default'), 
+                                        onTap: () { 
+                                          final newMethod = Map<String, dynamic>.from(method);
+                                          newMethod['isDefault'] = true;
+                                          PaymentManager().updatePaymentMethod(index, newMethod);
+                                          Navigator.pop(context); 
+                                        }
+                                      ),
+                                      ListTile(
+                                        leading: const Icon(Icons.edit_outlined), 
+                                        title: const Text('Edit Details'), 
+                                        onTap: () { 
+                                          Navigator.pop(context); 
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (context) => PaymentScreen(editMethod: method),
+                                            ),
+                                          );
+                                        }
+                                      ),
+                                      ListTile(
+                                        leading: const Icon(Icons.delete_outline, color: Colors.red), 
+                                        title: const Text('Remove Method', style: TextStyle(color: Colors.red)), 
+                                        onTap: () { 
+                                          PaymentManager().removePaymentMethod(index);
+                                          Navigator.pop(context); 
+                                        }
+                                      ),
+                                      const SizedBox(height: 20),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
                           ),
                       ],
                     ),
@@ -263,9 +290,9 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                           : (method['upiId']?.toString() ?? method['upild'] ?? 'name@bank').toString(),
                       style: TextStyle(
                         color: Colors.white, 
-                        fontSize: isBank ? 20 : 18, 
+                        fontSize: isBank ? 22 : 18, 
                         fontWeight: FontWeight.bold, 
-                        letterSpacing: isBank ? 2 : 1
+                        letterSpacing: isBank ? 3 : 1
                       ),
                     ),
                     const SizedBox(height: 40),
@@ -277,11 +304,11 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(isBank ? 'ACCOUNT HOLDER' : 'DISPLAY NAME', style: const TextStyle(color: Colors.white54, fontSize: 10, letterSpacing: 1)),
+                              Text(isBank ? 'ACCOUNT HOLDER' : 'DISPLAY NAME', style: const TextStyle(color: Colors.white70, fontSize: 9, letterSpacing: 1.2, fontWeight: FontWeight.bold)),
                               const SizedBox(height: 4),
                               Text(
                                 (isBank ? (method['accountHolderName'] ?? 'NAME NOT SET') : (method['displayName'] ?? method['name'] ?? 'NAME NOT SET')).toString().toUpperCase(),
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 0.5),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -291,13 +318,13 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                         if (isBank) ...[
                           const SizedBox(width: 16),
                           Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              const Text('IFSC', style: TextStyle(color: Colors.white54, fontSize: 10, letterSpacing: 1)),
+                              const Text('IFSC', style: TextStyle(color: Colors.white70, fontSize: 9, letterSpacing: 1.2, fontWeight: FontWeight.bold)),
                               const SizedBox(height: 4),
                               Text(
                                 method['ifscCode']?.toString() ?? '', 
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 1)
                               ),
                             ],
                           ),

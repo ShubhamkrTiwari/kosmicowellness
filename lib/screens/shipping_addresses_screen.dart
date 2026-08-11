@@ -175,6 +175,9 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
                           child: TextFormField(
                             controller: cityController,
                             decoration: _inputDecoration('City'),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                            ],
                             validator: (value) => value?.isEmpty == true ? 'City required' : null,
                           ),
                         ),
@@ -396,6 +399,13 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
 
   Widget _buildAddressCard(Map<String, String> address, int index, ColorScheme colorScheme) {
     final bool isDefault = address['isDefault'] == 'true';
+    final String label = address['label'] ?? 'Home';
+    final IconData labelIcon = label.toLowerCase().contains('home') 
+        ? Icons.home_rounded 
+        : label.toLowerCase().contains('office') 
+            ? Icons.business_rounded 
+            : Icons.location_on_rounded;
+
     return InkWell(
       onTap: widget.isSelectionMode ? () {
         Navigator.pop(context, address);
@@ -403,167 +413,184 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
       borderRadius: BorderRadius.circular(24),
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest,
+          color: colorScheme.surface,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: isDefault ? colorScheme.primary : colorScheme.primary.withValues(alpha: 0.1),
+            color: isDefault ? colorScheme.primary : colorScheme.outline.withValues(alpha: 0.1),
             width: isDefault ? 2 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: colorScheme.primary.withValues(alpha: 0.05),
-              blurRadius: 15,
+              color: isDefault 
+                ? colorScheme.primary.withValues(alpha: 0.08) 
+                : Colors.black.withValues(alpha: 0.03),
+              blurRadius: 20,
               offset: const Offset(0, 8),
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isDefault ? colorScheme.primary : colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    address['label']!,
-                    style: TextStyle(
-                      color: isDefault ? Colors.white : colorScheme.onSurfaceVariant,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Stack(
+            children: [
+              if (isDefault)
+                Positioned(
+                  right: -20,
+                  top: -20,
+                  child: Icon(
+                    Icons.check_circle_rounded,
+                    size: 80,
+                    color: colorScheme.primary.withValues(alpha: 0.05),
                   ),
                 ),
-                if (!widget.isSelectionMode)
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_horiz),
-                    onSelected: (value) async {
-                      if (value == 'edit') {
-                        _showAddressBottomSheet(index: index);
-                      } else if (value == 'delete') {
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Delete Address'),
-                            content: const Text('Are you sure you want to delete this address?'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: const Text('Cancel'),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: isDefault 
+                                ? colorScheme.primary 
+                                : colorScheme.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                labelIcon, 
+                                size: 14, 
+                                color: isDefault ? Colors.white : colorScheme.primary
                               ),
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                              const SizedBox(width: 6),
+                              Text(
+                                label.toUpperCase(),
+                                style: TextStyle(
+                                  color: isDefault ? Colors.white : colorScheme.primary,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.5,
+                                ),
                               ),
                             ],
                           ),
-                        );
+                        ),
+                        if (!widget.isSelectionMode)
+                          Material(
+                            color: Colors.transparent,
+                            child: PopupMenuButton<String>(
+                              icon: Icon(Icons.more_vert_rounded, color: colorScheme.onSurfaceVariant),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              onSelected: (value) async {
+                                if (value == 'edit') {
+                                  _showAddressBottomSheet(index: index);
+                                } else if (value == 'delete') {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: const Text('Delete Address'),
+                                      content: const Text('Are you sure you want to delete this address?'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(context, false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(context, true),
+                                          child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                        ),
+                                      ],
+                                    ),
+                                  );
 
-                        if (confirm == true) {
-                          await userManager.init();
-                          final token = userManager.token;
-                          final addressId = address['id'];
+                                  if (confirm == true) {
+                                    await userManager.init();
+                                    final token = userManager.token;
+                                    final addressId = address['id'];
 
-                          if (token != null && token.isNotEmpty && addressId != null && addressId.isNotEmpty) {
-                            debugPrint('Deleting Address with ID: $addressId'); // Debug print
-                            final result = await ApiService.deleteAddress(addressId, token);
-                            
-                            if (result['success']) {
-                              setState(() => _addresses.removeAt(index));
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Address deleted successfully!'),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              }
-                              // Optional: Refresh from server to be 100% sure
-                              _loadAddresses();
-                            } else {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(result['message'] ?? 'Failed to delete address'),
-                                    backgroundColor: Colors.redAccent,
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              }
-                            }
-                          } else {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Invalid address ID or not logged in'),
-                                  backgroundColor: Colors.redAccent,
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                            }
-                          }
-                        }
-                      } else if (value == 'default') {
-                        await userManager.init();
-                        final token = userManager.token;
-                        final addressId = address['id'];
-
-                        if (token != null && token.isNotEmpty && addressId != null && addressId.isNotEmpty) {
-                          final result = await ApiService.setDefaultAddress(addressId, token);
-                          if (result['success']) {
-                            _loadAddresses();
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Default address updated!'),
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                            }
-                          } else {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(result['message'] ?? 'Failed to set default address'),
-                                  backgroundColor: Colors.redAccent,
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                            }
-                          }
-                        }
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                      if (!isDefault) const PopupMenuItem(value: 'default', child: Text('Set as Default')),
-                      const PopupMenuItem(value: 'delete', child: Text('Delete', style: TextStyle(color: Colors.red))),
-                    ],
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              address['name']!,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${address['address']!}, ${address['city']!} - ${address['pincode']!}',
-              style: TextStyle(color: Colors.grey.shade600, height: 1.4),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              address['phone']!,
-              style: const TextStyle(fontWeight: FontWeight.w500),
-            ),
-          ],
+                                    if (token != null && token.isNotEmpty && addressId != null && addressId.isNotEmpty) {
+                                      final result = await ApiService.deleteAddress(addressId, token);
+                                      if (result['success']) {
+                                        setState(() => _addresses.removeAt(index));
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('Address deleted successfully!'), behavior: SnackBarBehavior.floating),
+                                          );
+                                        }
+                                        _loadAddresses();
+                                      }
+                                    }
+                                  }
+                                } else if (value == 'default') {
+                                  await userManager.init();
+                                  final token = userManager.token;
+                                  final addressId = address['id'];
+                                  if (token != null && token.isNotEmpty && addressId != null && addressId.isNotEmpty) {
+                                    final result = await ApiService.setDefaultAddress(addressId, token);
+                                    if (result['success']) {
+                                      _loadAddresses();
+                                    }
+                                  }
+                                }
+                              },
+                              itemBuilder: (context) => [
+                                const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 18), SizedBox(width: 12), Text('Edit')])),
+                                if (!isDefault) const PopupMenuItem(value: 'default', child: Row(children: [Icon(Icons.check_circle_outline, size: 18), SizedBox(width: 12), Text('Set as Default')])),
+                                const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 18, color: Colors.red), SizedBox(width: 12), Text('Delete', style: TextStyle(color: Colors.red))])),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      address['name']!,
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: -0.5),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.map_outlined, size: 16, color: colorScheme.primary.withValues(alpha: 0.5)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${address['address']!}, ${address['city']!} - ${address['pincode']!}',
+                            style: TextStyle(color: colorScheme.onSurfaceVariant, height: 1.4, fontSize: 13, fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.phone_iphone_rounded, size: 14, color: colorScheme.primary),
+                          const SizedBox(width: 8),
+                          Text(
+                            address['phone']!,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

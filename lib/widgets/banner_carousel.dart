@@ -16,7 +16,8 @@ class BannerItem {
 }
 
 class BannerCarousel extends StatefulWidget {
-  const BannerCarousel({super.key});
+  final VoidCallback? onTap;
+  const BannerCarousel({super.key, this.onTap});
 
   @override
   State<BannerCarousel> createState() => _BannerCarouselState();
@@ -172,9 +173,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
           ),
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: () {
-              // Action for banner button
-            },
+            onPressed: widget.onTap,
             style: ElevatedButton.styleFrom(
               backgroundColor: colorScheme.secondary,
               foregroundColor: Colors.white,

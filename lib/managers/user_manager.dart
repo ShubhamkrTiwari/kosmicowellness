@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'notification_manager.dart';
 
 class UserManager {
   static final UserManager _instance = UserManager._internal();
@@ -57,6 +58,9 @@ class UserManager {
     } else {
       await prefs.remove('profile_picture');
     }
+
+    // Refresh notifications for the new user
+    NotificationManager().clearAndReload();
   }
 
   Future<void> updateProfilePicture(String? imageUrl) async {
@@ -85,6 +89,9 @@ class UserManager {
     _userName = null;
     _userEmail = null;
     _token = null;
+
+    // Reset notification manager for next user
+    NotificationManager().clearAndReload();
   }
 
   bool get isLoggedIn => _token != null;

@@ -80,7 +80,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
                   Text(
                     'Our servers are currently undergoing scheduled maintenance to improve your experience.\n\nWe will be back shortly!',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey[600], fontSize: 16, height: 1.5),
+                    style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 16, height: 1.5),
                   ),
                   const SizedBox(height: 48),
                   SizedBox(

@@ -86,7 +86,7 @@ class HelpCenterScreen extends StatelessWidget {
                       _buildContactGridItem(
                         Icons.phone_in_talk_outlined,
                         'Call Us',
-                        'Mon-Sat\n9AM - 6PM',
+                        'Mon-Sat\n11AM - 7PM',
                         colorScheme,
                       ),
                       _buildContactGridItem(
@@ -104,7 +104,7 @@ class HelpCenterScreen extends StatelessWidget {
                       _buildContactGridItem(
                         Icons.location_on_outlined,
                         'Visit Us',
-                        'Wellness\nDistrict',
+                        'Greater\nNoida',
                         colorScheme,
                       ),
                     ],
@@ -122,25 +122,25 @@ class HelpCenterScreen extends StatelessWidget {
                 _buildInfoTile(
                   Icons.location_on_outlined,
                   'Main Office Address',
-                  '123 Ayurveda Street, Wellness District,\nMumbai 400001, Maharashtra, India',
+                  '1305 & 1307 A, 13th Floor, Tower 3, NX One Tower, Greater Noida (West), Gautam Buddha Nagar, UP, India - 201306',
                   colorScheme,
                 ),
                 _buildInfoTile(
                   Icons.phone_outlined,
-                  'Customer Support Lines',
-                  '+91 98765 43210, +91 98765 43211',
+                  'Customer Support Line',
+                  '+91 97931 70555',
                   colorScheme,
                 ),
                 _buildInfoTile(
                   Icons.email_outlined,
                   'Official Email Support',
-                  'support@ayurvedashop.com\norders@ayurvedashop.com',
+                  'supportkosmicowellness@gmail.com',
                   colorScheme,
                 ),
                 _buildInfoTile(
                   Icons.access_time_rounded,
                   'Operating Hours',
-                  'Mon - Sat: 9:00 AM - 6:00 PM\nSunday: 10:00 AM - 4:00 PM',
+                  'Mon - Sat: 11:00 AM - 7:00 PM\nSunday: Closed',
                   colorScheme,
                 ),
                 const SizedBox(height: 100),

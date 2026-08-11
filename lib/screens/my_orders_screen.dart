@@ -18,19 +18,64 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> with SingleTickerProvid
   List<Map<String, dynamic>> _activeOrders = [];
   List<Map<String, dynamic>> _completedOrders = [];
   bool _isLoading = false;
+  
+  // Pagination State
+  int _activePage = 1;
+  int _completedPage = 1;
+  bool _hasMoreActive = true;
+  bool _hasMoreCompleted = true;
+  bool _isFetchingMore = false;
+  final int _pageSize = 10;
+
+  final ScrollController _activeScrollController = ScrollController();
+  final ScrollController _completedScrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _fetchOrders();
+    _activeScrollController.addListener(() => _onScroll(true));
+    _completedScrollController.addListener(() => _onScroll(false));
+    _fetchOrders(isInitial: true);
   }
 
-  Future<void> _fetchOrders() async {
-    setState(() => _isLoading = true);
+  void _onScroll(bool isActive) {
+    final controller = isActive ? _activeScrollController : _completedScrollController;
+    if (controller.position.pixels >= controller.position.maxScrollExtent - 200) {
+      if (!_isLoading && !_isFetchingMore) {
+        if (isActive && _hasMoreActive) {
+          _fetchMoreOrders(true);
+        } else if (!isActive && _hasMoreCompleted) {
+          _fetchMoreOrders(false);
+        }
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _activeScrollController.dispose();
+    _completedScrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchOrders({bool isInitial = true}) async {
+    if (isInitial) {
+      setState(() {
+        _isLoading = true;
+        _activePage = 1;
+        _completedPage = 1;
+        _hasMoreActive = true;
+        _hasMoreCompleted = true;
+      });
+    }
+
     final token = UserManager().token;
     if (token != null) {
-      final result = await ApiService.getUserOrders(token);
+      // For initial fetch, we'll try to get the first page of everything
+      // In a real paginated API, you might fetch only for the active tab
+      final result = await ApiService.getUserOrders(token, page: 1, limit: 50); // Fetch a larger initial batch
       debugPrint('DEBUG: MyOrders API Response: $result');
       
       if (result['success'] && result['data'] != null) {
@@ -42,26 +87,12 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> with SingleTickerProvid
           allOrders = rawData['orders'] ?? rawData['data'] ?? [];
         }
         
-        if (allOrders.isNotEmpty) {
-          debugPrint('DEBUG: Keys in Order Object: ${allOrders[0].keys.toList()}');
-          debugPrint('DEBUG: Full First Order JSON: ${allOrders[0]}');
-        }
-
         setState(() {
-          // Strict Filter: Only show finalized orders
           final List filteredOrders = allOrders.where((o) {
             final String s = (o['status'] ?? o['paymentStatus'] ?? o['orderStatus'] ?? '').toString().toLowerCase();
             final String method = (o['paymentMethodId'] ?? o['paymentMethod'] ?? '').toString().toLowerCase();
-            
-            debugPrint('DEBUG: Filtering Order ID: ${o['_id'] ?? o['id']} | Status: $s | Method: $method');
-
-            // Exclude common "ghost" statuses
             if (s == 'created' || s == 'failed' || s == 'attempted') return false;
-            
-            // For Razorpay, if status is just 'pending', it usually means the payment hasn't been verified/completed
-            // Successful Razorpay orders should be 'paid' or 'processing'.
             if (method.contains('razorpay') && s == 'pending') return false;
-
             return true;
           }).toList();
 
@@ -74,10 +105,56 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> with SingleTickerProvid
             final String s = (o['status'] ?? o['paymentStatus'] ?? o['orderStatus'] ?? '').toString().toLowerCase();
             return s == 'delivered' || s == 'cancelled' || o['isCancelled'] == true;
           }).map((o) => _mapOrder(o)).toList().cast<Map<String, dynamic>>();
+          
+          // Heuristic: if we got less than requested, maybe no more
+          _hasMoreActive = _activeOrders.length >= 10; 
+          _hasMoreCompleted = _completedOrders.length >= 10;
         });
       }
     }
     setState(() => _isLoading = false);
+  }
+
+  Future<void> _fetchMoreOrders(bool isActive) async {
+    setState(() => _isFetchingMore = true);
+    final token = UserManager().token;
+    final int pageToFetch = isActive ? _activePage + 1 : _completedPage + 1;
+
+    if (token != null) {
+      final result = await ApiService.getUserOrders(token, page: pageToFetch, limit: _pageSize);
+      
+      if (result['success'] && result['data'] != null) {
+        final dynamic rawData = result['data'];
+        List allOrders = [];
+        if (rawData is List) allOrders = rawData;
+        else if (rawData is Map) allOrders = rawData['orders'] ?? rawData['data'] ?? [];
+
+        final List mapped = allOrders.map((o) => _mapOrder(o)).toList();
+        
+        setState(() {
+          if (isActive) {
+            final List<Map<String, dynamic>> newActive = mapped.where((o) {
+              final String s = o['status'].toString().toLowerCase();
+              return s != 'delivered' && s != 'cancelled';
+            }).cast<Map<String, dynamic>>().toList();
+            
+            _activeOrders.addAll(newActive);
+            _activePage++;
+            _hasMoreActive = allOrders.length == _pageSize;
+          } else {
+            final List<Map<String, dynamic>> newCompleted = mapped.where((o) {
+              final String s = o['status'].toString().toLowerCase();
+              return s == 'delivered' || s == 'cancelled';
+            }).cast<Map<String, dynamic>>().toList();
+            
+            _completedOrders.addAll(newCompleted);
+            _completedPage++;
+            _hasMoreCompleted = allOrders.length == _pageSize;
+          }
+        });
+      }
+    }
+    setState(() => _isFetchingMore = false);
   }
 
   String _getItemName(dynamic item) {
@@ -171,12 +248,6 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> with SingleTickerProvid
   }
 
   @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -197,7 +268,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> with SingleTickerProvid
         bottom: TabBar(
           controller: _tabController,
           labelColor: colorScheme.primary,
-          unselectedLabelColor: Colors.grey,
+          unselectedLabelColor: colorScheme.onSurfaceVariant,
           indicatorColor: colorScheme.primary,
           indicatorSize: TabBarIndicatorSize.label,
           tabs: const [
@@ -217,16 +288,25 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> with SingleTickerProvid
   }
 
   Widget _buildActiveOrders(ColorScheme colorScheme) {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_isLoading && _activeOrders.isEmpty) return const Center(child: CircularProgressIndicator());
     if (_activeOrders.isEmpty) return _buildEmptyState('No active orders');
 
     return RefreshIndicator(
-      onRefresh: _fetchOrders,
+      onRefresh: () => _fetchOrders(isInitial: true),
       child: ListView.builder(
+        controller: _activeScrollController,
         padding: const EdgeInsets.all(20),
         physics: const AlwaysScrollableScrollPhysics(),
-        itemCount: _activeOrders.length,
+        itemCount: _activeOrders.length + (_hasMoreActive ? 1 : 0),
         itemBuilder: (context, index) {
+          if (index == _activeOrders.length) {
+            return _isFetchingMore 
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              : const SizedBox.shrink();
+          }
           return _buildOrderCard(_activeOrders[index], colorScheme, true);
         },
       ),
@@ -234,16 +314,25 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> with SingleTickerProvid
   }
 
   Widget _buildCompletedOrders(ColorScheme colorScheme) {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_isLoading && _completedOrders.isEmpty) return const Center(child: CircularProgressIndicator());
     if (_completedOrders.isEmpty) return _buildEmptyState('No completed orders');
 
     return RefreshIndicator(
-      onRefresh: _fetchOrders,
+      onRefresh: () => _fetchOrders(isInitial: true),
       child: ListView.builder(
+        controller: _completedScrollController,
         padding: const EdgeInsets.all(20),
         physics: const AlwaysScrollableScrollPhysics(),
-        itemCount: _completedOrders.length,
+        itemCount: _completedOrders.length + (_hasMoreCompleted ? 1 : 0),
         itemBuilder: (context, index) {
+          if (index == _completedOrders.length) {
+            return _isFetchingMore 
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              : const SizedBox.shrink();
+          }
           return _buildOrderCard(_completedOrders[index], colorScheme, false);
         },
       ),
@@ -251,13 +340,14 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> with SingleTickerProvid
   }
 
   Widget _buildEmptyState(String message) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.shopping_bag_outlined, size: 64, color: Colors.grey[300]),
+          Icon(Icons.shopping_bag_outlined, size: 64, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
           const SizedBox(height: 16),
-          Text(message, style: TextStyle(color: Colors.grey[600])),
+          Text(message, style: TextStyle(color: colorScheme.onSurfaceVariant)),
         ],
       ),
     );
@@ -422,7 +512,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> with SingleTickerProvid
                     const SizedBox(height: 4),
                     Text(
                       'Ordered on $date',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                      style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
                     ),
                   ],
                 ),
@@ -436,10 +526,11 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> with SingleTickerProvid
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                       color: colorScheme.primary,
+                      letterSpacing: 0.5,
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text('$itemCount Item${itemCount > 1 ? 's' : ''}', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  Text('$itemCount Item${itemCount > 1 ? 's' : ''}', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12)),
                 ],
               ),
             ],

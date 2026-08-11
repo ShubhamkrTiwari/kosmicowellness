@@ -10,11 +10,27 @@ class NotificationScreen extends StatefulWidget {
 
 class _NotificationScreenState extends State<NotificationScreen> {
   final notificationManager = NotificationManager();
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    notificationManager.fetchFromApi();
+    _scrollController.addListener(_onScroll);
+    notificationManager.fetchFromApi(isInitial: true);
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      if (!notificationManager.isLoading && !notificationManager.isFetchingMore && notificationManager.hasMore) {
+        notificationManager.fetchFromApi(isInitial: false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -76,10 +92,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
                         Icon(Icons.notifications_off_outlined,
                             size: 80, color: colorScheme.primary.withOpacity(0.2)),
                         const SizedBox(height: 16),
-                        const Text('No notifications yet',
-                            style: TextStyle(fontSize: 16, color: Colors.grey)),
+                        Text('No notifications yet',
+                            style: TextStyle(fontSize: 16, color: colorScheme.onSurfaceVariant)),
                         const SizedBox(height: 8),
-                        Text('Pull down to refresh', style: TextStyle(fontSize: 12, color: Colors.grey.shade400)),
+                        Text('Pull down to refresh', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5))),
                       ],
                     ),
                   ),
@@ -89,11 +105,20 @@ class _NotificationScreenState extends State<NotificationScreen> {
           }
 
           return RefreshIndicator(
-            onRefresh: () => notificationManager.fetchFromApi(),
+            onRefresh: () => notificationManager.fetchFromApi(isInitial: true),
             child: ListView.builder(
+              controller: _scrollController,
               padding: const EdgeInsets.all(16),
-              itemCount: notifications.length,
+              itemCount: notifications.length + (notificationManager.hasMore ? 1 : 0),
               itemBuilder: (context, index) {
+                if (index == notifications.length) {
+                  return notificationManager.isFetchingMore 
+                    ? const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    : const SizedBox.shrink();
+                }
                 final item = notifications[index];
                 final bool isUnread = item['isRead'] == 'false';
 
@@ -191,7 +216,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                   item['message'] ?? '',
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: Colors.grey[600],
+                                    color: colorScheme.onSurfaceVariant,
                                     height: 1.4,
                                   ),
                                 ),
@@ -200,7 +225,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                   item['time'] ?? '',
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: Colors.grey[400],
+                                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),

@@ -199,6 +199,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             ? "Don't have an account? Sign Up"
                             : "Already have an account? Login",
                         style: TextStyle(color: colorScheme.secondary),
+                        textAlign: TextAlign.center,
                       ),
                     ),
                   ],

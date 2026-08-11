@@ -26,7 +26,13 @@ class ProductListScreenState extends State<ProductListScreen> {
 
   List<Map<String, dynamic>> _apiProducts = [];
   bool _isLoading = false;
+  bool _isFetchingMore = false;
+  bool _hasMore = true;
+  int _currentPage = 1;
+  final int _pageSize = 12;
+  
   Timer? _refreshTimer;
+  final ScrollController _scrollController = ScrollController();
 
   void refreshData() {
     _refreshAll();
@@ -41,28 +47,40 @@ class ProductListScreenState extends State<ProductListScreen> {
       maxPrice: 5000,
       minRating: 0,
     );
+    
+    _scrollController.addListener(_onScroll);
+    
     _fetchCategories();
-    _fetchProducts();
+    _fetchProducts(isInitial: true);
     
     // Auto refresh every 5 minutes while on this screen
     _refreshTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
       if (mounted) {
         _fetchCategories();
-        _fetchProducts();
+        _fetchProducts(isInitial: true);
       }
     });
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      if (!_isLoading && !_isFetchingMore && _hasMore) {
+        _fetchProducts(isInitial: false);
+      }
+    }
   }
 
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _scrollController.dispose();
     super.dispose();
   }
 
   Future<void> _refreshAll() async {
     await Future.wait([
       _fetchCategories(),
-      _fetchProducts(),
+      _fetchProducts(isInitial: true),
     ]);
   }
 
@@ -86,51 +104,58 @@ class ProductListScreenState extends State<ProductListScreen> {
     }
   }
 
-  Future<void> _fetchProducts() async {
-    setState(() => _isLoading = true);
+  Future<void> _fetchProducts({bool isInitial = true}) async {
+    if (isInitial) {
+      setState(() {
+        _isLoading = true;
+        _currentPage = 1;
+        _hasMore = true;
+      });
+    } else {
+      setState(() => _isFetchingMore = true);
+    }
+
     try {
-      final result = await ApiService.getProducts();
+      final result = await ApiService.getProducts(
+        page: isInitial ? 1 : _currentPage + 1,
+        limit: _pageSize,
+        category: _selectedCategory,
+        search: _searchQuery,
+        sortBy: _filterOptions.sortBy,
+        minPrice: _filterOptions.minPrice,
+        maxPrice: _filterOptions.maxPrice,
+        minRating: _filterOptions.minRating,
+      );
+
       if (result['success'] == true && result['data'] != null) {
+        final List<dynamic> fetchedData = result['data'];
+        final List<Map<String, dynamic>> newProducts = List<Map<String, dynamic>>.from(fetchedData);
+
         setState(() {
-          _apiProducts = List<Map<String, dynamic>>.from(result['data']);
+          if (isInitial) {
+            _apiProducts = newProducts;
+            _currentPage = 1;
+          } else {
+            _apiProducts.addAll(newProducts);
+            _currentPage++;
+          }
+          _hasMore = newProducts.length == _pageSize;
         });
       }
     } catch (e) {
       debugPrint('DEBUG: Error fetching products: $e');
     } finally {
-      setState(() => _isLoading = false);
+      setState(() {
+        _isLoading = false;
+        _isFetchingMore = false;
+      });
     }
   }
 
   List<Map<String, dynamic>> get _filteredProducts {
-    List<Map<String, dynamic>> products = _apiProducts.where((product) {
-      final matchesCategory = _selectedCategory == 'All' || 
-          (product['category']?.toString().toLowerCase() == _selectedCategory.toLowerCase());
-      
-      final matchesSearch = (product['name'] ?? '').toString().toLowerCase().contains(_searchQuery.toLowerCase());
-      
-      final double price = double.tryParse(product['price']?.toString() ?? '0') ?? 0;
-      final matchesPrice = price >= _filterOptions.minPrice && price <= _filterOptions.maxPrice;
-      
-      final double rating = double.tryParse(product['rating']?.toString() ?? '0') ?? 0;
-      final matchesRating = rating >= _filterOptions.minRating;
-
-      return matchesCategory && matchesSearch && matchesPrice && matchesRating;
-    }).toList();
-
-    // Sorting
-    if (_filterOptions.sortBy == 'Price: Low to High') {
-      products.sort((a, b) => (double.tryParse(a['price']?.toString() ?? '0') ?? 0)
-          .compareTo(double.tryParse(b['price']?.toString() ?? '0') ?? 0));
-    } else if (_filterOptions.sortBy == 'Price: High to Low') {
-      products.sort((a, b) => (double.tryParse(b['price']?.toString() ?? '0') ?? 0)
-          .compareTo(double.tryParse(a['price']?.toString() ?? '0') ?? 0));
-    } else if (_filterOptions.sortBy == 'Newest') {
-      // Assuming _id exists as is common in Mongo-based APIs
-      products.sort((a, b) => (b['_id']?.toString() ?? '').compareTo(a['_id']?.toString() ?? ''));
-    }
-
-    return products;
+    // Note: Filtering is now handled server-side via ApiService.getProducts parameters
+    // We just return _apiProducts which already has the server-side filtered data
+    return _apiProducts;
   }
 
   @override
@@ -145,6 +170,7 @@ class ProductListScreenState extends State<ProductListScreen> {
         child: RefreshIndicator(
           onRefresh: _refreshAll,
           child: CustomScrollView(
+            controller: _scrollController,
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               // Scrolling Header
@@ -174,9 +200,9 @@ class ProductListScreenState extends State<ProductListScreen> {
                             padding: const EdgeInsets.only(top: 40),
                             child: Column(
                               children: [
-                                Icon(Icons.search_off, size: 60, color: Colors.grey[300]),
+                                Icon(Icons.search_off, size: 60, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
                                 const SizedBox(height: 16),
-                                Text('No products found', style: TextStyle(color: Colors.grey[600], fontSize: 16)),
+                                Text('No products found', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 16)),
                               ],
                             ),
                           ),
@@ -185,9 +211,17 @@ class ProductListScreenState extends State<ProductListScreen> {
                     : SliverList(
                         delegate: SliverChildBuilderDelegate(
                           (context, index) {
+                            if (index == filteredList.length) {
+                              return _isFetchingMore 
+                                ? const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 20),
+                                    child: Center(child: CircularProgressIndicator()),
+                                  )
+                                : const SizedBox.shrink();
+                            }
                             return _buildProductListItem(filteredList[index], colorScheme);
                           },
-                          childCount: filteredList.length,
+                          childCount: filteredList.length + (_hasMore ? 1 : 0),
                         ),
                       ),
               ),
@@ -216,7 +250,7 @@ class ProductListScreenState extends State<ProductListScreen> {
           const SizedBox(height: 4),
           Text(
             'Handpicked Ayurvedic Essentials',
-            style: TextStyle(color: Colors.grey[600], fontSize: 14),
+            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
           ),
         ],
       ),
@@ -231,12 +265,16 @@ class ProductListScreenState extends State<ProductListScreen> {
           Expanded(
             child: TextField(
               onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
+                setState(() => _searchQuery = value);
+                // Debounce search for pagination
+                _refreshTimer?.cancel();
+                _refreshTimer = Timer(const Duration(milliseconds: 600), () {
+                  _fetchProducts(isInitial: true);
                 });
               },
               decoration: InputDecoration(
                 hintText: 'Search products...',
+                hintStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
                 fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
@@ -261,6 +299,7 @@ class ProductListScreenState extends State<ProductListScreen> {
               if (result != null) {
                 setState(() {
                   _filterOptions = result;
+                  _fetchProducts(isInitial: true);
                 });
               }
             },
@@ -299,7 +338,12 @@ class ProductListScreenState extends State<ProductListScreen> {
           return Padding(
             padding: const EdgeInsets.only(right: 12),
             child: GestureDetector(
-              onTap: () => setState(() => _selectedCategory = category),
+              onTap: () {
+                setState(() {
+                  _selectedCategory = category;
+                  _fetchProducts(isInitial: true);
+                });
+              },
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 decoration: BoxDecoration(
@@ -313,7 +357,7 @@ class ProductListScreenState extends State<ProductListScreen> {
                 child: Text(
                   category,
                   style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.grey[700],
+                    color: isSelected ? Colors.white : colorScheme.onSurfaceVariant,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                   ),
                 ),
@@ -328,28 +372,16 @@ class ProductListScreenState extends State<ProductListScreen> {
   Widget _buildProductListItem(Map<String, dynamic> product, ColorScheme colorScheme) {
     final String name = (product['name'] ?? 'Product').toString();
     final String imageUrl = (product['image'] ?? '').toString();
-    final String price = '₹${product['price'] ?? 0}';
+    final String rawPrice = (product['price'] ?? 0).toString().replaceAll('₹', '').trim();
+    final String price = '₹$rawPrice';
     final String rating = (product['rating'] ?? '0.0').toString();
     final String reviews = (product['numReviews'] ?? '0').toString();
 
     return GestureDetector(
       onTap: () {
-        // Standardize for details screen
-        final detailsProduct = {
-          '_id': product['_id']?.toString() ?? product['id']?.toString() ?? '',
-          'name': name,
-          'description': (product['description'] ?? '').toString(),
-          'price': price,
-          'image': imageUrl,
-          'category': (product['category'] ?? '').toString(),
-          'icon': '🌿',
-          'rating': rating,
-          'reviews': reviews,
-        };
-
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => ProductDetailsScreen(product: detailsProduct),
+            builder: (context) => ProductDetailsScreen(product: product),
           ),
         ).then((_) => setState(() {}));
       },
@@ -451,7 +483,7 @@ class ProductListScreenState extends State<ProductListScreen> {
                       ),
                       Text(
                         ' ($reviews)',
-                        style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                        style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11),
                       ),
                     ],
                   ),
@@ -466,6 +498,7 @@ class ProductListScreenState extends State<ProductListScreen> {
                             fontWeight: FontWeight.w900,
                             fontSize: 19,
                             color: colorScheme.primary,
+                            letterSpacing: 0.5,
                           ),
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,

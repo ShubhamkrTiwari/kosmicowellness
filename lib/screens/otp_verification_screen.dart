@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
-import '../home_screen.dart';
+import '../main.dart';
 import '../services/api_service.dart';
 import '../managers/user_manager.dart';
 
@@ -234,7 +234,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                 const SizedBox(height: 12),
                 Text(
                   'Please enter the 6-digit code sent to\n${widget.email}',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 16, height: 1.5),
+                  style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 16, height: 1.5),
                 ),
                 const SizedBox(height: 48),
                 FittedBox(
@@ -314,7 +314,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                     children: [
                       Text(
                         _canResend ? "Didn't receive the code?" : "Resend code in",
-                        style: TextStyle(color: Colors.grey[600]),
+                        style: TextStyle(color: colorScheme.onSurfaceVariant),
                       ),
                       const SizedBox(height: 8),
                       _canResend

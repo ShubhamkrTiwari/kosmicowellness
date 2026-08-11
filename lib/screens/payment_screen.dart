@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../managers/payment_manager.dart';
 
@@ -221,6 +222,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           label: 'Account Holder Name', 
                           icon: Icons.person_outline, 
                           enabled: !_isSavingLocal,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                          ],
                           validator: (v) => v?.isEmpty == true ? 'Name is required' : null,
                         ),
                         const SizedBox(height: 16),
@@ -229,6 +233,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           label: 'Bank Name', 
                           icon: Icons.business_outlined, 
                           enabled: !_isSavingLocal,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                          ],
                           validator: (v) => v?.isEmpty == true ? 'Bank name is required' : null,
                         ),
                         const SizedBox(height: 16),
@@ -238,6 +245,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           icon: Icons.numbers_outlined, 
                           keyboardType: TextInputType.number, 
                           enabled: !_isSavingLocal,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
                           validator: (v) => (v == null || v.isEmpty) ? 'Account number required' : null,
                         ),
                         const SizedBox(height: 16),
@@ -247,6 +257,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           icon: Icons.code_outlined, 
                           capitalization: TextCapitalization.characters, 
                           enabled: !_isSavingLocal,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
+                            LengthLimitingTextInputFormatter(11),
+                          ],
                           validator: (v) {
                             if (v == null || v.isEmpty) return 'IFSC is required';
                             if (v.length < 11) return 'Invalid IFSC (11 chars)';
@@ -266,6 +280,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           label: 'Display Name', 
                           icon: Icons.person_outline, 
                           enabled: !_isSavingLocal,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                          ],
                           validator: (v) => v?.isEmpty == true ? 'Display name required' : null,
                         ),
                         const SizedBox(height: 16),
@@ -387,6 +404,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     TextInputType keyboardType = TextInputType.text,
     TextCapitalization capitalization = TextCapitalization.none,
     bool enabled = true,
+    List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -395,6 +413,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       keyboardType: keyboardType,
       textCapitalization: capitalization,
       enabled: enabled,
+      inputFormatters: inputFormatters,
       validator: validator,
       style: TextStyle(color: colorScheme.onSurface),
       decoration: InputDecoration(

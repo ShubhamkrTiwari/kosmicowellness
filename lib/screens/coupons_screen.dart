@@ -103,7 +103,7 @@ class _CouponsScreenState extends State<CouponsScreen> {
                               children: [
                                 Icon(Icons.confirmation_number_outlined, size: 80, color: colorScheme.primary.withValues(alpha: 0.1)),
                                 const SizedBox(height: 16),
-                                Text('No coupons available', style: TextStyle(color: Colors.grey[600], fontSize: 16)),
+                                Text('No coupons available', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 16)),
                               ],
                             ),
                           ),

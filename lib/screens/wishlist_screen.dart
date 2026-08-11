@@ -52,7 +52,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
                       const SizedBox(height: 16),
                       Text(
                         'Your wishlist is empty',
-                        style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                        style: TextStyle(fontSize: 16, color: colorScheme.onSurfaceVariant),
                       ),
                       const SizedBox(height: 24),
                       ElevatedButton(
@@ -144,15 +144,12 @@ class _WishlistScreenState extends State<WishlistScreen> {
                           ScaffoldMessenger.of(context).hideCurrentSnackBar();
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('${item['name']} added to cart!'),
-                              duration: const Duration(milliseconds: 1500),
+                              content: const Text('Added to cart!'),
+                              duration: const Duration(milliseconds: 2000),
                               behavior: SnackBarBehavior.floating,
                               backgroundColor: colorScheme.primary,
-                              action: SnackBarAction(
-                                label: 'View',
-                                textColor: Colors.white,
-                                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => CartScreen())),
-                              ),
+                              margin: const EdgeInsets.all(16),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                           );
                         },
