@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../main.dart';
+import 'auth_screen.dart';
+import 'dart:ui';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -16,17 +17,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     OnboardingPage(
       title: 'Ancient Wisdom',
       description: 'Discover time-tested Ayurvedic formulations crafted for modern life.',
-      icon: Icons.auto_awesome,
+      imageUrl: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80&w=1000',
     ),
     OnboardingPage(
       title: '100% Natural Purity',
       description: 'Organic, cruelty-free, and sustainably sourced ingredients for your wellness.',
-      icon: Icons.eco,
+      imageUrl: 'https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?auto=format&fit=crop&q=80&w=1000',
     ),
     OnboardingPage(
       title: 'Find Your Balance',
       description: 'Identify your unique Dosha and embark on a personalized healing journey.',
-      icon: Icons.self_improvement,
+      imageUrl: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&q=80&w=1000',
     ),
   ];
 
@@ -34,19 +35,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              colorScheme.surface,
-              colorScheme.primary.withValues(alpha: 0.2),
-            ],
-          ),
-        ),
-        child: Stack(
+      body: Stack(
         children: [
+          // Background Images with PageView
           PageView.builder(
             controller: _pageController,
             itemCount: _pages.length,
@@ -56,87 +47,163 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               });
             },
             itemBuilder: (context, index) {
-              return OnboardingContent(page: _pages[index]);
+              return AnimatedOpacity(
+                duration: const Duration(milliseconds: 500),
+                opacity: _currentPage == index ? 1.0 : 0.0,
+                child: Image.network(
+                  _pages[index].imageUrl,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: double.infinity,
+                ),
+              );
             },
           ),
-          Positioned(
-            bottom: 60,
-            left: 20,
-            right: 20,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
+          // Content Overlay
+          SafeArea(
+            child: Column(
               children: [
-                Row(
-                  children: List.generate(
-                    _pages.length,
-                    (index) => buildDot(index, colorScheme),
+                // Top Bar
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Image.asset(
+                        'assets/images/kosmicologo.png',
+                        height: 40,
+                        errorBuilder: (context, error, stackTrace) => const SizedBox(width: 40),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(builder: (context) => const AuthScreen()),
+                          );
+                        },
+                        child: const Text(
+                          'Skip',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            shadows: [Shadow(blurRadius: 10, color: Colors.black)],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                ElevatedButton(
-                  onPressed: () {
-                    if (_currentPage == _pages.length - 1) {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (context) => const HomeScreen(title: 'Kosmico Wellness'),
+                
+                const Spacer(),
+
+                // Bottom Content Card (Glassmorphism)
+                Container(
+                  margin: const EdgeInsets.all(24),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(30),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(
+                        padding: const EdgeInsets.all(32),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.2),
+                          ),
                         ),
-                      );
-                    } else {
-                      _pageController.nextPage(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeIn,
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colorScheme.secondary,
-                    foregroundColor: colorScheme.onSecondary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _pages[_currentPage].title,
+                              style: const TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                height: 1.2,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              _pages[_currentPage].description,
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.white.withOpacity(0.9),
+                                height: 1.5,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 40),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: List.generate(
+                                    _pages.length,
+                                    (index) => buildDot(index, colorScheme),
+                                  ),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    if (_currentPage == _pages.length - 1) {
+                                      Navigator.of(context).pushReplacement(
+                                        MaterialPageRoute(
+                                          builder: (context) => const AuthScreen(),
+                                        ),
+                                      );
+                                    } else {
+                                      _pageController.nextPage(
+                                        duration: const Duration(milliseconds: 600),
+                                        curve: Curves.easeInOutQuart,
+                                      );
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: colorScheme.primary,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 32, 
+                                      vertical: 16
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                  child: Text(
+                                    _currentPage == _pages.length - 1 ? 'Get Started' : 'Next',
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                  ),
-                  child: Text(
-                    _currentPage == _pages.length - 1 ? 'Get Started' : 'Next',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
             ),
           ),
-          Positioned(
-            top: 50,
-            right: 20,
-            child: TextButton(
-              onPressed: () {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (context) => const HomeScreen(title: 'Kosmico Wellness'),
-                  ),
-                );
-              },
-              child: Text(
-                'Skip',
-                style: TextStyle(color: colorScheme.onSurfaceVariant),
-              ),
-            ),
-          ),
         ],
       ),
-    ),
     );
   }
 
   Widget buildDot(int index, ColorScheme colorScheme) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 300),
       margin: const EdgeInsets.only(right: 8),
       height: 8,
-      width: _currentPage == index ? 24 : 8,
+      width: _currentPage == index ? 32 : 8,
       decoration: BoxDecoration(
         color: _currentPage == index 
-            ? colorScheme.primary 
-            : colorScheme.primary.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(4),
+            ? Colors.white 
+            : Colors.white.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(10),
       ),
     );
   }
@@ -145,55 +212,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 class OnboardingPage {
   final String title;
   final String description;
-  final IconData icon;
+  final String imageUrl;
 
   OnboardingPage({
     required this.title,
     required this.description,
-    required this.icon,
+    required this.imageUrl,
   });
-}
-
-class OnboardingContent extends StatelessWidget {
-  final OnboardingPage page;
-
-  const OnboardingContent({super.key, required this.page});
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.all(40.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            page.icon,
-            size: 150,
-            color: colorScheme.primary,
-          ),
-          const SizedBox(height: 60),
-          Text(
-            page.title,
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: colorScheme.primary,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 20),
-          Text(
-            page.description,
-            style: TextStyle(
-              fontSize: 16,
-              color: colorScheme.onSurfaceVariant,
-              height: 1.5,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
 }
