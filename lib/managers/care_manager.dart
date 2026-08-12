@@ -12,9 +12,14 @@ class CareManager extends ChangeNotifier {
   late SharedPreferences _prefs;
   bool _isInitialized = false;
 
-  // Local-only data (backup/contacts)
+  // Local-only data (backup/contacts/lifestyle)
   List<Map<String, dynamic>> _contacts = [];
+  int _waterIntake = 0; // in ml
+  int _stressLevel = 0; // 0-5 scale (0 means not logged)
+  
   List<Map<String, dynamic>> get contacts => _contacts;
+  int get waterIntake => _waterIntake;
+  int get stressLevel => _stressLevel;
 
   // Server-synced data
   Map<String, dynamic> _dashboardMetrics = <String, dynamic>{};
@@ -57,6 +62,9 @@ class CareManager extends ChangeNotifier {
     if (_isInitialized) return;
     _prefs = await SharedPreferences.getInstance();
     _contacts = _loadList('care_contacts');
+    
+    // Load lifestyle data with daily reset logic
+    _loadLifestyleData();
     
     final bool hasContacts = _contacts != null && _contacts.length > 0;
     if (!hasContacts) {
@@ -169,6 +177,36 @@ class CareManager extends ChangeNotifier {
     }
   }
 
+  // Lifestyle methods
+  void _loadLifestyleData() {
+    final String today = DateTime.now().toString().split(' ')[0];
+    final String lastLoggedDate = _prefs.getString('last_lifestyle_date') ?? '';
+    
+    if (lastLoggedDate != today) {
+      // New day, reset local metrics
+      _waterIntake = 0;
+      _stressLevel = 0;
+      _prefs.setString('last_lifestyle_date', today);
+      _prefs.setInt('daily_water', 0);
+      _prefs.setInt('daily_stress', 0);
+    } else {
+      _waterIntake = _prefs.getInt('daily_water') ?? 0;
+      _stressLevel = _prefs.getInt('daily_stress') ?? 0;
+    }
+  }
+
+  Future<void> addWater(int amount) async {
+    _waterIntake += amount;
+    await _prefs.setInt('daily_water', _waterIntake);
+    notifyListeners();
+  }
+
+  Future<void> setStressLevel(int level) async {
+    _stressLevel = level;
+    await _prefs.setInt('daily_stress', _stressLevel);
+    notifyListeners();
+  }
+
   String generateClinicalReport() {
     final StringBuffer report = StringBuffer();
     report.writeln('KOSMICO WELLNESS - CLINICAL REPORT');
@@ -179,6 +217,16 @@ class CareManager extends ChangeNotifier {
     report.writeln('Estimated A1C: ${estimatedA1C.toStringAsFixed(2)}%');
     report.writeln('Time in Range: ${timeInRangePercentage.toStringAsFixed(1)}%');
     
+    report.writeln('\nLIFESTYLE METRICS (TODAY):');
+    report.writeln('Water Intake: $_waterIntake ml');
+    String stressDesc = 'Not Logged';
+    if (_stressLevel == 1) stressDesc = 'Very Low';
+    else if (_stressLevel == 2) stressDesc = 'Low';
+    else if (_stressLevel == 3) stressDesc = 'Moderate';
+    else if (_stressLevel == 4) stressDesc = 'High';
+    else if (_stressLevel == 5) stressDesc = 'Very High';
+    report.writeln('Stress Level: $stressDesc');
+
     report.writeln('\nRECENT MEALS:');
     for (var meal in _mealMarkers.reversed.take(10)) {
       report.writeln('${meal['mealType']}: ${meal['carbs']}g carbs (${meal['logTime'].split('T')[0]})');

@@ -106,7 +106,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _selectedIndex = 0;
   String _selectedHomeCategory = 'All';
-  List<String> _homeCategories = ['All'];
+  List<Map<String, dynamic>> _homeCategories = [{'name': 'All', '_id': 'All'}];
   String _homeSearchQuery = '';
   
   Map<String, dynamic>? _updateData;
@@ -153,7 +153,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // Filter by Category
     if (_selectedHomeCategory != 'All') {
       products = products.where((product) {
-        return product['category']?.toString().toLowerCase() == _selectedHomeCategory.toLowerCase();
+        final String cat = (product['category'] ?? '').toString().toLowerCase();
+        final String selected = _selectedHomeCategory.toLowerCase();
+        
+        // Exact match
+        if (cat == selected) return true;
+        
+        // Handle plural/singular mismatches (e.g., Herbals vs Herbal)
+        if (cat.contains(selected) || selected.contains(cat)) return true;
+
+        // Handle common typos (Essesntials vs Essential)
+        if ((selected.contains('essential') || selected.contains('essesntial')) && 
+            (cat.contains('essential') || cat.contains('essesntial'))) return true;
+
+        return false;
       }).toList();
     }
 
@@ -182,10 +195,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final result = await ApiService.getCategories();
       if (result['success'] == true && result['data'] != null) {
         final List<dynamic> categoriesData = result['data'];
-        final List<String> fetchedCategories = ['All'];
+        final List<Map<String, dynamic>> fetchedCategories = [{'name': 'All', '_id': 'All'}];
         for (var item in categoriesData) {
-          if (item['name'] != null) {
-            fetchedCategories.add(item['name'].toString());
+          if (item is Map<String, dynamic>) {
+            fetchedCategories.add(item);
           }
         }
         setState(() {
@@ -200,7 +213,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _fetchProducts() async {
     setState(() => _isLoadingProducts = true);
     try {
-      final result = await ApiService.getProducts();
+      // Find the ID for the selected category name
+      String? categoryId;
+      if (_selectedHomeCategory != 'All') {
+        final catObj = _homeCategories.firstWhere(
+          (c) => c['name'] == _selectedHomeCategory,
+          orElse: () => {},
+        );
+        categoryId = catObj['_id']?.toString() ?? catObj['id']?.toString();
+      }
+
+      final result = await ApiService.getProducts(category: categoryId ?? 'All');
       if (result['success'] == true && result['data'] != null) {
         setState(() {
           _apiProducts = List<Map<String, dynamic>>.from(result['data']);
@@ -424,10 +447,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: _homeCategories.length,
               itemBuilder: (context, index) {
-                final category = _homeCategories[index];
+                final catObj = _homeCategories[index];
+                final String name = catObj['name'] ?? 'All';
                 return _buildCategoryChip(
-                  category,
-                  _selectedHomeCategory == category,
+                  name,
+                  _selectedHomeCategory == name,
                   colorScheme,
                 );
               },
@@ -714,10 +738,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildCategoryChip(String label, bool isSelected, ColorScheme colorScheme) {
+    String displayName = label;
+    if (displayName == 'Essesntials Oils') displayName = 'Essential Oils';
+
     return GestureDetector(
       onTap: () {
         setState(() {
           _selectedHomeCategory = label;
+          _fetchProducts(); // Refresh products on category change
         });
       },
       child: Container(
@@ -741,7 +769,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
         alignment: Alignment.center,
         child: Text(
-          label,
+          displayName,
           style: TextStyle(
             color: isSelected ? Colors.white : colorScheme.primary,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,

@@ -11,10 +11,12 @@ class LogEntryModule extends StatefulWidget {
 class _LogEntryModuleState extends State<LogEntryModule> {
   final TextEditingController _glucoseController = TextEditingController();
   final TextEditingController _carbsController = TextEditingController();
+  final TextEditingController _waterController = TextEditingController();
   
   String _selectedTimeOfDay = 'Day';
   String _selectedReadingType = 'Post-Meal';
   String _selectedMealType = 'Lunch';
+  int _selectedStressLevel = 0;
 
   bool _isSaving = false;
 
@@ -22,34 +24,55 @@ class _LogEntryModuleState extends State<LogEntryModule> {
   void dispose() {
     _glucoseController.dispose();
     _carbsController.dispose();
+    _waterController.dispose();
     super.dispose();
   }
 
   Future<void> _saveEntries() async {
     setState(() => _isSaving = true);
-    bool success = false;
+    final manager = CareManager();
+    bool anySuccess = false;
 
     if (_glucoseController.text.isNotEmpty) {
       final val = double.tryParse(_glucoseController.text);
       if (val != null) {
-        success = await CareManager().addGlucoseLog(val, _selectedTimeOfDay, _selectedReadingType);
+        anySuccess = await manager.addGlucoseLog(val, _selectedTimeOfDay, _selectedReadingType);
       }
     }
     
     if (_carbsController.text.isNotEmpty) {
       final val = double.tryParse(_carbsController.text);
       if (val != null) {
-        success = await CareManager().addMealLog(_selectedMealType, val);
+        anySuccess = await manager.addMealLog(_selectedMealType, val);
       }
+    }
+
+    if (_waterController.text.isNotEmpty) {
+      final val = int.tryParse(_waterController.text);
+      if (val != null) {
+        await manager.addWater(val);
+        anySuccess = true;
+      }
+    }
+
+    if (_selectedStressLevel > 0) {
+      await manager.setStressLevel(_selectedStressLevel);
+      anySuccess = true;
     }
 
     if (mounted) {
       setState(() => _isSaving = false);
-      if (success) {
+      if (anySuccess) {
         _glucoseController.clear();
         _carbsController.clear();
+        _waterController.clear();
+        setState(() => _selectedStressLevel = 0);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Logs synced with server successfully!'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('Lifestyle logs updated successfully!'), backgroundColor: Colors.green),
+        );
+      } else if (_glucoseController.text.isEmpty && _carbsController.text.isEmpty && _waterController.text.isEmpty && _selectedStressLevel == 0) {
+         ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter at least one log.'), backgroundColor: Colors.orange),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -89,6 +112,38 @@ class _LogEntryModuleState extends State<LogEntryModule> {
             _buildLogItem('Carbs', 'grams', Icons.restaurant, Colors.orange, colorScheme, _carbsController),
             const SizedBox(height: 8),
             _buildDropdown('Meal Type', ['Breakfast', 'Lunch', 'Dinner', 'Snack'], _selectedMealType, (v) => setState(() => _selectedMealType = v!)),
+          ], colorScheme),
+
+          const SizedBox(height: 24),
+          
+          _buildLogCategory('Lifestyle Data', [
+            _buildLogItem('Water', 'ml', Icons.water_drop, Colors.blue, colorScheme, _waterController),
+            const SizedBox(height: 16),
+            const Text('Stress Level', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: List.generate(5, (index) {
+                final int l = index + 1;
+                final bool isSelected = _selectedStressLevel == l;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedStressLevel = l),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: isSelected ? colorScheme.primary.withValues(alpha: 0.1) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: isSelected ? colorScheme.primary : Colors.grey.withValues(alpha: 0.2)),
+                    ),
+                    child: Text(
+                      _getStressEmoji(l),
+                      style: const TextStyle(fontSize: 20),
+                    ),
+                  ),
+                );
+              }),
+            ),
           ], colorScheme),
 
           const SizedBox(height: 32),
@@ -144,7 +199,7 @@ class _LogEntryModuleState extends State<LogEntryModule> {
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.onSurface.withOpacity(0.1)),
+        border: Border.all(color: colorScheme.onSurface.withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [
@@ -171,5 +226,16 @@ class _LogEntryModuleState extends State<LogEntryModule> {
         ],
       ),
     );
+  }
+
+  String _getStressEmoji(int level) {
+    switch (level) {
+      case 1: return '😊';
+      case 2: return '🙂';
+      case 3: return '😐';
+      case 4: return '😟';
+      case 5: return '😫';
+      default: return '❓';
+    }
   }
 }

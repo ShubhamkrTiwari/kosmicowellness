@@ -20,7 +20,7 @@ class ProductListScreen extends StatefulWidget {
 class ProductListScreenState extends State<ProductListScreen> {
   String _selectedCategory = 'All';
   String _searchQuery = '';
-  List<String> _categories = ['All'];
+  List<Map<String, dynamic>> _categories = [{'name': 'All', '_id': 'All'}];
 
   late FilterOptions _filterOptions;
 
@@ -89,10 +89,10 @@ class ProductListScreenState extends State<ProductListScreen> {
       final result = await ApiService.getCategories();
       if (result['success'] == true && result['data'] != null) {
         final List<dynamic> categoriesData = result['data'];
-        final List<String> fetchedCategories = ['All'];
+        final List<Map<String, dynamic>> fetchedCategories = [{'name': 'All', '_id': 'All'}];
         for (var item in categoriesData) {
-          if (item['name'] != null) {
-            fetchedCategories.add(item['name'].toString());
+          if (item is Map<String, dynamic>) {
+            fetchedCategories.add(item);
           }
         }
         setState(() {
@@ -116,10 +116,20 @@ class ProductListScreenState extends State<ProductListScreen> {
     }
 
     try {
+      // Find the ID for the selected category name
+      String? categoryId;
+      if (_selectedCategory != 'All') {
+        final catObj = _categories.firstWhere(
+          (c) => c['name'] == _selectedCategory,
+          orElse: () => {},
+        );
+        categoryId = catObj['_id']?.toString() ?? catObj['id']?.toString();
+      }
+
       final result = await ApiService.getProducts(
         page: isInitial ? 1 : _currentPage + 1,
         limit: _pageSize,
-        category: _selectedCategory,
+        category: categoryId ?? 'All',
         search: _searchQuery,
         sortBy: _filterOptions.sortBy,
         minPrice: _filterOptions.minPrice,
@@ -153,9 +163,37 @@ class ProductListScreenState extends State<ProductListScreen> {
   }
 
   List<Map<String, dynamic>> get _filteredProducts {
-    // Note: Filtering is now handled server-side via ApiService.getProducts parameters
-    // We just return _apiProducts which already has the server-side filtered data
-    return _apiProducts;
+    List<Map<String, dynamic>> products = _apiProducts;
+
+    // Double check filtering locally to ensure UI consistency
+    if (_selectedCategory != 'All') {
+      products = products.where((product) {
+        final String cat = (product['category'] ?? '').toString().toLowerCase();
+        final String selected = _selectedCategory.toLowerCase();
+        
+        // Exact match
+        if (cat == selected) return true;
+        
+        // Handle plural/singular mismatches (e.g., Herbals vs Herbal, Oils vs Oil)
+        if (cat.contains(selected) || selected.contains(cat)) return true;
+        
+        // Handle common typos (Essesntials vs Essential)
+        if ((selected.contains('essential') || selected.contains('essesntial')) && 
+            (cat.contains('essential') || cat.contains('essesntial'))) return true;
+        
+        return false;
+      }).toList();
+    }
+
+    // Immediate search filtering while debounce is active
+    if (_searchQuery.isNotEmpty) {
+      products = products.where((product) {
+        final name = (product['name'] ?? '').toString().toLowerCase();
+        return name.contains(_searchQuery.toLowerCase());
+      }).toList();
+    }
+
+    return products;
   }
 
   @override
@@ -333,14 +371,19 @@ class ProductListScreenState extends State<ProductListScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: _categories.length,
         itemBuilder: (context, index) {
-          final category = _categories[index];
-          final isSelected = _selectedCategory == category;
+          final catObj = _categories[index];
+          final String name = catObj['name'] ?? 'All';
+          final isSelected = _selectedCategory == name;
+          
+          String displayName = name;
+          if (displayName == 'Essesntials Oils') displayName = 'Essential Oils';
+
           return Padding(
             padding: const EdgeInsets.only(right: 12),
             child: GestureDetector(
               onTap: () {
                 setState(() {
-                  _selectedCategory = category;
+                  _selectedCategory = name;
                   _fetchProducts(isInitial: true);
                 });
               },
@@ -355,7 +398,7 @@ class ProductListScreenState extends State<ProductListScreen> {
                 ),
                 alignment: Alignment.center,
                 child: Text(
-                  category,
+                  displayName,
                   style: TextStyle(
                     color: isSelected ? Colors.white : colorScheme.onSurfaceVariant,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,

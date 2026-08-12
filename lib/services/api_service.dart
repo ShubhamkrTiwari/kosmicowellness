@@ -1023,7 +1023,9 @@ class ApiService {
   }) async {
     try {
       String query = 'page=$page&limit=$limit';
-      if (category != null && category != 'All') query += '&category=${Uri.encodeComponent(category)}';
+      if (category != null && category != 'All') {
+        query += '&category=${Uri.encodeComponent(category)}';
+      }
       if (search != null && search.isNotEmpty) query += '&search=${Uri.encodeComponent(search)}';
       if (sortBy != null) query += '&sortBy=${Uri.encodeComponent(sortBy)}';
       if (minPrice != null) query += '&minPrice=$minPrice';

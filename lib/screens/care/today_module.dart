@@ -52,6 +52,8 @@ class _TodayModuleState extends State<TodayModule> {
                 const SizedBox(height: 24),
                 _buildStatCards(colorScheme, manager),
                 const SizedBox(height: 24),
+                _buildLifestyleTrackers(colorScheme, manager),
+                const SizedBox(height: 24),
                 _buildMealMarkers(colorScheme, manager),
               ],
             ),
@@ -134,9 +136,9 @@ class _TodayModuleState extends State<TodayModule> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: colorScheme.primary.withOpacity(0.1)),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,9 +187,9 @@ class _TodayModuleState extends State<TodayModule> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -199,6 +201,168 @@ class _TodayModuleState extends State<TodayModule> {
         ],
       ),
     );
+  }
+
+  Widget _buildLifestyleTrackers(ColorScheme colorScheme, CareManager manager) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Lifestyle Trackers', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            TextButton(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('About Lifestyle Tracking'),
+                    content: const Text(
+                      'Hydration and stress levels significantly impact blood sugar dynamics. Dehydration can lead to higher glucose concentration, while stress hormones like cortisol can trigger glucose release from the liver.',
+                    ),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Got it')),
+                    ],
+                  ),
+                );
+              },
+              child: const Text('Why this?', style: TextStyle(fontSize: 12)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(child: _buildHydrationCard(colorScheme, manager)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildStressCard(colorScheme, manager)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHydrationCard(ColorScheme colorScheme, CareManager manager) {
+    final int water = manager.waterIntake;
+    final double progress = (water / 2000).clamp(0.0, 1.0);
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.blue.withValues(alpha: 0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Icon(Icons.water_drop, color: Colors.blue, size: 20),
+              Text('${(progress * 100).toInt()}%', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text('Hydration', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          Text('$water / 2000 ml', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Colors.blue.withValues(alpha: 0.1),
+              valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+              minHeight: 6,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => manager.addWater(250),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(0, 32),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+              ),
+              child: const Text('+250ml', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStressCard(ColorScheme colorScheme, CareManager manager) {
+    final int level = manager.stressLevel;
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.deepPurple.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.deepPurple.withValues(alpha: 0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.psychology, color: Colors.deepPurple, size: 20),
+          const SizedBox(height: 12),
+          const Text('Stress Level', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          Text(level == 0 ? 'Not logged' : _getStressLabel(level), style: const TextStyle(fontSize: 10, color: Colors.grey)),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(5, (index) {
+              final int l = index + 1;
+              final bool isSelected = level == l;
+              return GestureDetector(
+                onTap: () => manager.setStressLevel(l),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: isSelected ? Colors.deepPurple : Colors.transparent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    _getStressEmoji(l),
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 12),
+          const Text('Tap to log', style: TextStyle(fontSize: 8, color: Colors.grey, fontStyle: FontStyle.italic)),
+        ],
+      ),
+    );
+  }
+
+  String _getStressEmoji(int level) {
+    switch (level) {
+      case 1: return '😊';
+      case 2: return '🙂';
+      case 3: return '😐';
+      case 4: return '😟';
+      case 5: return '😫';
+      default: return '❓';
+    }
+  }
+
+  String _getStressLabel(int level) {
+    switch (level) {
+      case 1: return 'Very Low';
+      case 2: return 'Low';
+      case 3: return 'Moderate';
+      case 4: return 'High';
+      case 5: return 'Extreme';
+      default: return '';
+    }
   }
 
   Widget _buildMealMarkers(ColorScheme colorScheme, CareManager manager) {
@@ -247,7 +411,7 @@ class _TodayModuleState extends State<TodayModule> {
   Widget _buildMealItem(String title, String time, String detail, IconData icon, ColorScheme colorScheme) {
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: colorScheme.primary.withOpacity(0.1),
+        backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
         child: Icon(icon, color: colorScheme.primary, size: 20),
       ),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
@@ -294,7 +458,7 @@ class GlucosePainter extends CustomPainter {
 
     canvas.drawPath(path, paint);
 
-    final rangePaint = Paint()..color = color.withOpacity(0.05);
+    final rangePaint = Paint()..color = color.withValues(alpha: 0.05);
     double yTop = size.height - ((140 - 40) / 160) * size.height;
     double yBottom = size.height - ((70 - 40) / 160) * size.height;
     canvas.drawRect(Rect.fromLTRB(0, yTop, size.width, yBottom), rangePaint);
