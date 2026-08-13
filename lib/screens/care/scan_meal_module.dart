@@ -1,7 +1,8 @@
 import 'dart:io';
-import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
 import '../../managers/care_manager.dart';
 
 class ScanMealModule extends StatefulWidget {
@@ -17,8 +18,30 @@ class _ScanMealModuleState extends State<ScanMealModule> {
   XFile? _capturedImage;
   final ImagePicker _picker = ImagePicker();
   Map<String, dynamic>? _currentFoodData;
+  ImageLabeler? _imageLabeler;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!kIsWeb) {
+      _imageLabeler = ImageLabeler(options: ImageLabelerOptions(confidenceThreshold: 0.5));
+    }
+  }
+
+  @override
+  void dispose() {
+    _imageLabeler?.close();
+    super.dispose();
+  }
 
   Future<void> _startScan() async {
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Scanning is only supported on Android/iOS devices.')),
+      );
+      return;
+    }
+
     try {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.camera,
@@ -34,22 +57,68 @@ class _ScanMealModuleState extends State<ScanMealModule> {
           _showResult = false;
         });
         
-        // High-fidelity simulation of AI analysis picking a random starting point
-        await Future.delayed(const Duration(seconds: 3));
+        final inputImage = InputImage.fromFilePath(image.path);
+        final labels = await _imageLabeler!.processImage(inputImage);
         
         if (mounted) {
-          final db = CareManager().foodDatabase;
-          setState(() {
-            _isScanning = false;
-            _showResult = true;
-            // Pick a random guess from DB
-            _currentFoodData = db[Random().nextInt(db.length)];
-          });
+          _matchFoodWithLocalDatabase(labels);
         }
       }
     } catch (e) {
-      debugPrint('Camera Error: $e');
+      debugPrint('Scan Error: $e');
+      if (mounted) {
+        setState(() => _isScanning = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e. Please re-run the app.')),
+        );
+      }
     }
+  }
+
+  void _matchFoodWithLocalDatabase(List<ImageLabel> labels) {
+    final db = CareManager().foodDatabase;
+    Map<String, dynamic>? match;
+
+    // Check for direct matches in our database
+    for (var label in labels) {
+      final labelText = label.label.toLowerCase();
+      
+      // Find food in our local DB that matches the ML label
+      for (var food in db) {
+        final foodName = food['name'].toString().toLowerCase();
+        if (foodName.contains(labelText) || labelText.contains(foodName)) {
+          match = food;
+          break;
+        }
+      }
+      if (match != null) break;
+    }
+
+    // Smart fallback if no direct match
+    if (match == null && labels.isNotEmpty) {
+      final String allLabels = labels.map((l) => l.label.toLowerCase()).join(' ');
+      
+      if (allLabels.contains('bottle') || allLabels.contains('water') || allLabels.contains('plastic')) {
+        match = db.firstWhere((f) => f['name'] == 'Water (Bottle)');
+      } else if (allLabels.contains('fruit') || allLabels.contains('apple')) {
+        match = db.firstWhere((f) => f['name'] == 'Apple (Medium)');
+      } else if (allLabels.contains('juice') || allLabels.contains('drink') || allLabels.contains('beverage')) {
+        match = db.firstWhere((f) => f['name'] == 'Real Guava Juice');
+      } else if (allLabels.contains('bread') || allLabels.contains('dough')) {
+        match = db.firstWhere((f) => f['name'] == 'Paneer Paratha');
+      } else if (allLabels.contains('food') || allLabels.contains('dish') || allLabels.contains('cuisine')) {
+        match = db.firstWhere((f) => f['name'] == 'Dal Tadka & Rice');
+      } else {
+        // Definitely not food? 
+        match = null; 
+      }
+    }
+
+    setState(() {
+      _isScanning = false;
+      _showResult = true;
+      _currentFoodData = match;
+    });
   }
 
   void _showFoodCorrectionDialog() {
@@ -95,7 +164,7 @@ class _ScanMealModuleState extends State<ScanMealModule> {
         children: [
           _buildScannerView(colorScheme),
           const SizedBox(height: 24),
-          if (_showResult && _currentFoodData != null) _buildResultView(colorScheme),
+          if (_showResult) _buildResultView(colorScheme),
           if (!_isScanning && !_showResult) _buildInstructions(colorScheme),
         ],
       ),
@@ -109,26 +178,33 @@ class _ScanMealModuleState extends State<ScanMealModule> {
       decoration: BoxDecoration(
         color: Colors.black,
         borderRadius: BorderRadius.circular(24),
-        image: (_capturedImage != null && !_isScanning) 
-          ? DecorationImage(image: FileImage(File(_capturedImage!.path)), fit: BoxFit.cover)
-          : null,
       ),
       child: Stack(
         alignment: Alignment.center,
         children: [
-          if (_capturedImage == null)
+          if (_capturedImage != null && !_isScanning)
+             ClipRRect(
+               borderRadius: BorderRadius.circular(24),
+               child: kIsWeb 
+                ? Image.network(_capturedImage!.path, fit: BoxFit.cover, width: double.infinity, height: double.infinity)
+                : Image.file(File(_capturedImage!.path), fit: BoxFit.cover, width: double.infinity, height: double.infinity),
+             ),
+
+          if (_capturedImage == null && !_isScanning)
             const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 48),
           
           if (_isScanning) ...[
              if (_capturedImage != null)
                 Opacity(
                   opacity: 0.5,
-                  child: Image.file(File(_capturedImage!.path), fit: BoxFit.cover, width: double.infinity, height: double.infinity),
+                  child: kIsWeb
+                    ? Image.network(_capturedImage!.path, fit: BoxFit.cover, width: double.infinity, height: double.infinity)
+                    : Image.file(File(_capturedImage!.path), fit: BoxFit.cover, width: double.infinity, height: double.infinity),
                 ),
              _buildScanAnimation(colorScheme),
              const Positioned(
                top: 40,
-               child: Text('AI ANALYZING...', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 2)),
+               child: Text('AI RECOGNIZING...', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 2)),
              ),
           ],
 
@@ -170,7 +246,7 @@ class _ScanMealModuleState extends State<ScanMealModule> {
         );
       },
       onEnd: () {
-        if (_isScanning) setState(() {}); // Loop animation
+        if (_isScanning) setState(() {});
       },
     );
   }
@@ -201,7 +277,7 @@ class _ScanMealModuleState extends State<ScanMealModule> {
             ],
           ),
           const SizedBox(height: 4),
-          Text('AI suggests: ${food['name']}', style: TextStyle(fontSize: 14, color: Colors.grey[700])),
+          Text('Best local match: ${food['name']}', style: TextStyle(fontSize: 14, color: Colors.grey[700])),
           const SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -315,26 +315,29 @@ class _TodayModuleState extends State<TodayModule> {
           const Text('Stress Level', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
           Text(level == 0 ? 'Not logged' : _getStressLabel(level), style: const TextStyle(fontSize: 10, color: Colors.grey)),
           const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(5, (index) {
-              final int l = index + 1;
-              final bool isSelected = level == l;
-              return GestureDetector(
-                onTap: () => manager.setStressLevel(l),
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: isSelected ? Colors.deepPurple : Colors.transparent,
-                    shape: BoxShape.circle,
+          SizedBox(
+            width: double.infinity,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              children: List.generate(5, (index) {
+                final int l = index + 1;
+                final bool isSelected = level == l;
+                return GestureDetector(
+                  onTap: () => manager.setStressLevel(l),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: isSelected ? Colors.deepPurple : Colors.transparent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      _getStressEmoji(l),
+                      style: const TextStyle(fontSize: 14),
+                    ),
                   ),
-                  child: Text(
-                    _getStressEmoji(l),
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                ),
-              );
-            }),
+                );
+              }),
+            ),
           ),
           const SizedBox(height: 12),
           const Text('Tap to log', style: TextStyle(fontSize: 8, color: Colors.grey, fontStyle: FontStyle.italic)),

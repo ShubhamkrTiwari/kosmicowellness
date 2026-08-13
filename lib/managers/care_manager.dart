@@ -293,5 +293,14 @@ class CareManager extends ChangeNotifier {
       'spikeRisk': 'High',
       'swap': 'Dal with Cauliflower Rice / Quinoa',
     },
+    {
+      'name': 'Water (Bottle)',
+      'carbs': 0.0,
+      'netCarbs': 0.0,
+      'gi': 'None',
+      'gl': 'None',
+      'spikeRisk': 'None',
+      'swap': 'Great choice! Stay hydrated.',
+    },
   ];
 }

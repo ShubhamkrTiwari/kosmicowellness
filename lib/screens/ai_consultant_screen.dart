@@ -14,7 +14,7 @@ class _AiConsultantScreenState extends State<AiConsultantScreen> {
   final ScrollController _scrollController = ScrollController();
   final List<Map<String, dynamic>> _messages = [];
   bool _isTyping = false;
-  String? _lastTopic; // Context tracking
+  String? _lastTopic;
 
   final List<String> _suggestions = [
     'Hair Fall Problem',
@@ -57,13 +57,13 @@ class _AiConsultantScreenState extends State<AiConsultantScreen> {
     if (text == null) _controller.clear();
     _scrollToBottom();
 
-    // Simulate AI delay and response
-    Future.delayed(const Duration(milliseconds: 1500), () {
+    // Fast local response simulation
+    Future.delayed(const Duration(milliseconds: 800), () {
       if (mounted) {
         setState(() {
           _isTyping = false;
           _messages.add({
-            'text': _getAiResponse(messageText),
+            'text': _getSmartLocalResponse(messageText),
             'isMe': false,
             'time': DateTime.now(),
           });
@@ -77,7 +77,7 @@ class _AiConsultantScreenState extends State<AiConsultantScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
-          0.0, // Because ListView is reversed
+          0.0,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
@@ -85,28 +85,20 @@ class _AiConsultantScreenState extends State<AiConsultantScreen> {
     });
   }
 
-  String _getAiResponse(String message) {
+  String _getSmartLocalResponse(String message) {
     message = message.toLowerCase();
     
-    // Check for specific price query first if context exists
-    if ((message.contains('price') || message.contains('cost') || message.contains('kitne ka')) && _lastTopic != null) {
-      if (_lastTopic == 'digestion') return 'Digestion products jaise Liver Care ₹399 aur Triphala ₹249 se shuru hote hain. Aap "Products" tab mein check kar sakte hain.';
-      if (_lastTopic == 'hair') return 'Hair care range ₹299 (Oils) se lekar ₹899 (Combo kits) tak aati hai. Current deals ke liye "Products" section dekhein.';
-      if (_lastTopic == 'skin') return 'Kumkumadi Tailam ₹549 ka hai aur serums ₹499 se shuru hote hain. Offers ke liye "Coupons" section check karein.';
-      if (_lastTopic == 'weight') return 'Slim Detox tea ₹349 ki hai aur ACV ₹450 ka. Dono saath lene par 10% off mil sakta hai.';
-    }
-
     // 1. Digestion & Stomach Issues
     if (message.contains('pet') || message.contains('stomach') || message.contains('pait') || 
         message.contains('digestion') || message.contains('gas') || message.contains('acidity')) {
       _lastTopic = 'digestion';
-      return 'Pet ki samasyaon ke liye hamara "Digestion Care" range best hai. Acidity aur gas ke liye hamara Triphala Churan ya Liver Care Syrup try karein. Ye natural tarike se pet saaf rakhta hai.';
+      return 'Pet ki samasyaon ke liye hamara "Digestion Care" range best hai. Acidity aur gas ke liye hamara Triphala Churan ya Liver Care Syrup try karein. Ye natural tarike se pet saaf rakhta hai. Kya aapko constipation bhi hai?';
     }
 
     // 2. Hair Care
     if (message.contains('hair') || message.contains('baal') || message.contains('kesh') || message.contains('fall')) {
       _lastTopic = 'hair';
-      return 'Baalo ke jhadne (Hair fall) ya dandruff ke liye hamara Ayurvedic Hair Oil aur Onion Shampoo kaafi effective hai. Isme Bhringraj aur Amla hai jo jadon ko mazboot banata hai.';
+      return 'Baalo ke jhadne (Hair fall) ke liye hamara Ayurvedic Hair Oil aur Onion Shampoo kaafi effective hai. Isme Bhringraj aur Amla hai jo jadon ko mazboot banata hai. Stress bhi hair fall ka reason ho sakta hai.';
     }
 
     // 3. Skin & Glow
@@ -118,39 +110,27 @@ class _AiConsultantScreenState extends State<AiConsultantScreen> {
     // 4. Weight Management
     if (message.contains('weight') || message.contains('vajan') || message.contains('fat') || message.contains('motapa') || message.contains('slim')) {
       _lastTopic = 'weight';
-      return 'Vajan ghatane ke liye hamara "Slim Detox" powder aur Apple Cider Vinegar (ACV) kaafi asardaar hai. Ye metabolism badhata hai. Kya aap yoga ya exercise karte hain?';
+      return 'Vajan ghatane ke liye hamara "Slim Detox" powder aur Apple Cider Vinegar (ACV) kaafi asardaar hai. Ye metabolism badhata hai. Saath hi subah garam paani aur thoda yoga zarur karein.';
     }
 
-    // 5. Pricing general
-    if (message.contains('price') || message.contains('keemat') || message.contains('daam') || message.contains('cost') || message.contains('kitne ka')) {
-      return 'Hamare products ki keemat unki quality aur ingredients par depend karti hai. Zyadatar items ₹249 se ₹999 ke beech hain. Aap "Products" tab mein sabhi rates dekh sakte hain.';
+    // 5. Order Tracking
+    if (message.contains('order') || message.contains('track') || message.contains('saman') || message.contains('kab aayega') || message.contains('delivery')) {
+      return 'Aap apna order "Profile" > "My Orders" par jaakar live track kar sakte hain. Delivery mein aam taur par 3-5 business days lagte hain. Kya main aapke order ki details dekhne mein madad karoon?';
     }
 
-    // 6. Order Tracking
-    if (message.contains('order') || message.contains('track') || message.contains('saman') || message.contains('kab aayega')) {
-      return 'Aap apna order "Profile" > "My Orders" par jaakar live track kar sakte hain. Delivery mein aam taur par 3-5 business days lagte hain.';
+    // 6. Ashwagandha & Energy
+    if (message.contains('ashwagandha') || message.contains('energy') || message.contains('stamina') || message.contains('kamzori')) {
+      return 'Energy badhane ke liye Ashwagandha Gold sabse behtareen hai. Ye stress kam karta hai aur immunity badhata hai. Isse raat ko doodh ke saath lena chahiye.';
     }
 
-    // 7. Energy & Stress
-    if (message.contains('energy') || message.contains('stress') || message.contains('tension') || message.contains('kamzori') || message.contains('ashwagandha')) {
-      _lastTopic = 'vitality';
-      return 'Energy aur stress relief ke liye Ashwagandha best hai. Hamara Ashwagandha Gold stamina badhane aur dimaag ko shant rakhne mein madad karta hai.';
-    }
-
-    // 8. Immunity & Health
-    if (message.contains('sardi') || message.contains('cold') || message.contains('cough') || message.contains('immunity') || message.contains('fever')) {
-      _lastTopic = 'immunity';
-      return 'Immunity ke liye hamara Giloy aur Tulsi Drops bahut acche hain. Khansi ke liye hamara Ayurvedic Cough Syrup turant rahat deta hai.';
-    }
-
-    // 9. Greetings
-    final List<String> greetings = ['hello', 'namaste', 'hey', 'kaise ho', 'hi'];
+    // 7. Greetings
+    final List<String> greetings = ['hello', 'namaste', 'hey', 'kaise ho', 'hi', 'hola'];
     if (greetings.any((g) => message.contains(g)) || RegExp(r'\bhi\b').hasMatch(message)) {
-      return 'Namaste! Main Kosmico AI Consultant hoon. Main aapki health, products aur orders se jude sawalon ke jawab de sakta hoon. Bataiye, main kaise madad karoon?';
+      return 'Namaste! Main Kosmico AI Consultant hoon. Main aapki health, products aur orders se jude sawalon ke jawab de sakta hoon. Bataiye, aaj main kaise madad karoon?';
     }
 
-    // Default response
-    return 'Main samajh gaya. Kya aap apni query ke baare mein thoda aur detail mein bata sakte hain? Taki main aapko behtar advice de sakoon.';
+    // 8. Default fallback
+    return 'Main samajh gaya. Wellness aur Ayurveda se judi aur jaankari ke liye aap humare expert se bhi baat kar sakte hain. Kya aap koi specific product ke baare mein puchna chahte hain?';
   }
 
   @override
@@ -215,7 +195,7 @@ class _AiConsultantScreenState extends State<AiConsultantScreen> {
                 child: ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.all(16),
-                  reverse: true, // Show latest messages at bottom
+                  reverse: true,
                   itemCount: _messages.length,
                   itemBuilder: (context, index) {
                     final msg = _messages[_messages.length - 1 - index];
@@ -228,9 +208,9 @@ class _AiConsultantScreenState extends State<AiConsultantScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                   child: Row(
                     children: [
-                      const SizedBox(width: 30, height: 15, child: CircularProgressIndicator(strokeWidth: 2)),
+                      const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
                       const SizedBox(width: 12),
-                      Text('Kosmico AI is thinking...', style: TextStyle(fontSize: 12, color: colorScheme.primary, fontStyle: FontStyle.italic)),
+                      Text('Thinking...', style: TextStyle(fontSize: 12, color: colorScheme.primary, fontStyle: FontStyle.italic)),
                     ],
                   ),
                 ),
@@ -360,7 +340,7 @@ class _AiConsultantScreenState extends State<AiConsultantScreen> {
             child: TextField(
               controller: _controller,
               decoration: InputDecoration(
-                hintText: 'Type your wellness query...',
+                hintText: 'Type your query...',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(25),
                   borderSide: BorderSide.none,
