@@ -3,8 +3,6 @@ import 'package:flutter/services.dart';
 import 'today_module.dart';
 import 'scan_meal_module.dart';
 import 'log_entry_module.dart';
-import 'trends_module.dart';
-import 'recipes_module.dart';
 import 'care_network_module.dart';
 
 class CareDashboardScreen extends StatefulWidget {
@@ -22,8 +20,6 @@ class _CareDashboardScreenState extends State<CareDashboardScreen> with SingleTi
     'Today',
     'Scan Meal',
     'Log Entry',
-    'Trends',
-    'Recipes',
     'Care Network'
   ];
 
@@ -98,8 +94,6 @@ class _CareDashboardScreenState extends State<CareDashboardScreen> with SingleTi
           TodayModule(),
           ScanMealModule(),
           LogEntryModule(),
-          TrendsModule(),
-          RecipesModule(),
           CareNetworkModule(),
         ],
       ),

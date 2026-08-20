@@ -35,6 +35,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   void dispose() {
     _searchController.dispose();
     _debounce?.cancel();
+    _mapController.dispose();
     super.dispose();
   }
 
@@ -108,8 +109,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
           } else {
             throw Exception('No results found');
           }
-        }
- else {
+        } else {
           throw Exception('Failed to search location');
         }
       } catch (e) {
@@ -129,10 +129,10 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       if (!query.toLowerCase().contains("india")) {
         searchInput = "$query, India";
       }
-      final List? locations = await locationFromAddress(searchInput);
-      if (locations != null && locations.isNotEmpty) {
-        final dynamic loc = locations.first;
-        final LatLng target = LatLng(loc.latitude as double, loc.longitude as double);
+      final locations = await Geocoding().locationFromAddress(searchInput);
+      if (locations.isNotEmpty) {
+        final loc = locations.first;
+        final LatLng target = LatLng(loc.latitude, loc.longitude);
         
         setState(() {
           _currentCenter = target;
@@ -245,13 +245,13 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       return;
     }
     try {
-      final List? placemarks = await placemarkFromCoordinates(
+      final placemarks = await Geocoding().placemarkFromCoordinates(
         position.latitude,
         position.longitude,
       );
 
-      if (placemarks != null && placemarks.isNotEmpty) {
-        final dynamic place = placemarks[0];
+      if (placemarks.isNotEmpty) {
+        final place = placemarks[0];
         setState(() {
           final List<String> addressParts = [
             place.street?.toString() ?? '',
@@ -326,7 +326,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
+                        color: Colors.black.withOpacity(0.1),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -355,7 +355,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                     },
                   ),
                 ),
-                if (_suggestions != null && _suggestions.isNotEmpty)
+                if (_suggestions.isNotEmpty)
                   Container(
                     margin: const EdgeInsets.only(top: 8),
                     constraints: const BoxConstraints(maxHeight: 250),
@@ -364,7 +364,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
+                          color: Colors.black.withOpacity(0.1),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -451,7 +451,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
+                        color: Colors.black.withOpacity(0.1),
                         blurRadius: 20,
                         offset: const Offset(0, -5),
                       ),
@@ -494,11 +494,11 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                               return;
                             }
                             try {
-                              final List? placemarks = await placemarkFromCoordinates(
+                              final placemarks = await Geocoding().placemarkFromCoordinates(
                                 _currentCenter.latitude,
                                 _currentCenter.longitude,
                               );
-                              if (placemarks != null && placemarks.isNotEmpty) {
+                              if (placemarks.isNotEmpty) {
                                 if (context.mounted) {
                                   Navigator.pop(context, {
                                     'lat': _currentCenter.latitude,

@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
-import '../main.dart';
+import '../utils/keys.dart';
 import '../screens/maintenance_screen.dart';
 
 class ApiService {
@@ -925,6 +925,74 @@ class ApiService {
     } catch (e) {
       return _handleError(e);
     }
+  }
+
+  // Emergency Module
+  static Future<Map<String, dynamic>> generateEmergencyMessage({
+    required double latitude,
+    required double longitude,
+    required String token,
+  }) async {
+    final String googleMapsLink = 'https://maps.google.com/?q=$latitude,$longitude';
+    final String localFallbackText = '🚨 URGENT: I am having a glucose emergency and need immediate assistance! Here is my current live location: $googleMapsLink';
+
+    final List<String> paths = [
+      '/api/emergency/generate-message',
+      '/api/emergency',
+      '/api/v1/emergency/generate-message',
+    ];
+
+    for (String path in paths) {
+      try {
+        final url = _getUri(path);
+        debugPrint('DEBUG: Attempting Emergency POST to $url');
+        
+        final response = await http.post(
+          url,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode({
+            'latitude': latitude,
+            'longitude': longitude,
+          }),
+        ).timeout(const Duration(seconds: 15));
+
+        debugPrint('DEBUG: $path POST Status: ${response.statusCode}');
+
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          return _processResponse(response);
+        }
+        
+        // If POST fails, try GET as fallback for this path
+        debugPrint('DEBUG: POST to $path failed, attempting GET...');
+        final getUrl = Uri.parse('${url.toString()}?latitude=$latitude&longitude=$longitude');
+        final getResponse = await http.get(
+          getUrl,
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ).timeout(const Duration(seconds: 15));
+        
+        debugPrint('DEBUG: $path GET Status: ${getResponse.statusCode}');
+        if (getResponse.statusCode >= 200 && getResponse.statusCode < 300) {
+          return _processResponse(getResponse);
+        }
+      } catch (e) {
+        debugPrint('DEBUG: Error trying emergency path $path: $e');
+      }
+    }
+
+    // Safety Net: If server fails, return local message
+    return {
+      'success': true, 
+      'message': 'Generated locally (Server unreachable)',
+      'data': {
+        'shareableText': localFallbackText,
+        'mapsLink': googleMapsLink
+      }
+    };
   }
 
   // GlucoRhythm Module

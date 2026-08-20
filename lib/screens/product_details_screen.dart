@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '../main.dart'; // Add this for scaffoldMessengerKey
+import '../utils/keys.dart'; // Add this for scaffoldMessengerKey
 import '../managers/cart_manager.dart';
+import '../managers/language_manager.dart';
 import '../managers/wishlist_manager.dart';
 import 'checkout_screen.dart';
 import 'cart_screen.dart';
@@ -128,14 +129,37 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  product['category']?.toUpperCase() ?? 'WELLNESS',
-                                  style: TextStyle(
-                                    color: colorScheme.primary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 11,
-                                    letterSpacing: 1.5,
+                                // Feature Tags
+                                if (product['name']?.toString().toLowerCase().contains('sweet monk') ?? false)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: Row(
+                                      children: [
+                                        _buildFeatureTag('Zero Calories', Icons.close, const Color(0xFFFF6B6B), colorScheme),
+                                        const SizedBox(width: 8),
+                                        _buildFeatureTag('100% Natural', Icons.eco, const Color(0xFF4CAF50), colorScheme),
+                                      ],
+                                    ),
                                   ),
+                                Builder(
+                                  builder: (context) {
+                                    final String rawCat = product['category']?.toString() ?? 'wellness';
+                                    String catDisplay = rawCat.replaceAll('_', ' ');
+                                    if (catDisplay.toLowerCase().contains('essesntials')) {
+                                      catDisplay = catDisplay.toLowerCase().replaceFirst('essesntials', 'essential');
+                                    }
+                                    catDisplay = catDisplay.split(' ').map((word) => word.isNotEmpty ? word[0].toUpperCase() + word.substring(1) : '').join(' ');
+                                    
+                                    return Text(
+                                      catDisplay.toUpperCase(),
+                                      style: TextStyle(
+                                        color: colorScheme.primary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 11,
+                                        letterSpacing: 1.5,
+                                      ),
+                                    );
+                                  }
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
@@ -152,35 +176,56 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: colorScheme.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.star, color: Colors.amber, size: 16),
-                                const SizedBox(width: 4),
-                                Text(
-                                  (product['rating'] ?? '4.9').toString(),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: colorScheme.primary,
-                                  ),
+                          Builder(
+                            builder: (context) {
+                              final dynamic ratingRaw = product['rating'] ?? product['avgRating'];
+                              final double rating = double.tryParse(ratingRaw?.toString() ?? '') ?? 0.0;
+                              
+                              final dynamic reviewsRaw = product['reviews'] ?? product['numReviews'] ?? product['reviewsCount'];
+                              int reviewCount = 0;
+                              if (reviewsRaw is List) {
+                                reviewCount = reviewsRaw.length;
+                              } else if (reviewsRaw != null) {
+                                reviewCount = int.tryParse(reviewsRaw.toString()) ?? 0;
+                              }
+
+                              // Use actual ratings from API
+                              final String displayRating = rating.toStringAsFixed(1);
+                              final String displayReviews = '($reviewCount)';
+
+                              if (reviewCount == 0 && rating == 0) {
+                                return const SizedBox.shrink(); // Hide rating if no reviews yet
+                              }
+
+                              return Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
-                                if (product['reviews'] != null) ...[
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '(${product['reviews']})',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: colorScheme.onSurfaceVariant,
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.star, color: Colors.amber, size: 16),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      displayRating,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: colorScheme.primary,
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ],
-                            ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      displayReviews,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -195,9 +240,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                         ),
                       ),
                       const SizedBox(height: 32),
-                      const Text(
-                        'The Ayurvedic Story',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      Text(
+                        LanguageManager().translate('ayurvedic_story'),
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 12),
                       Text(
@@ -238,6 +283,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   }
 
   Widget _buildSpecsGrid(Map<String, dynamic> product, ColorScheme colorScheme) {
+    final lang = LanguageManager();
     // Robust key extraction to handle different naming conventions from API/Admin
     final String sku = (product['sku'] ?? product['product_id'] ?? product['SKU'] ?? 'N/A').toString();
     final String brand = (product['brand'] ?? product['manufacturer'] ?? product['vendor'] ?? 'Kosmico Wellness').toString();
@@ -248,7 +294,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Brand', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        Text(lang.translate('brand'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
         Text(brand, style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 15, fontWeight: FontWeight.w500)),
         const SizedBox(height: 24),
@@ -267,8 +313,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   Container(width: 1, height: 40, color: colorScheme.outline.withValues(alpha: 0.1)),
                   Expanded(
                     child: _specItem(
-                      'Stock Status', 
-                      stockRaw != null ? 'In Stock ($stockRaw)' : 'In Stock', 
+                      lang.translate('stock_status'), 
+                      stockRaw != null ? '${lang.translate('in_stock')} ($stockRaw)' : lang.translate('in_stock'), 
                       Icons.inventory_2_outlined, 
                       colorScheme, 
                       valueColor: Colors.green
@@ -279,9 +325,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
               const Divider(height: 24, thickness: 0.5),
               Row(
                 children: [
-                  Expanded(child: _specItem('Shelf Life', shelfLife, Icons.history_toggle_off_rounded, colorScheme)),
+                  Expanded(child: _specItem(lang.translate('shelf_life'), shelfLife, Icons.history_toggle_off_rounded, colorScheme)),
                   Container(width: 1, height: 40, color: colorScheme.outline.withValues(alpha: 0.1)),
-                  Expanded(child: _specItem('Made In', origin, Icons.public_rounded, colorScheme)),
+                  Expanded(child: _specItem(lang.translate('made_in'), origin, Icons.public_rounded, colorScheme)),
                 ],
               ),
             ],
@@ -343,7 +389,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             children: [
               Icon(Icons.check_circle_outline_rounded, color: colorScheme.primary, size: 28),
               const SizedBox(width: 12),
-              const Text('Key Benefits', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              Text(LanguageManager().translate('key_benefits'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 20),
@@ -393,7 +439,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Ingredients', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        Text(LanguageManager().translate('ingredients'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
         Wrap(
           spacing: 10,
@@ -420,21 +466,22 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   }
 
   Widget _buildBenefitsGrid(ColorScheme colorScheme) {
+    final lang = LanguageManager();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Product Highlights',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        Text(
+          lang.translate('product_highlights'),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Expanded(child: _highlightItem(Icons.eco_outlined, 'Organic', colorScheme)),
-            Expanded(child: _highlightItem(Icons.science_outlined, 'Lab Tested', colorScheme)),
-            Expanded(child: _highlightItem(Icons.auto_awesome_outlined, 'Handmade', colorScheme)),
-            Expanded(child: _highlightItem(Icons.verified_outlined, 'Authentic', colorScheme)),
+            Expanded(child: _highlightItem(Icons.eco_outlined, lang.translate('organic'), colorScheme)),
+            Expanded(child: _highlightItem(Icons.science_outlined, lang.translate('lab_tested'), colorScheme)),
+            Expanded(child: _highlightItem(Icons.auto_awesome_outlined, lang.translate('handmade'), colorScheme)),
+            Expanded(child: _highlightItem(Icons.verified_outlined, lang.translate('authentic'), colorScheme)),
           ],
         ),
       ],
@@ -462,6 +509,50 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colorScheme.onSurfaceVariant),
         ),
       ],
+    );
+  }
+
+  Widget _buildFeatureTag(String text, IconData icon, Color iconColor, ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 18,
+            height: 18,
+            decoration: BoxDecoration(
+              color: iconColor,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              color: Colors.white,
+              size: 10,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              color: colorScheme.onSurface,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -494,7 +585,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
     return Row(
       children: [
-        const Text('Quantity', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text(LanguageManager().translate('quantity'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const Spacer(),
         Container(
           decoration: BoxDecoration(
@@ -623,7 +714,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   padding: EdgeInsets.zero,
                 ),
                 child: Text(
-                  isOutOfStock ? 'No Stock' : 'Add to Cart',
+                  isOutOfStock ? LanguageManager().translate('out_of_stock') : LanguageManager().translate('add_to_cart'),
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                   textAlign: TextAlign.center,
                 ),
@@ -661,7 +752,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   padding: EdgeInsets.zero,
                 ),
                 child: Text(
-                  isOutOfStock ? 'Out of Stock' : 'Buy Now',
+                  isOutOfStock ? LanguageManager().translate('out_of_stock') : LanguageManager().translate('buy_now'),
                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),

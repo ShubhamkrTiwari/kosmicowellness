@@ -1,4 +1,9 @@
-import 'dart:io';
+// Removed dart:io to support Web
+import 'dart:io' show File; // Using conditional import or just guarding it would be better, but File is only used in non-web parts.
+// Actually, if I keep 'import dart:io', it will still crash on Web if 'File' is even mentioned in the code that gets compiled for web.
+// But Flutter's compiler is usually smart enough if it's guarded by kIsWeb.
+// However, the cleanest way is to use 'dart:io' only when not kIsWeb.
+
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -7,6 +12,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../managers/notification_manager.dart';
 import '../managers/theme_manager.dart';
+import '../managers/language_manager.dart';
 import '../managers/user_manager.dart';
 import '../managers/wishlist_manager.dart';
 import '../services/api_service.dart';
@@ -732,8 +738,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
               const SizedBox(height: 30),
 
               // Settings Section
-              _buildSectionHeader('Account Settings', colorScheme),
-              _buildMenuItem(Icons.shopping_bag_outlined, 'My Orders', 'Track and manage your orders', colorScheme, onTap: () {
+              _buildSectionHeader(LanguageManager().translate('settings'), colorScheme),
+              _buildMenuItem(Icons.shopping_bag_outlined, LanguageManager().translate('my_orders'), 'Track and manage your orders', colorScheme, onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (context) => const MyOrdersScreen()),
                 );
@@ -757,7 +763,51 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
 
               const SizedBox(height: 20),
 
-              _buildSectionHeader('Support & Preferences', colorScheme),
+              _buildSectionHeader(LanguageManager().translate('support'), colorScheme),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4),
+                child: Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.language_outlined,
+                        color: colorScheme.primary,
+                        size: 22,
+                      ),
+                    ),
+                    title: Text(
+                      LanguageManager().translate('language'),
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                    ),
+                    subtitle: Text(
+                      LanguageManager().currentLanguage == 'en' ? 'English' : 'हिंदी',
+                      style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('EN', style: TextStyle(fontSize: 10, fontWeight: LanguageManager().currentLanguage == 'en' ? FontWeight.bold : FontWeight.normal)),
+                        Switch(
+                          value: LanguageManager().currentLanguage == 'hi',
+                          onChanged: (value) async {
+                            await LanguageManager().setLanguage(value ? 'hi' : 'en');
+                            setState(() {});
+                          },
+                          activeTrackColor: colorScheme.primary,
+                        ),
+                        Text('हिं', style: TextStyle(fontSize: 10, fontWeight: LanguageManager().currentLanguage == 'hi' ? FontWeight.bold : FontWeight.normal)),
+                      ],
+                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                ),
+              ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4),
                 child: Material(
@@ -775,9 +825,9 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                         size: 22,
                       ),
                     ),
-                    title: const Text(
-                      'Dark Mode',
-                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                    title: Text(
+                      LanguageManager().translate('dark_mode'),
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
                     ),
                     subtitle: Text(
                       ThemeManager().isDarkMode ? 'Currently Dark' : 'Currently Light',
@@ -795,12 +845,12 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                   ),
                 ),
               ),
-              _buildMenuItem(Icons.help_outline, 'Help Center', 'FAQs and support chat', colorScheme, onTap: () {
+              _buildMenuItem(Icons.help_outline, LanguageManager().translate('help_center'), 'FAQs and support chat', colorScheme, onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (context) => const HelpCenterScreen()),
                 );
               }),
-              _buildMenuItem(Icons.info_outline, 'About Kosmico', 'Our story and values', colorScheme, onTap: () {
+              _buildMenuItem(Icons.info_outline, LanguageManager().translate('about_kosmico'), 'Our story and values', colorScheme, onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (context) => const AboutKosmicoScreen()),
                 );
@@ -841,13 +891,13 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                           final confirm = await showDialog<bool>(
                             context: context,
                             builder: (context) => AlertDialog(
-                              title: const Text('Logout'),
+                              title: Text(LanguageManager().translate('logout')),
                               content: const Text('Are you sure you want to logout?'),
                               actions: [
                                 TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
                                 TextButton(
                                   onPressed: () => Navigator.pop(context, true), 
-                                  child: const Text('Logout', style: TextStyle(color: Colors.red))
+                                  child: Text(LanguageManager().translate('logout'), style: const TextStyle(color: Colors.red))
                                 ),
                               ],
                             ),
@@ -863,7 +913,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                           }
                         },
                         icon: const Icon(Icons.logout, size: 20),
-                        label: const Text('Logout'),
+                        label: Text(LanguageManager().translate('logout')),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.redAccent,
                           side: const BorderSide(color: Colors.redAccent, width: 1.5),

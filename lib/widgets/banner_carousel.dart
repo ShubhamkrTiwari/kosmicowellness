@@ -6,12 +6,14 @@ class BannerItem {
   final String subtitle;
   final String imageUrl;
   final String buttonText;
+  final bool isAsset;
 
   BannerItem({
     required this.title,
     required this.subtitle,
     required this.imageUrl,
     required this.buttonText,
+    this.isAsset = false,
   });
 }
 
@@ -30,22 +32,25 @@ class _BannerCarouselState extends State<BannerCarousel> {
 
   final List<BannerItem> _banners = [
     BannerItem(
-      title: 'Ancient Wisdom,\nModern Wellness',
-      subtitle: 'Discover the healing power of Ayurveda',
-      imageUrl: 'https://images.unsplash.com/photo-1615485290382-441e4d0c9cb5?auto=format&fit=crop&q=80&w=800',
-      buttonText: 'Shop Now',
+      title: '', // Empty because image already has text
+      subtitle: '',
+      imageUrl: 'assets/images/adbannersweetmonk.png',
+      buttonText: 'Buy Now',
+      isAsset: true,
     ),
     BannerItem(
-      title: 'Monsoon Care\nSpecial Offers',
-      subtitle: 'Boost your immunity with natural herbs',
-      imageUrl: 'https://images.unsplash.com/photo-1540555700478-4be289fbecee?auto=format&fit=crop&q=80&w=800',
-      buttonText: 'Explore',
+      title: '', // Image likely has its own text
+      subtitle: '',
+      imageUrl: 'assets/images/scanplatebanner.png',
+      buttonText: 'Scan Now',
+      isAsset: true,
     ),
     BannerItem(
-      title: 'Pure Herbal\nExtractions',
-      subtitle: '100% Organic & Sustainably Sourced',
-      imageUrl: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&q=80&w=800',
-      buttonText: 'View More',
+      title: '', 
+      subtitle: '',
+      imageUrl: 'assets/images/socialbanner.png',
+      buttonText: 'Join Now',
+      isAsset: true,
     ),
   ];
 
@@ -84,10 +89,11 @@ class _BannerCarouselState extends State<BannerCarousel> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Column(
+    return Stack(
+      alignment: Alignment.bottomCenter,
       children: [
         SizedBox(
-          height: 180,
+          height: 180, 
           child: PageView.builder(
             controller: _pageController,
             onPageChanged: (int page) {
@@ -101,12 +107,14 @@ class _BannerCarouselState extends State<BannerCarousel> {
             },
           ),
         ),
-        const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(
-            _banners.length,
-            (index) => _buildIndicator(index == _currentPage, colorScheme),
+        Positioned(
+          bottom: 16,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(
+              _banners.length,
+              (index) => _buildIndicator(index == _currentPage, colorScheme),
+            ),
           ),
         ),
       ],
@@ -117,76 +125,111 @@ class _BannerCarouselState extends State<BannerCarousel> {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       margin: const EdgeInsets.symmetric(horizontal: 4),
-      height: 8,
-      width: isActive ? 24 : 8,
+      height: 6,
+      width: isActive ? 20 : 6,
       decoration: BoxDecoration(
-        color: isActive ? colorScheme.primary : colorScheme.primary.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(4),
+        color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(3),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 4,
+          )
+        ],
       ),
     );
   }
 
   Widget _buildBannerCard(BannerItem banner, ColorScheme colorScheme) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: colorScheme.primary,
-        borderRadius: BorderRadius.circular(24),
-        image: DecorationImage(
-          image: NetworkImage(banner.imageUrl),
-          fit: BoxFit.cover,
-          colorFilter: ColorFilter.mode(
-            colorScheme.primary.withValues(alpha: 0.7),
-            BlendMode.srcOver,
+    final bool hasText = banner.title.isNotEmpty || banner.subtitle.isNotEmpty;
+    
+    return InkWell(
+      onTap: widget.onTap,
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.symmetric(horizontal: 16), // Re-added margin for visible rounded corners
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(24), // Added corner radius
+          image: DecorationImage(
+            image: banner.isAsset 
+                ? AssetImage(banner.imageUrl) as ImageProvider
+                : NetworkImage(banner.imageUrl),
+            fit: BoxFit.cover,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.primary.withValues(alpha: 0.2),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24), // Ensure content/image is clipped to rounded corners
+          child: Stack(
+            children: [
+            if (hasText) ...[
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.5),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (banner.title.isNotEmpty)
+                      Text(
+                        banner.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          height: 1.1,
+                        ),
+                      ),
+                    if (banner.subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        banner.subtitle,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: widget.onTap,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: colorScheme.secondary,
+                        foregroundColor: Colors.white,
+                        elevation: 4,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: Text(banner.buttonText, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            banner.title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              height: 1.1,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            banner.subtitle,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.9),
-              fontSize: 13,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: widget.onTap,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: colorScheme.secondary,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: Text(banner.buttonText, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
+    ),
+  );
+}
 }

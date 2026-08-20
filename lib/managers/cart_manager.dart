@@ -104,6 +104,20 @@ class CartManager extends ChangeNotifier {
     }
   }
 
+  void incrementItemByName(String name) {
+    final index = _items.indexWhere((element) => element['name'] == name);
+    if (index != -1) {
+      incrementItem(index);
+    }
+  }
+
+  void decrementItemByName(String name) {
+    final index = _items.indexWhere((element) => element['name'] == name);
+    if (index != -1) {
+      removeItem(index);
+    }
+  }
+
   double get totalPrice {
     return _items.fold(0.0, (sum, item) => sum + (((item['price'] ?? 0) as int) * ((item['quantity'] ?? 0) as int)));
   }

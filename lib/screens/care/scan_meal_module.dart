@@ -2,7 +2,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
+import '../../utils/keys.dart';
+import '../../services/gemini_service.dart';
 import '../../managers/care_manager.dart';
 
 class ScanMealModule extends StatefulWidget {
@@ -18,30 +19,18 @@ class _ScanMealModuleState extends State<ScanMealModule> {
   XFile? _capturedImage;
   final ImagePicker _picker = ImagePicker();
   Map<String, dynamic>? _currentFoodData;
-  ImageLabeler? _imageLabeler;
 
   @override
   void initState() {
     super.initState();
-    if (!kIsWeb) {
-      _imageLabeler = ImageLabeler(options: ImageLabelerOptions(confidenceThreshold: 0.5));
-    }
   }
 
   @override
   void dispose() {
-    _imageLabeler?.close();
     super.dispose();
   }
 
   Future<void> _startScan() async {
-    if (kIsWeb) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Scanning is only supported on Android/iOS devices.')),
-      );
-      return;
-    }
-
     try {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.camera,
@@ -56,12 +45,28 @@ class _ScanMealModuleState extends State<ScanMealModule> {
           _isScanning = true;
           _showResult = false;
         });
-        
-        final inputImage = InputImage.fromFilePath(image.path);
-        final labels = await _imageLabeler!.processImage(inputImage);
+
+        // Run Cloud AI Recognition (Primary & Only Source)
+        final aiResponse = await GeminiService().analyzeFoodImage(File(image.path));
         
         if (mounted) {
-          _matchFoodWithLocalDatabase(labels);
+          setState(() {
+            _isScanning = false;
+            if (aiResponse.data != null) {
+              // SUCCESS: Use real-time AI analysis
+              _currentFoodData = aiResponse.data;
+              _showResult = true;
+            } else {
+              // FAIL: If AI fails, we don't use inaccurate fallback data anymore
+              _showResult = false;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(aiResponse.errorMessage ?? 'AI could not identify this food. Please try a clearer photo.'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          });
         }
       }
     } catch (e) {
@@ -69,87 +74,78 @@ class _ScanMealModuleState extends State<ScanMealModule> {
       if (mounted) {
         setState(() => _isScanning = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e. Please re-run the app.')),
+          SnackBar(content: Text('Error: $e')),
         );
       }
     }
   }
 
-  void _matchFoodWithLocalDatabase(List<ImageLabel> labels) {
-    final db = CareManager().foodDatabase;
-    Map<String, dynamic>? match;
-
-    // Check for direct matches in our database
-    for (var label in labels) {
-      final labelText = label.label.toLowerCase();
-      
-      // Find food in our local DB that matches the ML label
-      for (var food in db) {
-        final foodName = food['name'].toString().toLowerCase();
-        if (foodName.contains(labelText) || labelText.contains(foodName)) {
-          match = food;
-          break;
-        }
-      }
-      if (match != null) break;
-    }
-
-    // Smart fallback if no direct match
-    if (match == null && labels.isNotEmpty) {
-      final String allLabels = labels.map((l) => l.label.toLowerCase()).join(' ');
-      
-      if (allLabels.contains('bottle') || allLabels.contains('water') || allLabels.contains('plastic')) {
-        match = db.firstWhere((f) => f['name'] == 'Water (Bottle)');
-      } else if (allLabels.contains('fruit') || allLabels.contains('apple')) {
-        match = db.firstWhere((f) => f['name'] == 'Apple (Medium)');
-      } else if (allLabels.contains('juice') || allLabels.contains('drink') || allLabels.contains('beverage')) {
-        match = db.firstWhere((f) => f['name'] == 'Real Guava Juice');
-      } else if (allLabels.contains('bread') || allLabels.contains('dough')) {
-        match = db.firstWhere((f) => f['name'] == 'Paneer Paratha');
-      } else if (allLabels.contains('food') || allLabels.contains('dish') || allLabels.contains('cuisine')) {
-        match = db.firstWhere((f) => f['name'] == 'Dal Tadka & Rice');
-      } else {
-        // Definitely not food? 
-        match = null; 
-      }
-    }
-
-    setState(() {
-      _isScanning = false;
-      _showResult = true;
-      _currentFoodData = match;
-    });
-  }
-
   void _showFoodCorrectionDialog() {
-    final db = CareManager().foodDatabase;
+    final TextEditingController searchController = TextEditingController();
+    bool isSearching = false;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Not what you\'re eating?'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: db.length,
-            itemBuilder: (context, index) {
-              final item = db[index];
-              return ListTile(
-                title: Text(item['name']),
-                subtitle: Text('${item['carbs']}g Carbs'),
-                onTap: () {
-                  setState(() {
-                    _currentFoodData = item;
-                  });
-                  Navigator.pop(context);
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Correct Food Item'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('If AI misidentified your food, type the correct name below for real nutritional analysis:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              const SizedBox(height: 16),
+              TextField(
+                controller: searchController,
+                decoration: InputDecoration(
+                  hintText: 'e.g., Bajra Roti, Chicken Curry',
+                  suffixIcon: isSearching 
+                    ? const SizedBox(width: 20, height: 20, child: Padding(padding: EdgeInsets.all(10), child: CircularProgressIndicator(strokeWidth: 2)))
+                    : IconButton(
+                        icon: const Icon(Icons.search),
+                        onPressed: () async {
+                          if (searchController.text.isEmpty) return;
+                          setDialogState(() => isSearching = true);
+                          
+                          final response = await GeminiService().analyzeFoodByName(searchController.text);
+                          
+                          if (response.data != null) {
+                            setState(() {
+                              _currentFoodData = response.data;
+                              _showResult = true;
+                            });
+                            if (context.mounted) Navigator.pop(context);
+                          } else {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(response.errorMessage ?? 'Could not find data.'))
+                              );
+                            }
+                          }
+                          setDialogState(() => isSearching = false);
+                        },
+                      ),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onSubmitted: (val) async {
+                  if (val.isEmpty) return;
+                  setDialogState(() => isSearching = true);
+                  final response = await GeminiService().analyzeFoodByName(val);
+                  if (response.data != null) {
+                    setState(() {
+                      _currentFoodData = response.data;
+                      _showResult = true;
+                    });
+                    if (context.mounted) Navigator.pop(context);
+                  }
+                  setDialogState(() => isSearching = false);
                 },
-              );
-            },
+              ),
+            ],
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-        ],
       ),
     );
   }
@@ -204,7 +200,7 @@ class _ScanMealModuleState extends State<ScanMealModule> {
              _buildScanAnimation(colorScheme),
              const Positioned(
                top: 40,
-               child: Text('AI RECOGNIZING...', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 2)),
+               child: Text('RECOGNIZING...', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 2)),
              ),
           ],
 
@@ -258,7 +254,7 @@ class _ScanMealModuleState extends State<ScanMealModule> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+        color: colorScheme.surfaceVariant.withOpacity(0.3),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: colorScheme.primary.withOpacity(0.1)),
       ),
@@ -277,15 +273,15 @@ class _ScanMealModuleState extends State<ScanMealModule> {
             ],
           ),
           const SizedBox(height: 4),
-          Text('Best local match: ${food['name']}', style: TextStyle(fontSize: 14, color: Colors.grey[700])),
+          Text('Result: ${food['name']}', style: TextStyle(fontSize: 14, color: Colors.grey[700])),
           const SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _buildMetric('Carbs', '${food['carbs'] ?? 0}g', Colors.orange),
               _buildMetric('Net Carbs', '${food['netCarbs'] ?? 0}g', Colors.blue),
-              _buildMetric('GI', food['gi'] ?? 'Med', Colors.green),
-              _buildMetric('GL', food['gl'] ?? 'Med', Colors.yellow[800] ?? Colors.orange),
+              _buildMetric('GI', food['gi']?.toString() ?? 'Med', Colors.green),
+              _buildMetric('GL', food['gl']?.toString() ?? 'Med', Colors.yellow[800] ?? Colors.orange),
             ],
           ),
           const SizedBox(height: 20),
@@ -354,7 +350,7 @@ class _ScanMealModuleState extends State<ScanMealModule> {
           ),
           const SizedBox(height: 4),
           Text(
-            swap.contains('choice') ? swap : 'Try replacing with $swap to manage your glucose levels better.',
+            swap.toLowerCase().contains('choice') || swap.toLowerCase().contains('good') ? swap : 'Try replacing with $swap to manage your glucose levels better.',
             style: const TextStyle(fontSize: 12),
           ),
         ],

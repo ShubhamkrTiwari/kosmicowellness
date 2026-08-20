@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
-import '../main.dart';
+import '../home_screen.dart';
+import '../utils/keys.dart';
 import '../services/api_service.dart';
 import '../managers/user_manager.dart';
+import '../managers/language_manager.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
   final String email;
@@ -181,7 +183,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         if (mounted) {
           // Navigate to Home
           Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const HomeScreen(title: 'Kosmico Wellness Private Limited')),
+            MaterialPageRoute(builder: (context) => HomeScreen(title: LanguageManager().translate('app_title'))),
             (route) => false,
           );
         }

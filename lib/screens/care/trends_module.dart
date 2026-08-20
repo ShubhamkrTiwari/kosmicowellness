@@ -16,9 +16,67 @@ class TrendsModule extends StatelessWidget {
           const SizedBox(height: 24),
           _buildTimeInRangeBars(colorScheme),
           const SizedBox(height: 24),
+          _buildSpikePredictor(colorScheme),
+          const SizedBox(height: 24),
           _buildPatternInsights(colorScheme),
         ],
       ),
+    );
+  }
+
+  Widget _buildSpikePredictor(ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.deepPurple.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.deepPurple.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.auto_awesome, color: Colors.deepPurple, size: 20),
+              const SizedBox(width: 8),
+              const Text('AI Spike Predictor', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.deepPurple,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text('Beta', style: TextStyle(color: Colors.white, fontSize: 10)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Based on your lunch (Pasta) and activity (Low), we estimate a potential rise in 45 minutes.',
+            style: TextStyle(fontSize: 13, height: 1.4),
+          ),
+          const SizedBox(height: 16),
+          _buildPredictionMetric('Estimated Spike', '+65 mg/dL', Colors.red),
+          const SizedBox(height: 12),
+          _buildPredictionMetric('Confidence Score', '88%', Colors.green),
+          const SizedBox(height: 16),
+          const Text(
+            'Recommendation: Take a 10-minute brisk walk to mitigate this rise.',
+            style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPredictionMetric(String label, String value, Color color) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 14)),
+      ],
     );
   }
 

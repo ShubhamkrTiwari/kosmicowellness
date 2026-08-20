@@ -12,11 +12,14 @@ class _LogEntryModuleState extends State<LogEntryModule> {
   final TextEditingController _glucoseController = TextEditingController();
   final TextEditingController _carbsController = TextEditingController();
   final TextEditingController _waterController = TextEditingController();
+  final TextEditingController _insulinController = TextEditingController();
+  final TextEditingController _medicationController = TextEditingController();
   
   String _selectedTimeOfDay = 'Day';
   String _selectedReadingType = 'Post-Meal';
   String _selectedMealType = 'Lunch';
   int _selectedStressLevel = 0;
+  int _selectedEnergyLevel = 0;
 
   bool _isSaving = false;
 
@@ -25,6 +28,8 @@ class _LogEntryModuleState extends State<LogEntryModule> {
     _glucoseController.dispose();
     _carbsController.dispose();
     _waterController.dispose();
+    _insulinController.dispose();
+    _medicationController.dispose();
     super.dispose();
   }
 
@@ -60,17 +65,40 @@ class _LogEntryModuleState extends State<LogEntryModule> {
       anySuccess = true;
     }
 
+    if (_selectedEnergyLevel > 0) {
+      await manager.setEnergyLevel(_selectedEnergyLevel);
+      anySuccess = true;
+    }
+
+    if (_insulinController.text.isNotEmpty) {
+      final val = double.tryParse(_insulinController.text);
+      if (val != null) {
+        await manager.addInsulinLog(val, _selectedTimeOfDay);
+        anySuccess = true;
+      }
+    }
+
+    if (_medicationController.text.isNotEmpty) {
+      await manager.addMedicationLog('Medication', _medicationController.text);
+      anySuccess = true;
+    }
+
     if (mounted) {
       setState(() => _isSaving = false);
       if (anySuccess) {
         _glucoseController.clear();
         _carbsController.clear();
         _waterController.clear();
-        setState(() => _selectedStressLevel = 0);
+        _insulinController.clear();
+        _medicationController.clear();
+        setState(() {
+          _selectedStressLevel = 0;
+          _selectedEnergyLevel = 0;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Lifestyle logs updated successfully!'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('Health logs updated successfully!'), backgroundColor: Colors.green),
         );
-      } else if (_glucoseController.text.isEmpty && _carbsController.text.isEmpty && _waterController.text.isEmpty && _selectedStressLevel == 0) {
+      } else if (_glucoseController.text.isEmpty && _carbsController.text.isEmpty && _waterController.text.isEmpty && _selectedStressLevel == 0 && _insulinController.text.isEmpty && _medicationController.text.isEmpty && _selectedEnergyLevel == 0) {
          ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Please enter at least one log.'), backgroundColor: Colors.orange),
         );
@@ -97,6 +125,8 @@ class _LogEntryModuleState extends State<LogEntryModule> {
           _buildLogCategory('Glucose Reading', [
             _buildLogItem('Glucose', 'mg/dL', Icons.bloodtype, Colors.red, colorScheme, _glucoseController),
             const SizedBox(height: 8),
+            _buildLogItem('Insulin', 'units', Icons.colorize, Colors.purple, colorScheme, _insulinController),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(child: _buildDropdown('Time of Day', ['Dawn', 'Day', 'Dusk', 'Night'], _selectedTimeOfDay, (v) => setState(() => _selectedTimeOfDay = v!))),
@@ -116,36 +146,22 @@ class _LogEntryModuleState extends State<LogEntryModule> {
 
           const SizedBox(height: 24),
           
-          _buildLogCategory('Lifestyle Data', [
+          _buildLogCategory('Medication & Lifestyle', [
+            _buildLogItem('Medication', 'dose', Icons.medication, Colors.teal, colorScheme, _medicationController),
+            const SizedBox(height: 12),
             _buildLogItem('Water', 'ml', Icons.water_drop, Colors.blue, colorScheme, _waterController),
+            const SizedBox(height: 16),
+            const Text('Energy Level', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 8),
+            _buildEmojiSelector(5, _selectedEnergyLevel, (l) => setState(() => _selectedEnergyLevel = l), _getEnergyEmoji, colorScheme),
             const SizedBox(height: 16),
             const Text('Stress Level', style: TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: List.generate(5, (index) {
-                final int l = index + 1;
-                final bool isSelected = _selectedStressLevel == l;
-                return GestureDetector(
-                  onTap: () => setState(() => _selectedStressLevel = l),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: isSelected ? colorScheme.primary.withValues(alpha: 0.1) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: isSelected ? colorScheme.primary : Colors.grey.withValues(alpha: 0.2)),
-                    ),
-                    child: Text(
-                      _getStressEmoji(l),
-                      style: const TextStyle(fontSize: 20),
-                    ),
-                  ),
-                );
-              }),
-            ),
+            _buildEmojiSelector(5, _selectedStressLevel, (l) => setState(() => _selectedStressLevel = l), _getStressEmoji, colorScheme),
           ], colorScheme),
 
+          const SizedBox(height: 32),
+          _buildRecentLogs(colorScheme),
           const SizedBox(height: 32),
           SizedBox(
             width: double.infinity,
@@ -226,6 +242,91 @@ class _LogEntryModuleState extends State<LogEntryModule> {
         ],
       ),
     );
+  }
+
+  Widget _buildEmojiSelector(int count, int selectedValue, Function(int) onTap, String Function(int) getEmoji, ColorScheme colorScheme) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: List.generate(count, (index) {
+        final int l = index + 1;
+        final bool isSelected = selectedValue == l;
+        return GestureDetector(
+          onTap: () => onTap(l),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: isSelected ? colorScheme.primary.withValues(alpha: 0.1) : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: isSelected ? colorScheme.primary : Colors.grey.withValues(alpha: 0.2)),
+            ),
+            child: Text(
+              getEmoji(l),
+              style: const TextStyle(fontSize: 20),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildRecentLogs(ColorScheme colorScheme) {
+    final manager = CareManager();
+    final glucoseLogs = manager.glucoseCurve;
+    
+    return ListenableBuilder(
+      listenable: manager,
+      builder: (context, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Recent Entries', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const SizedBox(height: 12),
+          if (glucoseLogs.isEmpty)
+            const Text('No recent logs found.', style: TextStyle(fontSize: 12, color: Colors.grey))
+          else
+            ...glucoseLogs.reversed.take(3).map((log) => Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.history, size: 16, color: colorScheme.primary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Glucose: ${log['level']} mg/dL', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        Text('${log['timeOfDay']} • ${log['logTime']?.toString().split('T').last.substring(0, 5) ?? ''}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                  if (log['notes']?.toString().contains('Insulin') ?? false)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(color: Colors.purple.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                      child: const Text('Insulin Logged', style: TextStyle(color: Colors.purple, fontSize: 10, fontWeight: FontWeight.bold)),
+                    ),
+                ],
+              ),
+            )),
+        ],
+      ),
+    );
+  }
+
+  String _getEnergyEmoji(int level) {
+    switch (level) {
+      case 1: return '😴';
+      case 2: return '🥱';
+      case 3: return '😐';
+      case 4: return '🙂';
+      case 5: return '⚡';
+      default: return '❓';
+    }
   }
 
   String _getStressEmoji(int level) {

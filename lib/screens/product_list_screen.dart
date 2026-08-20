@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../managers/language_manager.dart';
 import '../managers/notification_manager.dart';
 import '../models/filter_options.dart';
 import '../widgets/filter_bottom_sheet.dart';
@@ -149,6 +151,19 @@ class ProductListScreenState extends State<ProductListScreen> {
             _apiProducts.addAll(newProducts);
             _currentPage++;
           }
+          
+          // Force "Sweet Monk" products to the very top across all pages
+          _apiProducts.sort((a, b) {
+            final String nameA = (a['name'] ?? '').toString().toLowerCase();
+            final String nameB = (b['name'] ?? '').toString().toLowerCase();
+            final bool isA = nameA.contains('sweet monk');
+            final bool isB = nameB.contains('sweet monk');
+            
+            if (isA && !isB) return -1;
+            if (!isA && isB) return 1;
+            return 0;
+          });
+          
           _hasMore = newProducts.length == _pageSize;
         });
       }
@@ -199,85 +214,92 @@ class ProductListScreenState extends State<ProductListScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final filteredList = _filteredProducts;
+    final lang = LanguageManager();
 
-    return Scaffold(
-      backgroundColor: colorScheme.surface,
-      body: SafeArea(
-        bottom: false,
-        child: RefreshIndicator(
-          onRefresh: _refreshAll,
-          child: CustomScrollView(
-            controller: _scrollController,
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              // Scrolling Header
-              SliverToBoxAdapter(
-                child: _buildHeader(colorScheme),
-              ),
-              // Search Bar & Filter Button
-              SliverToBoxAdapter(
-                child: _buildSearchBar(colorScheme),
-              ),
-              // Categories
-              SliverToBoxAdapter(
-                child: _buildCategories(colorScheme),
-              ),
-              // The List of Products
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 140),
-                sliver: _isLoading && filteredList.isEmpty
-                  ? const SliverToBoxAdapter(child: Center(child: Padding(
-                      padding: EdgeInsets.only(top: 100),
-                      child: CircularProgressIndicator(),
-                    )))
-                  : filteredList.isEmpty 
-                    ? SliverToBoxAdapter(
-                        child: Center(
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 40),
-                            child: Column(
-                              children: [
-                                Icon(Icons.search_off, size: 60, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
-                                const SizedBox(height: 16),
-                                Text('No products found', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 16)),
-                              ],
+    return ListenableBuilder(
+      listenable: lang,
+      builder: (context, _) {
+        final filteredList = _filteredProducts;
+        return Scaffold(
+          backgroundColor: colorScheme.surface,
+          body: SafeArea(
+            bottom: false,
+            child: RefreshIndicator(
+              onRefresh: _refreshAll,
+              child: CustomScrollView(
+                controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  // Scrolling Header
+                  SliverToBoxAdapter(
+                    child: _buildHeader(colorScheme),
+                  ),
+                  // Search Bar & Filter Button
+                  SliverToBoxAdapter(
+                    child: _buildSearchBar(colorScheme),
+                  ),
+                  // Categories
+                  SliverToBoxAdapter(
+                    child: _buildCategories(colorScheme),
+                  ),
+                  // The List of Products
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 140),
+                    sliver: _isLoading && filteredList.isEmpty
+                      ? const SliverToBoxAdapter(child: Center(child: Padding(
+                          padding: EdgeInsets.only(top: 100),
+                          child: CircularProgressIndicator(),
+                        )))
+                      : filteredList.isEmpty 
+                        ? SliverToBoxAdapter(
+                            child: Center(
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 40),
+                                child: Column(
+                                  children: [
+                                    Icon(Icons.search_off, size: 60, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
+                                    const SizedBox(height: 16),
+                                    Text(lang.translate('no_products'), style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 16)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          )
+                        : SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                if (index == filteredList.length) {
+                                  return _isFetchingMore 
+                                    ? const Padding(
+                                        padding: EdgeInsets.symmetric(vertical: 20),
+                                        child: Center(child: CircularProgressIndicator()),
+                                      )
+                                    : const SizedBox.shrink();
+                                }
+                                return _buildProductListItem(filteredList[index], colorScheme);
+                              },
+                              childCount: filteredList.length + (_hasMore ? 1 : 0),
                             ),
                           ),
-                        ),
-                      )
-                    : SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            if (index == filteredList.length) {
-                              return _isFetchingMore 
-                                ? const Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 20),
-                                    child: Center(child: CircularProgressIndicator()),
-                                  )
-                                : const SizedBox.shrink();
-                            }
-                            return _buildProductListItem(filteredList[index], colorScheme);
-                          },
-                          childCount: filteredList.length + (_hasMore ? 1 : 0),
-                        ),
-                      ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      }
     );
   }
 
   Widget _buildHeader(ColorScheme colorScheme) {
+    final lang = LanguageManager();
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Wellness Catalog',
+            lang.translate('wellness_catalog'),
             style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.w900,
@@ -287,7 +309,7 @@ class ProductListScreenState extends State<ProductListScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Handpicked Ayurvedic Essentials',
+            lang.translate('ayurvedic_essentials'),
             style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
           ),
         ],
@@ -296,6 +318,7 @@ class ProductListScreenState extends State<ProductListScreen> {
   }
 
   Widget _buildSearchBar(ColorScheme colorScheme) {
+    final lang = LanguageManager();
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: Row(
@@ -311,7 +334,7 @@ class ProductListScreenState extends State<ProductListScreen> {
                 });
               },
               decoration: InputDecoration(
-                hintText: 'Search products...',
+                hintText: lang.translate('search_products'),
                 hintStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
@@ -375,8 +398,14 @@ class ProductListScreenState extends State<ProductListScreen> {
           final String name = catObj['name'] ?? 'All';
           final isSelected = _selectedCategory == name;
           
-          String displayName = name;
-          if (displayName == 'Essesntials Oils') displayName = 'Essential Oils';
+          String displayName = name.replaceAll('_', ' ');
+          if (displayName.toLowerCase().contains('essesntials')) {
+            displayName = displayName.toLowerCase().replaceFirst('essesntials', 'essential');
+          }
+          // Capitalize words
+          displayName = displayName.split(' ').map((word) => word.isNotEmpty ? word[0].toUpperCase() + word.substring(1) : '').join(' ');
+          
+          if (name == 'All') displayName = LanguageManager().currentLanguage == 'hi' ? 'सभी' : 'All';
 
           return Padding(
             padding: const EdgeInsets.only(right: 12),
@@ -417,8 +446,20 @@ class ProductListScreenState extends State<ProductListScreen> {
     final String imageUrl = (product['image'] ?? '').toString();
     final String rawPrice = (product['price'] ?? 0).toString().replaceAll('₹', '').trim();
     final String price = '₹$rawPrice';
-    final String rating = (product['rating'] ?? '0.0').toString();
-    final String reviews = (product['numReviews'] ?? '0').toString();
+    final dynamic ratingRaw = product['rating'] ?? product['avgRating'];
+    final double ratingVal = double.tryParse(ratingRaw?.toString() ?? '') ?? 0.0;
+    final String rating = ratingVal.toStringAsFixed(1);
+
+    final dynamic reviewsRaw = product['numReviews'] ?? product['reviews'];
+    int reviewCount = 0;
+    if (reviewsRaw is List) {
+      reviewCount = reviewsRaw.length;
+    } else if (reviewsRaw != null) {
+      reviewCount = int.tryParse(reviewsRaw.toString()) ?? 0;
+    }
+    final String reviews = reviewCount.toString();
+
+    final bool hasNoReviews = ratingVal == 0 && reviewCount == 0;
 
     return GestureDetector(
       onTap: () {
@@ -481,16 +522,29 @@ class ProductListScreenState extends State<ProductListScreen> {
                             color: colorScheme.secondary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Text(
-                            (product['category'] ?? 'Wellness').toString().toUpperCase(),
-                            style: TextStyle(
-                              color: colorScheme.secondary,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
+                          child: Builder(
+                            builder: (context) {
+                              final String rawCat = product['category']?.toString() ?? 'wellness';
+                              String catDisplay = LanguageManager().translate(rawCat.toLowerCase().replaceAll(' ', '_'));
+                              if (catDisplay == rawCat.toLowerCase().replaceAll(' ', '_')) {
+                                catDisplay = rawCat.replaceAll('_', ' ');
+                                if (catDisplay.toLowerCase().contains('essesntials')) {
+                                  catDisplay = catDisplay.toLowerCase().replaceFirst('essesntials', 'essential');
+                                }
+                                catDisplay = catDisplay.split(' ').map((word) => word.isNotEmpty ? word[0].toUpperCase() + word.substring(1) : '').join(' ');
+                              }
+                              return Text(
+                                catDisplay.toUpperCase(),
+                                style: TextStyle(
+                                  color: colorScheme.secondary,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              );
+                            }
                           ),
                         ),
                       ),
@@ -516,20 +570,21 @@ class ProductListScreenState extends State<ProductListScreen> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(Icons.star, color: Colors.amber, size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        rating,
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        ' ($reviews)',
-                        style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11),
-                      ),
-                    ],
-                  ),
+                  if (!hasNoReviews)
+                    Row(
+                      children: [
+                        const Icon(Icons.star, color: Colors.amber, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          rating,
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          ' ($reviews)',
+                          style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11),
+                        ),
+                      ],
+                    ),
                   const SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -552,18 +607,75 @@ class ProductListScreenState extends State<ProductListScreen> {
                         listenable: CartManager(),
                         builder: (context, _) {
                           final quantity = CartManager().getProductQuantity(name);
+                          
+                          if (quantity > 0) {
+                            return Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                GestureDetector(
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    CartManager().decrementItemByName(name);
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.surface,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: colorScheme.secondary.withOpacity(0.3)),
+                                    ),
+                                    child: Icon(Icons.remove, color: colorScheme.secondary, size: 16),
+                                  ),
+                                ),
+                                Container(
+                                  constraints: const BoxConstraints(minWidth: 32),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    quantity.toString(),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: colorScheme.primary,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    if (CartManager().canAddMore(product, 1)) {
+                                      CartManager().incrementItemByName(name);
+                                    } else {
+                                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text(LanguageManager().translate('out_of_stock')), behavior: SnackBarBehavior.floating)
+                                      );
+                                    }
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.secondary,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(Icons.add, color: Colors.white, size: 16),
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
+
                           return ElevatedButton(
                             onPressed: () {
                               CartManager().addItem(product);
                               ScaffoldMessenger.of(context).hideCurrentSnackBar();
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('Added to cart'),
+                                  content: Text(LanguageManager().translate('added_to_cart')),
                                   behavior: SnackBarBehavior.floating,
                                   backgroundColor: colorScheme.primary,
                                   duration: const Duration(milliseconds: 1500),
                                   action: SnackBarAction(
-                                    label: 'View',
+                                    label: LanguageManager().translate('view'),
                                     textColor: Colors.white,
                                     onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => CartScreen())),
                                   ),
@@ -579,7 +691,7 @@ class ProductListScreenState extends State<ProductListScreen> {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                             child: Text(
-                              quantity > 0 ? 'Add ($quantity)' : 'Add',
+                              LanguageManager().translate('add_to_cart'),
                               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                             ),
                           );

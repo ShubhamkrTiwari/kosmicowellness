@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'onboarding_screen.dart';
 import 'maintenance_screen.dart';
+import '../home_screen.dart';
 import '../services/api_service.dart';
 import '../managers/user_manager.dart';
-import '../main.dart';
+import '../managers/language_manager.dart';
+import '../utils/keys.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -60,7 +62,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       debugPrint('SplashScreen: User logged in, navigating to Home');
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (context) => const HomeScreen(title: 'Kosmico Wellness Private Limited'),
+          builder: (context) => HomeScreen(title: LanguageManager().translate('app_title')),
         ),
       );
     } else {

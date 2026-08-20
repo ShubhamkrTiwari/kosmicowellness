@@ -1,0 +1,3 @@
+- [x] Update `android/gradle.properties` with alignment flags
+- [x] Refine `packaging` block in `android/app/build.gradle.kts`
+- [x] Verify build and 16KB alignment readiness

@@ -46,9 +46,19 @@ class RecipeDetailScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(
-                        child: Text(
-                          recipe['name'],
-                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              recipe['name'],
+                              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                            ),
+                            if (recipe['servingSize'] != null)
+                              Text(
+                                'Per ${recipe['servingSize']}',
+                                style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                              ),
+                          ],
                         ),
                       ),
                       Container(

@@ -12,14 +12,42 @@ class CareManager extends ChangeNotifier {
   late SharedPreferences _prefs;
   bool _isInitialized = false;
 
-  // Local-only data (backup/contacts/lifestyle)
+  // Local-only data (backup/contacts/lifestyle/devices)
   List<Map<String, dynamic>> _contacts = [];
   int _waterIntake = 0; // in ml
   int _stressLevel = 0; // 0-5 scale (0 means not logged)
+  int _energyLevel = 0; // 0-5 scale (0 means not logged)
+  List<Map<String, dynamic>> _medicationLogs = [];
+  List<Map<String, dynamic>> _insulinLogs = [];
+  List<Map<String, dynamic>> _communityPosts = [];
+  
+  List<Map<String, dynamic>> _devices = [
+    {'name': 'Dexcom G7 CGM', 'type': 'CGM', 'connected': false, 'isPairing': false, 'lastData': null, 'icon': Icons.sensors},
+    {'name': 'Apple Watch Ultra', 'type': 'Smartwatch', 'connected': true, 'isPairing': false, 'lastData': '98 mg/dL', 'icon': Icons.watch},
+    {'name': 'Samsung Galaxy Watch 6', 'type': 'Smartwatch', 'connected': false, 'isPairing': false, 'lastData': null, 'icon': Icons.watch},
+    {'name': 'Fitbit Sense 2', 'type': 'Smartwatch', 'connected': false, 'isPairing': false, 'lastData': null, 'icon': Icons.watch},
+    {'name': 'Garmin Venu 3', 'type': 'Smartwatch', 'connected': false, 'isPairing': false, 'lastData': null, 'icon': Icons.watch},
+    {'name': 'Google Pixel Watch 3', 'type': 'Smartwatch', 'connected': false, 'isPairing': false, 'lastData': null, 'icon': Icons.watch},
+    {'name': 'Fossil Gen 6', 'type': 'Smartwatch', 'connected': false, 'isPairing': false, 'lastData': null, 'icon': Icons.watch},
+    {'name': 'Generic Smartwatch', 'type': 'Smartwatch', 'connected': false, 'isPairing': false, 'lastData': null, 'icon': Icons.bluetooth},
+    {'name': 'Accu-Chek Guide', 'type': 'Glucometer', 'connected': false, 'isPairing': false, 'lastData': null, 'icon': Icons.bloodtype},
+  ];
   
   List<Map<String, dynamic>> get contacts => _contacts;
   int get waterIntake => _waterIntake;
   int get stressLevel => _stressLevel;
+  int get energyLevel => _energyLevel;
+  List<Map<String, dynamic>> get medicationLogs => _medicationLogs;
+  List<Map<String, dynamic>> get insulinLogs => _insulinLogs;
+  List<Map<String, dynamic>> get communityPosts => _communityPosts;
+  List<Map<String, dynamic>> get devices => _devices;
+
+  String get connectedDeviceName {
+    final connected = _devices.where((d) => d['connected'] == true).toList();
+    if (connected.isEmpty) return 'No device connected';
+    if (connected.length == 1) return connected.first['name'];
+    return '${connected.first['name']} + ${connected.length - 1} more';
+  }
 
   // Server-synced data
   Map<String, dynamic> _dashboardMetrics = <String, dynamic>{};
@@ -65,6 +93,7 @@ class CareManager extends ChangeNotifier {
     
     // Load lifestyle data with daily reset logic
     _loadLifestyleData();
+    _loadCommunityPosts();
     
     final bool hasContacts = _contacts != null && _contacts.length > 0;
     if (!hasContacts) {
@@ -177,6 +206,54 @@ class CareManager extends ChangeNotifier {
     }
   }
 
+  void setPairing(int index, bool val) {
+    if (index >= 0 && index < _devices.length) {
+      _devices[index]['isPairing'] = val;
+      notifyListeners();
+    }
+  }
+
+  void toggleDeviceConnection(int index) {
+    if (index >= 0 && index < _devices.length) {
+      final bool newVal = !_devices[index]['connected'];
+      _devices[index]['connected'] = newVal;
+      if (newVal) {
+        _devices[index]['lastData'] = '${80 + (DateTime.now().millisecond % 40)} mg/dL';
+      } else {
+        _devices[index]['lastData'] = null;
+      }
+      notifyListeners();
+    }
+  }
+
+  Future<bool> simulateDeviceSync() async {
+    final token = UserManager().token;
+    if (token == null) return false;
+
+    // Generate a realistic random glucose reading (between 80 and 160)
+    final double randomLevel = 80 + (DateTime.now().millisecond % 80).toDouble();
+    final hour = DateTime.now().hour;
+    String timeOfDay = 'Day';
+    if (hour >= 5 && hour < 11) timeOfDay = 'Dawn';
+    else if (hour >= 17 && hour < 21) timeOfDay = 'Dusk';
+    else if (hour >= 21 || hour < 5) timeOfDay = 'Night';
+
+    // Log it to the server
+    final result = await ApiService.logGlucoseReading(
+      level: randomLevel,
+      timeOfDay: timeOfDay,
+      readingType: 'Random',
+      notes: 'Auto-synced from wearable device',
+      token: token,
+    );
+
+    if (result['success']) {
+      await fetchDashboardData();
+      return true;
+    }
+    return false;
+  }
+
   // Lifestyle methods
   void _loadLifestyleData() {
     final String today = DateTime.now().toString().split(' ')[0];
@@ -186,13 +263,105 @@ class CareManager extends ChangeNotifier {
       // New day, reset local metrics
       _waterIntake = 0;
       _stressLevel = 0;
+      _energyLevel = 0;
+      _medicationLogs = [];
+      _insulinLogs = [];
       _prefs.setString('last_lifestyle_date', today);
       _prefs.setInt('daily_water', 0);
       _prefs.setInt('daily_stress', 0);
+      _prefs.setInt('daily_energy', 0);
+      _prefs.setString('daily_meds', '[]');
+      _prefs.setString('daily_insulin', '[]');
     } else {
       _waterIntake = _prefs.getInt('daily_water') ?? 0;
       _stressLevel = _prefs.getInt('daily_stress') ?? 0;
+      _energyLevel = _prefs.getInt('daily_energy') ?? 0;
+      _medicationLogs = _loadList('daily_meds');
+      _insulinLogs = _loadList('daily_insulin');
     }
+  }
+
+  void _loadCommunityPosts() {
+    _communityPosts = _loadList('community_posts');
+    if (_communityPosts.isEmpty) {
+      // Default posts if none exist
+      _communityPosts = [
+        {
+          'id': '1',
+          'user': 'Rohan M.',
+          'time': '2 hours ago',
+          'content': 'Just tried the Almond Flour Roti from the Recipes tab! It actually tasted great and my post-meal glucose was only 132. Progress! 🎉',
+          'image': 'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=400&q=80',
+          'likes': 12,
+          'isLiked': false,
+          'comments': [],
+        },
+        {
+          'id': '2',
+          'user': 'Sneha K.',
+          'time': '5 hours ago',
+          'content': 'Managed to walk 10k steps today. Feeling tired but seeing more stable trends in the morning. Anyone has tips for Dawn Phenomenon?',
+          'image': null,
+          'likes': 24,
+          'isLiked': false,
+          'comments': [],
+        },
+      ];
+    } else {
+      // Ensure all loaded posts have the comments field (migration logic)
+      for (var post in _communityPosts) {
+        if (post['comments'] == null) post['comments'] = [];
+        if (post['isLiked'] == null) post['isLiked'] = false;
+      }
+    }
+  }
+
+  Future<void> addCommunityPost(String user, String content, {String? image}) async {
+    final newPost = {
+      'id': DateTime.now().millisecondsSinceEpoch.toString(),
+      'user': user,
+      'time': 'Just now',
+      'content': content,
+      'image': image,
+      'likes': 0,
+      'isLiked': false,
+      'comments': [],
+    };
+    _communityPosts.insert(0, newPost);
+    await _saveList('community_posts', _communityPosts);
+    notifyListeners();
+  }
+
+  Future<void> toggleLike(String postId) async {
+    final index = _communityPosts.indexWhere((p) => p['id'] == postId);
+    if (index != -1) {
+      final bool currentlyLiked = _communityPosts[index]['isLiked'] ?? false;
+      _communityPosts[index]['isLiked'] = !currentlyLiked;
+      _communityPosts[index]['likes'] = (_communityPosts[index]['likes'] ?? 0) + (currentlyLiked ? -1 : 1);
+      await _saveList('community_posts', _communityPosts);
+      notifyListeners();
+    }
+  }
+
+  Future<void> addComment(String postId, String comment) async {
+    final index = _communityPosts.indexWhere((p) => p['id'] == postId);
+    if (index != -1) {
+      final List comments = List.from(_communityPosts[index]['comments'] ?? []);
+      comments.add({
+        'user': 'You',
+        'text': comment,
+        'time': 'Just now',
+      });
+      _communityPosts[index]['comments'] = comments;
+      await _saveList('community_posts', _communityPosts);
+      notifyListeners();
+    }
+  }
+
+  Future<void> deletePost(String postId) async {
+    _communityPosts.removeWhere((p) => p['id'] == postId);
+    await _saveList('community_posts', _communityPosts);
+    notifyListeners();
   }
 
   Future<void> addWater(int amount) async {
@@ -204,6 +373,32 @@ class CareManager extends ChangeNotifier {
   Future<void> setStressLevel(int level) async {
     _stressLevel = level;
     await _prefs.setInt('daily_stress', _stressLevel);
+    notifyListeners();
+  }
+
+  Future<void> setEnergyLevel(int level) async {
+    _energyLevel = level;
+    await _prefs.setInt('daily_energy', _energyLevel);
+    notifyListeners();
+  }
+
+  Future<void> addMedicationLog(String name, String dose) async {
+    _medicationLogs.add({
+      'name': name,
+      'dose': dose,
+      'time': DateTime.now().toIso8601String(),
+    });
+    await _saveList('daily_meds', _medicationLogs);
+    notifyListeners();
+  }
+
+  Future<void> addInsulinLog(double units, String timeOfDay) async {
+    _insulinLogs.add({
+      'units': units,
+      'timeOfDay': timeOfDay,
+      'time': DateTime.now().toIso8601String(),
+    });
+    await _saveList('daily_insulin', _insulinLogs);
     notifyListeners();
   }
 
@@ -240,13 +435,34 @@ class CareManager extends ChangeNotifier {
   // Food Database for Scan Meal feature
   final List<Map<String, dynamic>> foodDatabase = [
     {
+      'name': 'Plain Roti / Chapati',
+      'carbs': 18.0,
+      'netCarbs': 15.0,
+      'gi': 'Med',
+      'gl': 'Low',
+      'spikeRisk': 'Low',
+      'swap': 'Good choice! Try Multigrain Roti for even better control.',
+      'keywords': ['roti', 'chapati', 'phulka', 'bread', 'flatbread', 'wheat'],
+    },
+    {
+      'name': 'Multigrain Roti',
+      'carbs': 15.0,
+      'netCarbs': 11.0,
+      'gi': 'Low',
+      'gl': 'Low',
+      'spikeRisk': 'Low',
+      'swap': 'Excellent choice for glucose management.',
+      'keywords': ['roti', 'multigrain', 'bread', 'wheat', 'fiber'],
+    },
+    {
       'name': 'Paneer Paratha',
       'carbs': 42.0,
       'netCarbs': 38.0,
       'gi': 'High',
       'gl': 'Med',
       'spikeRisk': 'High',
-      'swap': 'Multigrain Roti',
+      'swap': 'Plain Roti or Multigrain Roti',
+      'keywords': ['paratha', 'stuffed paratha', 'paneer', 'dough', 'stuffed'],
     },
     {
       'name': 'Real Guava Juice',
@@ -256,6 +472,7 @@ class CareManager extends ChangeNotifier {
       'gl': 'High',
       'spikeRisk': 'Very High',
       'swap': 'Fresh Whole Guava',
+      'keywords': ['juice', 'drink', 'beverage', 'guava', 'liquid'],
     },
     {
       'name': 'Cold Drink (Cola)',
@@ -265,6 +482,17 @@ class CareManager extends ChangeNotifier {
       'gl': 'High',
       'spikeRisk': 'Extreme',
       'swap': 'Sparkling Water / Fresh Lime',
+      'keywords': ['cola', 'drink', 'soda', 'beverage', 'can', 'bottle'],
+    },
+    {
+      'name': 'Aloo Paratha',
+      'carbs': 35.0,
+      'netCarbs': 32.0,
+      'gi': 'High',
+      'gl': 'High',
+      'spikeRisk': 'High',
+      'swap': 'Plain Roti or Vegetable Roti',
+      'keywords': ['paratha', 'aloo', 'potato', 'stuffed'],
     },
     {
       'name': 'Apple (Medium)',
@@ -274,6 +502,17 @@ class CareManager extends ChangeNotifier {
       'gl': 'Low',
       'spikeRisk': 'Low',
       'swap': 'Good choice! Keep the skin on.',
+      'keywords': ['apple', 'fruit', 'round', 'red', 'green'],
+    },
+    {
+      'name': 'Plain Dosa',
+      'carbs': 25.0,
+      'netCarbs': 23.0,
+      'gi': 'Med',
+      'gl': 'Low',
+      'spikeRisk': 'Med',
+      'swap': 'Oats Dosa or Moong Dal Dosa',
+      'keywords': ['dosa', 'pancake', 'south indian', 'plain'],
     },
     {
       'name': 'Masala Dosa',
@@ -283,6 +522,7 @@ class CareManager extends ChangeNotifier {
       'gl': 'Med',
       'spikeRisk': 'High',
       'swap': 'Oats Dosa or Moong Dal Dosa',
+      'keywords': ['dosa', 'pancake', 'crepe', 'south indian'],
     },
     {
       'name': 'Dal Tadka & Rice',
@@ -292,6 +532,7 @@ class CareManager extends ChangeNotifier {
       'gl': 'High',
       'spikeRisk': 'High',
       'swap': 'Dal with Cauliflower Rice / Quinoa',
+      'keywords': ['rice', 'dal', 'grain', 'bowl', 'curry'],
     },
     {
       'name': 'Water (Bottle)',
@@ -301,6 +542,57 @@ class CareManager extends ChangeNotifier {
       'gl': 'None',
       'spikeRisk': 'None',
       'swap': 'Great choice! Stay hydrated.',
+      'keywords': ['water', 'bottle', 'plastic', 'liquid', 'transparent'],
+    },
+    {
+      'name': 'Samosa (1 piece)',
+      'carbs': 18.0,
+      'netCarbs': 16.0,
+      'gi': 'High',
+      'gl': 'High',
+      'spikeRisk': 'Very High',
+      'swap': 'Baked Paneer Cubes',
+      'keywords': ['samosa', 'pastry', 'fried', 'snack', 'triangle'],
+    },
+    {
+      'name': 'Banana (Medium)',
+      'carbs': 27.0,
+      'netCarbs': 24.0,
+      'gi': 'Med',
+      'gl': 'Med',
+      'spikeRisk': 'Med',
+      'swap': 'Berries or Guava',
+      'keywords': ['banana', 'fruit', 'yellow', 'long'],
+    },
+    {
+      'name': 'Pizza (1 slice)',
+      'carbs': 25.0,
+      'netCarbs': 23.0,
+      'gi': 'High',
+      'gl': 'Med',
+      'spikeRisk': 'High',
+      'swap': 'Keto Pizza or Whole Wheat Roti',
+      'keywords': ['pizza', 'cheese', 'pepperoni', 'italian', 'fast food'],
+    },
+    {
+      'name': 'Indian Thali (Full)',
+      'carbs': 85.0,
+      'netCarbs': 78.0,
+      'gi': 'High',
+      'gl': 'High',
+      'spikeRisk': 'Very High',
+      'swap': 'Smaller portion of rice, more salad/dal',
+      'keywords': ['thali', 'platter', 'meal', 'tableware', 'dishware', 'lunch', 'dinner', 'plate', 'rice', 'curry', 'bowl', 'katori', 'indian cuisine'],
+    },
+    {
+      'name': 'Salad Bowl',
+      'carbs': 12.0,
+      'netCarbs': 8.0,
+      'gi': 'Low',
+      'gl': 'Low',
+      'spikeRisk': 'Low',
+      'swap': 'Great choice! Add protein.',
+      'keywords': ['salad', 'vegetable', 'leafy', 'green', 'healthy', 'broccoli', 'cucumber'],
     },
   ];
 }

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../main.dart'; // Add this for scaffoldMessengerKey
+import '../utils/keys.dart'; // Add this for scaffoldMessengerKey
 import '../managers/cart_manager.dart';
 import 'checkout_screen.dart';
 

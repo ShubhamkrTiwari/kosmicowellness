@@ -599,8 +599,8 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> with SingleTickerProvid
                               for (var item in items) {
                                 CartManager().addItem(item);
                               }
-                            } else {
-                              // Fallback: Add the mapped order if items list is missing (unlikely)
+
+                            } else {// Fallback: Add the mapped order if items list is missing (unlikely)
                               CartManager().addItem(order);
                             }
 
