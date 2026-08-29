@@ -87,7 +87,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          colorScheme.primary.withValues(alpha: 0.05),
+                          colorScheme.primaryContainer.withValues(alpha: 0.1),
                           colorScheme.surface,
                         ],
                       ),
@@ -95,19 +95,22 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     child: Center(
                       child: Hero(
                         tag: 'product-${product['name']}',
-                        child: (product['image'] != null && product['image'].toString().isNotEmpty)
-                            ? Image.network(
-                                product['image'].toString(),
-                                fit: BoxFit.contain,
-                                errorBuilder: (context, error, stackTrace) => Text(
+                        child: Container(
+                          padding: const EdgeInsets.all(40),
+                          child: (product['image'] != null && product['image'].toString().isNotEmpty)
+                              ? Image.network(
+                                  product['image'].toString(),
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) => Text(
+                                    product['icon'] ?? '🌿',
+                                    style: const TextStyle(fontSize: 140, decoration: TextDecoration.none),
+                                  ),
+                                )
+                              : Text(
                                   product['icon'] ?? '🌿',
-                                  style: const TextStyle(fontSize: 160, decoration: TextDecoration.none),
+                                  style: const TextStyle(fontSize: 140, decoration: TextDecoration.none),
                                 ),
-                              )
-                            : Text(
-                                product['icon'] ?? '🌿',
-                                style: const TextStyle(fontSize: 160, decoration: TextDecoration.none),
-                              ),
+                        ),
                       ),
                     ),
                   ),
@@ -150,24 +153,33 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                                     }
                                     catDisplay = catDisplay.split(' ').map((word) => word.isNotEmpty ? word[0].toUpperCase() + word.substring(1) : '').join(' ');
                                     
-                                    return Text(
-                                      catDisplay.toUpperCase(),
-                                      style: TextStyle(
-                                        color: colorScheme.primary,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 11,
-                                        letterSpacing: 1.5,
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: colorScheme.primary.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
+                                      ),
+                                      child: Text(
+                                        catDisplay.toUpperCase(),
+                                        style: TextStyle(
+                                          color: colorScheme.primary,
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 10,
+                                          letterSpacing: 1.2,
+                                        ),
                                       ),
                                     );
                                   }
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 12),
                                 Text(
                                   product['name']!,
                                   style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: -0.5,
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.8,
+                                    height: 1.2,
                                   ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
@@ -200,18 +212,20 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                               return Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 decoration: BoxDecoration(
-                                  color: colorScheme.primary.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(16),
+                                  color: Colors.amber.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: Colors.amber.withValues(alpha: 0.2)),
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.star, color: Colors.amber, size: 16),
+                                    const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
                                     const SizedBox(width: 4),
                                     Text(
                                       displayRating,
                                       style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: colorScheme.primary,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 14,
+                                        color: colorScheme.onSurface,
                                       ),
                                     ),
                                     const SizedBox(width: 4),
@@ -219,6 +233,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                                       displayReviews,
                                       style: TextStyle(
                                         fontSize: 10,
+                                        fontWeight: FontWeight.w600,
                                         color: colorScheme.onSurfaceVariant,
                                       ),
                                     ),
@@ -230,39 +245,53 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                         ],
                       ),
                       const SizedBox(height: 24),
-                      Text(
-                        '₹${(product['price'] ?? 0).toString().replaceAll('₹', '').trim()}',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w900,
-                          color: colorScheme.secondary,
-                          letterSpacing: 1.0,
-                        ),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            '₹',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                          Text(
+                            (product['price'] ?? 0).toString().replaceAll('₹', '').trim(),
+                            style: TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w900,
+                              color: colorScheme.onSurface,
+                              letterSpacing: -1.0,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            LanguageManager().translate('inclusive_of_taxes').replaceAll('_', ' '),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 32),
-                      Text(
-                        LanguageManager().translate('ayurvedic_story'),
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        (product['description'] ?? '').toString(),
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: colorScheme.onSurfaceVariant,
-                          height: 1.6,
-                        ),
-                      ),
-                      const SizedBox(height: 32),
+                      _buildDescriptionCard(product, colorScheme),
+                      const SizedBox(height: 24),
                       _buildBenefitsGrid(colorScheme),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 24),
                       _buildSpecsGrid(product, colorScheme),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 24),
                       _buildKeyBenefits(product, colorScheme),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 24),
                       _buildIngredients(product, colorScheme),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 24),
+                      _buildTrustBadges(colorScheme),
+                      const SizedBox(height: 24),
                       _buildQuantitySelector(colorScheme),
+                      const SizedBox(height: 40),
                     ],
                   ),
                 ),
@@ -282,9 +311,67 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     );
   }
 
+  Widget _buildSectionHeader(String title, IconData icon, ColorScheme colorScheme, {Color? iconColor}) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: (iconColor ?? colorScheme.primary).withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: iconColor ?? colorScheme.primary, size: 18),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          title,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDescriptionCard(Map<String, dynamic> product, ColorScheme colorScheme) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader(
+            LanguageManager().translate('ayurvedic_story').replaceAll('_', ' ').toUpperCase(), 
+            Icons.history_edu_rounded, 
+            colorScheme
+          ),
+          const SizedBox(height: 16),
+          Text(
+            (product['description'] ?? '').toString(),
+            style: TextStyle(
+              fontSize: 15,
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+              height: 1.6,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSpecsGrid(Map<String, dynamic> product, ColorScheme colorScheme) {
     final lang = LanguageManager();
-    // Robust key extraction to handle different naming conventions from API/Admin
     final String sku = (product['sku'] ?? product['product_id'] ?? product['SKU'] ?? 'N/A').toString();
     final String brand = (product['brand'] ?? product['manufacturer'] ?? product['vendor'] ?? 'Kosmico Wellness').toString();
     final dynamic stockRaw = product['countInStock'] ?? product['stock'] ?? product['inventory'] ?? product['quantity'] ?? product['qty'];
@@ -294,42 +381,31 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(lang.translate('brand'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text(brand, style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 15, fontWeight: FontWeight.w500)),
-        const SizedBox(height: 24),
+        _buildSectionHeader(lang.translate('product_specifications').replaceAll('_', ' ').toUpperCase(), Icons.info_outline_rounded, colorScheme),
+        const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: colorScheme.primary.withValues(alpha: 0.1)),
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.02),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
           child: Column(
             children: [
-              Row(
-                children: [
-                  Expanded(child: _specItem('SKU', sku, Icons.qr_code_scanner, colorScheme)),
-                  Container(width: 1, height: 40, color: colorScheme.outline.withValues(alpha: 0.1)),
-                  Expanded(
-                    child: _specItem(
-                      lang.translate('stock_status'), 
-                      stockRaw != null ? '${lang.translate('in_stock')} ($stockRaw)' : lang.translate('in_stock'), 
-                      Icons.inventory_2_outlined, 
-                      colorScheme, 
-                      valueColor: Colors.green
-                    )
-                  ),
-                ],
-              ),
+              _specRow('Brand', brand, Icons.business_rounded, colorScheme),
               const Divider(height: 24, thickness: 0.5),
-              Row(
-                children: [
-                  Expanded(child: _specItem(lang.translate('shelf_life'), shelfLife, Icons.history_toggle_off_rounded, colorScheme)),
-                  Container(width: 1, height: 40, color: colorScheme.outline.withValues(alpha: 0.1)),
-                  Expanded(child: _specItem(lang.translate('made_in'), origin, Icons.public_rounded, colorScheme)),
-                ],
-              ),
+              _specRow('SKU ID', sku, Icons.qr_code_2_rounded, colorScheme),
+              const Divider(height: 24, thickness: 0.5),
+              _specRow('Shelf Life', shelfLife, Icons.timer_outlined, colorScheme),
+              const Divider(height: 24, thickness: 0.5),
+              _specRow('Origin', origin, Icons.location_on_outlined, colorScheme),
             ],
           ),
         ),
@@ -337,32 +413,32 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     );
   }
 
-  Widget _specItem(String label, String value, IconData icon, ColorScheme colorScheme, {Color? valueColor}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _specRow(String label, String value, IconData icon, ColorScheme colorScheme) {
+    return Row(
       children: [
-        Row(
-          children: [
-            Icon(icon, size: 14, color: colorScheme.primary.withValues(alpha: 0.7)),
-            const SizedBox(width: 6),
-            Text(label, style: TextStyle(color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7), fontSize: 11, fontWeight: FontWeight.bold)),
-          ],
+        Icon(icon, size: 20, color: colorScheme.primary.withValues(alpha: 0.6)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            label, 
+            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14, fontWeight: FontWeight.w500),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
-        const SizedBox(height: 4),
-        Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: valueColor)),
+        const SizedBox(width: 8),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
       ],
     );
   }
 
   Widget _buildKeyBenefits(Map<String, dynamic> product, ColorScheme colorScheme) {
-    // Try multiple possible keys from API
     final dynamic benefitsRaw = product['keyBenefits'] ?? product['benefits'] ?? product['key_benefits'];
     
     List<String> benefits = [];
     if (benefitsRaw is List) {
       benefits = benefitsRaw.map((e) => e.toString()).toList();
     } else if (benefitsRaw is String && benefitsRaw.isNotEmpty) {
-      // If it's a comma-separated string or has newlines, split it
       if (benefitsRaw.contains('\n')) {
         benefits = benefitsRaw.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
       } else if (benefitsRaw.contains(',')) {
@@ -372,52 +448,67 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       }
     }
 
-    // Strictly hide if no data from admin
     if (benefits.isEmpty) return const SizedBox.shrink();
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: colorScheme.primary.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.check_circle_outline_rounded, color: colorScheme.primary, size: 28),
-              const SizedBox(width: 12),
-              Text(LanguageManager().translate('key_benefits'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader(LanguageManager().translate('key_benefits').replaceAll('_', ' ').toUpperCase(), Icons.auto_awesome_rounded, colorScheme),
+        const SizedBox(height: 16),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [colorScheme.primary.withValues(alpha: 0.08), colorScheme.primary.withValues(alpha: 0.02)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: colorScheme.primary.withValues(alpha: 0.05)),
+            boxShadow: [
+              BoxShadow(
+                color: colorScheme.primary.withValues(alpha: 0.02),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
             ],
           ),
-          const SizedBox(height: 20),
-          ...benefits.map((benefit) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.check_circle_rounded, color: colorScheme.primary.withValues(alpha: 0.5), size: 18),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text(benefit, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14))),
-                ],
-              ),
-            ),
-          )),
-        ],
-      ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ...benefits.map((benefit) => Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(top: 2),
+                      child: Icon(Icons.verified_rounded, color: colorScheme.primary, size: 16),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        benefit,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                          color: colorScheme.onSurface.withValues(alpha: 0.8),
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildIngredients(Map<String, dynamic> product, ColorScheme colorScheme) {
-    // Try multiple possible keys from API
     final dynamic ingRaw = product['ingredients'] ?? product['key_ingredients'] ?? product['ingredientsList'];
     
     List<String> ingredients = [];
@@ -433,33 +524,55 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       }
     }
 
-    // Strictly hide if no data from admin
     if (ingredients.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(LanguageManager().translate('ingredients'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        _buildSectionHeader(LanguageManager().translate('ingredients').replaceAll('_', ' ').toUpperCase(), Icons.eco_rounded, colorScheme, iconColor: const Color(0xFF4CAF50)),
         const SizedBox(height: 16),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: ingredients.map((ing) => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: colorScheme.primary.withValues(alpha: 0.1)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('🌿', style: TextStyle(fontSize: 14)),
-                const SizedBox(width: 8),
-                Text(ing, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-              ],
-            ),
-          )).toList(),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
+          ),
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: ingredients.map((ing) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('🌿', style: TextStyle(fontSize: 14)),
+                  const SizedBox(width: 10),
+                  Text(
+                    ing, 
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700, 
+                      fontSize: 13,
+                      color: colorScheme.onSurface.withValues(alpha: 0.8),
+                    )
+                  ),
+                ],
+              ),
+            )).toList(),
+          ),
         ),
       ],
     );
@@ -470,43 +583,101 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          lang.translate('product_highlights'),
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
+        _buildSectionHeader(lang.translate('product_highlights').replaceAll('_', ' ').toUpperCase(), Icons.star_outline_rounded, colorScheme),
         const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          childAspectRatio: 2.5,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
           children: [
-            Expanded(child: _highlightItem(Icons.eco_outlined, lang.translate('organic'), colorScheme)),
-            Expanded(child: _highlightItem(Icons.science_outlined, lang.translate('lab_tested'), colorScheme)),
-            Expanded(child: _highlightItem(Icons.auto_awesome_outlined, lang.translate('handmade'), colorScheme)),
-            Expanded(child: _highlightItem(Icons.verified_outlined, lang.translate('authentic'), colorScheme)),
+            _highlightCard(Icons.eco_outlined, lang.translate('organic'), colorScheme),
+            _highlightCard(Icons.science_outlined, lang.translate('lab_tested'), colorScheme),
+            _highlightCard(Icons.auto_awesome_outlined, lang.translate('handmade'), colorScheme),
+            _highlightCard(Icons.verified_outlined, lang.translate('authentic'), colorScheme),
           ],
         ),
       ],
     );
   }
 
-  Widget _highlightItem(IconData icon, String label, ColorScheme colorScheme) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: colorScheme.primary.withOpacity(0.05),
-            shape: BoxShape.circle,
+  Widget _highlightCard(IconData icon, String label, ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.01),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
-          child: Icon(icon, color: colorScheme.primary, size: 24),
-        ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withValues(alpha: 0.05),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: colorScheme.primary, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12, 
+                fontWeight: FontWeight.w700, 
+                color: colorScheme.onSurface.withValues(alpha: 0.8)
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrustBadges(ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.05)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _trustBadge(Icons.verified_user_rounded, 'Certified', colorScheme),
+          _trustBadge(Icons.health_and_safety_rounded, 'Non-GMO', colorScheme),
+          _trustBadge(Icons.biotech_rounded, 'Lab Tested', colorScheme),
+          _trustBadge(Icons.nature_people_rounded, 'Ethical', colorScheme),
+        ],
+      ),
+    );
+  }
+
+  Widget _trustBadge(IconData icon, String label, ColorScheme colorScheme) {
+    return Column(
+      children: [
+        Icon(icon, color: colorScheme.primary.withValues(alpha: 0.4), size: 24),
         const SizedBox(height: 8),
         Text(
           label,
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colorScheme.onSurfaceVariant),
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+          ),
         ),
       ],
     );
@@ -516,39 +687,25 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: iconColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(color: iconColor.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 18,
-            height: 18,
-            decoration: BoxDecoration(
-              color: iconColor,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: Colors.white,
-              size: 10,
-            ),
+          Icon(
+            icon,
+            color: iconColor,
+            size: 14,
           ),
           const SizedBox(width: 6),
           Text(
             text,
             style: TextStyle(
-              color: colorScheme.onSurface,
+              color: iconColor,
               fontSize: 11,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -563,78 +720,103 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
     if (availableStock <= 0) {
       return Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         width: double.infinity,
         decoration: BoxDecoration(
-          color: Colors.red.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
+          color: Colors.red.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.red.withValues(alpha: 0.1)),
         ),
         child: const Row(
           children: [
-            Icon(Icons.error_outline, color: Colors.red, size: 20),
+            Icon(Icons.error_outline_rounded, color: Colors.red, size: 22),
             SizedBox(width: 12),
             Text(
-              'Sorry, this item is currently Out of Stock',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 14),
+              'Currently Out of Stock',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w800, fontSize: 14),
             ),
           ],
         ),
       );
     }
 
-    return Row(
-      children: [
-        Text(LanguageManager().translate('quantity'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        const Spacer(),
-        Container(
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
+      ),
+      child: Row(
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              IconButton(
-                onPressed: () { if (_quantity > 1) setState(() => _quantity--); },
-                icon: const Icon(Icons.remove, size: 20),
+              Text(
+                LanguageManager().translate('quantity'), 
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)
               ),
               Text(
-                _quantity.toString().padLeft(2, '0'),
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              IconButton(
-                onPressed: () {
-                  if (_quantity < availableStock) {
-                    setState(() => _quantity++);
-                  } else {
-                    scaffoldMessengerKey.currentState?.hideCurrentSnackBar();
-                    scaffoldMessengerKey.currentState?.showSnackBar(
-                      SnackBar(
-                        content: Row(
-                          children: [
-                            const Icon(Icons.info_outline, color: Colors.white, size: 20),
-                            const SizedBox(width: 12),
-                            Expanded(child: Text('Only $availableStock items available in stock.')),
-                          ],
-                        ),
-                        backgroundColor: Colors.orange[800],
-                        behavior: SnackBarBehavior.floating,
-                        margin: const EdgeInsets.all(16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    );
-                  }
-                },
-                icon: Icon(
-                  Icons.add, 
-                  size: 20, 
-                  color: _quantity >= availableStock ? colorScheme.onSurface.withValues(alpha: 0.3) : null
-                ),
+                'Select units',
+                style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500),
               ),
             ],
           ),
-        ),
-      ],
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: () { if (_quantity > 1) setState(() => _quantity--); },
+                  icon: Icon(Icons.remove_circle_outline_rounded, size: 24, color: colorScheme.primary),
+                ),
+                Container(
+                  constraints: const BoxConstraints(minWidth: 30),
+                  alignment: Alignment.center,
+                  child: Text(
+                    _quantity.toString(),
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () {
+                    if (_quantity < availableStock) {
+                      setState(() => _quantity++);
+                    } else {
+                      scaffoldMessengerKey.currentState?.hideCurrentSnackBar();
+                      scaffoldMessengerKey.currentState?.showSnackBar(
+                        SnackBar(
+                          content: Row(
+                            children: [
+                              const Icon(Icons.info_outline, color: Colors.white, size: 20),
+                              const SizedBox(width: 12),
+                              Expanded(child: Text('Only $availableStock items available in stock.')),
+                            ],
+                          ),
+                          backgroundColor: Colors.orange[800],
+                          behavior: SnackBarBehavior.floating,
+                          margin: const EdgeInsets.all(16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      );
+                    }
+                  },
+                  icon: Icon(
+                    Icons.add_circle_outline_rounded, 
+                    size: 24, 
+                    color: _quantity >= availableStock ? colorScheme.onSurface.withValues(alpha: 0.2) : colorScheme.primary
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -644,23 +826,25 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     final bool isOutOfStock = availableStock <= 0;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+        borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, -5),
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 30,
+            offset: const Offset(0, 10),
           ),
         ],
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [
           Expanded(
             child: SizedBox(
-              height: 60,
+              height: 56,
               child: OutlinedButton(
                 onPressed: isOutOfStock ? null : () {
                   final cart = CartManager();
@@ -710,21 +894,32 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 },
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: isOutOfStock ? colorScheme.outline : colorScheme.primary, width: 2),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                   padding: EdgeInsets.zero,
                 ),
                 child: Text(
-                  isOutOfStock ? LanguageManager().translate('out_of_stock') : LanguageManager().translate('add_to_cart'),
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  isOutOfStock ? LanguageManager().translate('out_of_stock') : LanguageManager().translate('add_to_cart').toUpperCase(),
+                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.1),
                   textAlign: TextAlign.center,
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
-            child: SizedBox(
-              height: 60,
+            child: Container(
+              height: 56,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  if (!isOutOfStock)
+                    BoxShadow(
+                      color: colorScheme.primary.withValues(alpha: 0.3),
+                      blurRadius: 15,
+                      offset: const Offset(0, 5),
+                    ),
+                ],
+              ),
               child: ElevatedButton(
                 onPressed: isOutOfStock ? null : () {
                   final cart = CartManager();
@@ -747,13 +942,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: isOutOfStock ? colorScheme.surfaceContainerHighest : colorScheme.primary,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                   elevation: 0,
                   padding: EdgeInsets.zero,
                 ),
                 child: Text(
-                  isOutOfStock ? LanguageManager().translate('out_of_stock') : LanguageManager().translate('buy_now'),
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                  isOutOfStock ? LanguageManager().translate('out_of_stock') : LanguageManager().translate('buy_now').toUpperCase(),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 1.1),
                   textAlign: TextAlign.center,
                 ),
               ),

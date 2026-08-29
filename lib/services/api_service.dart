@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import '../utils/keys.dart';
 import '../screens/maintenance_screen.dart';
+import '../managers/user_manager.dart';
 
 class ApiService {
 
@@ -1042,6 +1043,268 @@ class ApiService {
           'logTime': DateTime.now().toIso8601String(),
           'status': 'Logged',
         }),
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  // Post APIs
+  static Future<Map<String, dynamic>> createPost({
+    required String content,
+    XFile? imageFile,
+    String privacyLevel = 'public',
+    List<String>? tags,
+    String? location,
+    required String token,
+  }) async {
+    try {
+      var uri = _getUri('/api/posts');
+      var request = http.MultipartRequest('POST', uri);
+      
+      request.headers.addAll({
+        'Authorization': 'Bearer $token',
+      });
+      
+      request.fields['content'] = content;
+      request.fields['text'] = content;
+      request.fields['caption'] = content;
+      request.fields['description'] = content;
+      request.fields['message'] = content;
+      request.fields['body'] = content;
+      request.fields['privacyLevel'] = privacyLevel;
+      if (location != null) request.fields['location'] = location;
+      if (tags != null) {
+        request.fields['tags'] = jsonEncode(tags);
+      }
+
+      if (imageFile != null) {
+        Uint8List imageBytes = await imageFile.readAsBytes();
+        String ext = imageFile.name.split('.').last.toLowerCase();
+        String mimeType = 'image/jpeg';
+        if (ext == 'png') mimeType = 'image/png';
+        if (ext == 'webp') mimeType = 'image/webp';
+        if (ext == 'gif') mimeType = 'image/gif';
+
+        request.files.add(http.MultipartFile.fromBytes(
+          'media',
+          imageBytes,
+          filename: imageFile.name,
+          contentType: MediaType.parse(mimeType),
+        ));
+      }
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+      
+      return _processResponse(response);
+    } catch (e) {
+      debugPrint('API Error: $e');
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> getFeed(String token, {int page = 1, int limit = 10}) async {
+    try {
+      final response = await http.get(
+        _getUri('/api/posts/feed?page=$page&limit=$limit'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> getUserPosts(String userId, String token) async {
+    try {
+      final response = await http.get(
+        _getUri('/api/posts/user/$userId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> likePost(String postId, String token) async {
+    try {
+      final response = await http.post(
+        _getUri('/api/posts/$postId/like'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> addComment(String postId, String text, String token) async {
+    try {
+      final name = UserManager().userName;
+      final email = UserManager().userEmail;
+      final resolvedName = (name != null && name.trim().isNotEmpty && name.trim().toLowerCase() != 'user')
+          ? name.trim()
+          : (email != null && email.contains('@') ? email.split('@').first : 'Member');
+
+      final response = await http.post(
+        _getUri('/api/posts/$postId/comments'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'text': text,
+          'comment': text,
+          'content': text,
+          'userName': resolvedName,
+          'name': resolvedName,
+          'fullName': resolvedName,
+          'authorName': resolvedName,
+          'user': {
+            '_id': UserManager().userId,
+            'name': resolvedName,
+            'userName': resolvedName,
+            'email': UserManager().userEmail,
+            'profilePicture': UserManager().profilePicture,
+          },
+          'userImage': UserManager().profilePicture,
+          'profilePicture': UserManager().profilePicture,
+        }),
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> editPost(String postId, Map<String, dynamic> updates, String token) async {
+    try {
+      final payload = Map<String, dynamic>.from(updates);
+      if (payload.containsKey('content')) {
+        final c = payload['content'];
+        payload['text'] = c;
+        payload['caption'] = c;
+        payload['description'] = c;
+        payload['message'] = c;
+        payload['body'] = c;
+      }
+      final response = await http.put(
+        _getUri('/api/posts/$postId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 30));
+      final res = _processResponse(response);
+      if (res['success'] == true) return res;
+
+      // Fallback to PATCH if PUT returned non-success
+      final patchResponse = await http.patch(
+        _getUri('/api/posts/$postId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(patchResponse);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> deletePost(String postId, String token) async {
+    try {
+      final response = await http.delete(
+        _getUri('/api/posts/$postId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> addFriend(String friendId, String token) async {
+    try {
+      final response = await http.post(
+        _getUri('/api/posts/friend-request/send/$friendId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> getFriends(String token) async {
+    try {
+      final response = await http.get(
+        _getUri('/api/posts/friends'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> getFriendRequests(String token) async {
+    try {
+      final response = await http.get(
+        _getUri('/api/posts/friend-requests'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> acceptFriendRequest(String requestId, String token) async {
+    try {
+      final response = await http.post(
+        _getUri('/api/posts/friend-request/accept/$requestId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> rejectFriendRequest(String requestId, String token) async {
+    try {
+      final response = await http.post(
+        _getUri('/api/posts/friend-request/reject/$requestId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
       ).timeout(const Duration(seconds: 30));
       return _processResponse(response);
     } catch (e) {

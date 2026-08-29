@@ -94,46 +94,7 @@ class _RecipesModuleState extends State<RecipesModule> {
     ];
   }
 
-  List<Map<String, dynamic>> _getLocalFallbackRecipes() {
-    return [
-      {
-        'name': 'Quinoa Pulao',
-        'carbs': '15g Carbs',
-        'servingSize': '1 small bowl',
-        'image': 'https://images.unsplash.com/photo-1543339308-43e59d6b73a6?auto=format&fit=crop&w=800&q=80',
-        'protein': '12g',
-        'fiber': '8g',
-        'prep': '25 min',
-        'category': 'Lunch / Dinner',
-        'ingredients': ['1 cup Quinoa', 'Mixed Vegetables', 'Lemon Juice'],
-        'steps': ['Rinse quinoa thoroughly.', 'Sauté vegetables in a pan.', 'Cook quinoa with veggies and water.', 'Add lemon juice and serve.'],
-      },
-      {
-        'name': 'Moong Dal Chilla',
-        'carbs': '10g Carbs',
-        'servingSize': '2 chillas',
-        'image': 'https://images.unsplash.com/photo-1626074353765-517a681e40be?auto=format&fit=crop&w=800&q=80',
-        'protein': '14g',
-        'fiber': '6g',
-        'prep': '15 min',
-        'category': 'Breakfast',
-        'ingredients': ['Moong Dal', 'Ginger', 'Green Chili'],
-        'steps': ['Soak dal for 2 hours.', 'Grind to a smooth batter.', 'Cook on tawa like thin pancakes until golden.'],
-      },
-      {
-        'name': 'Sprouted Salad',
-        'carbs': '8g Carbs',
-        'servingSize': '1 bowl',
-        'image': 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=800&q=80',
-        'protein': '10g',
-        'fiber': '7g',
-        'prep': '10 min',
-        'category': 'Snack',
-        'ingredients': ['Mixed Sprouts', 'Cucumber', 'Tomato', 'Lemon'],
-        'steps': ['Mix sprouts and chopped vegetables.', 'Add lemon juice and salt.', 'Toss well and serve fresh.'],
-      },
-    ];
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -146,10 +107,12 @@ class _RecipesModuleState extends State<RecipesModule> {
         children: [
           _buildSearchBar(colorScheme),
           const SizedBox(height: 24),
-          Row(
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 4,
             children: [
               _buildSectionTitle('Diabetes Friendly Recipes'),
-              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
@@ -407,9 +370,23 @@ class _RecipesModuleState extends State<RecipesModule> {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Text(from, style: const TextStyle(fontSize: 12, decoration: TextDecoration.lineThrough)),
+          Flexible(
+            child: Text(
+              from, 
+              style: const TextStyle(fontSize: 12, decoration: TextDecoration.lineThrough),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 4),
           const Icon(Icons.arrow_right_alt, size: 16),
-          Text(to, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green)),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              to, 
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );

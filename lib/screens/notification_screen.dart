@@ -175,10 +175,24 @@ class _NotificationScreenState extends State<NotificationScreen> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             alignment: Alignment.center,
-                            child: Text(
-                              item['icon'] ?? '🔔',
-                              style: const TextStyle(fontSize: 24),
-                            ),
+                            child: (item['senderImage'] != null && item['senderImage']!.isNotEmpty)
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Image.network(
+                                      item['senderImage']!,
+                                      width: 50,
+                                      height: 50,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (c, e, s) => Text(
+                                        item['icon'] ?? '👥',
+                                        style: const TextStyle(fontSize: 24),
+                                      ),
+                                    ),
+                                  )
+                                : Text(
+                                    item['icon'] ?? '🔔',
+                                    style: const TextStyle(fontSize: 24),
+                                  ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
@@ -220,6 +234,68 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                     height: 1.4,
                                   ),
                                 ),
+                                if (item['type'] == 'friend_request' || (item['type'] ?? '').contains('friend')) ...[
+                                  const SizedBox(height: 10),
+                                  if (item['status'] == 'accepted')
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.check_circle, color: Colors.green, size: 14),
+                                          SizedBox(width: 4),
+                                          Text('Accepted', style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold)),
+                                        ],
+                                      ),
+                                    )
+                                  else
+                                    Row(
+                                      children: [
+                                        ElevatedButton(
+                                          onPressed: () async {
+                                            final success = await notificationManager.acceptFriendRequest(item['id']!);
+                                            if (context.mounted && success) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(content: Text('Friend request accepted!'), backgroundColor: Colors.green),
+                                              );
+                                            }
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: colorScheme.primary,
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                            minimumSize: Size.zero,
+                                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                          ),
+                                          child: const Text('Accept', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        OutlinedButton(
+                                          onPressed: () async {
+                                            await notificationManager.rejectFriendRequest(item['id']!);
+                                            if (context.mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(content: Text('Friend request declined.')),
+                                              );
+                                            }
+                                          },
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: colorScheme.onSurfaceVariant,
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                            minimumSize: Size.zero,
+                                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                          ),
+                                          child: const Text('Decline', style: TextStyle(fontSize: 12)),
+                                        ),
+                                      ],
+                                    ),
+                                ],
                                 const SizedBox(height: 8),
                                 Text(
                                   item['time'] ?? '',

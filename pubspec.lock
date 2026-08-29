@@ -41,6 +41,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.13"
+  bluez:
+    dependency: transitive
+    description:
+      name: bluez
+      sha256: "61a7204381925896a374301498f2f5399e59827c6498ae1e924aaa598751b545"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.8.3"
   boolean_selector:
     dependency: transitive
     description:
@@ -85,10 +93,10 @@ packages:
     dependency: transitive
     description:
       name: code_assets
-      sha256: bf394f466ba9205f1812a0433b392d6af280f155f56651eda7c18cc32ed493b8
+      sha256: cfd4f5f575a49c5f10ca856e9846073f1e6c3ee94912377eea5f6cefc5272941
       url: "https://pub.dev"
     source: hosted
-    version: "1.2.1"
+    version: "2.0.0"
   collection:
     dependency: transitive
     description:
@@ -141,10 +149,10 @@ packages:
     dependency: transitive
     description:
       name: dbus
-      sha256: "792974a4007974fbc5c1b5433eb2330a9db3e368c3f906253af4c007d0f49a91"
+      sha256: a48d5da28e89bd02196e80d81ed8d7954923d00a0f4a68cc20b575038f023383
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.13"
+    version: "0.7.15"
   eventify:
     dependency: transitive
     description:
@@ -230,6 +238,62 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_blue_plus:
+    dependency: "direct main"
+    description:
+      name: flutter_blue_plus
+      sha256: "5389f2b85305d0e03b025de7a92ec86137440b5108744f1017645ff67c5f2dcc"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.3.12"
+  flutter_blue_plus_android:
+    dependency: transitive
+    description:
+      name: flutter_blue_plus_android
+      sha256: "5f1db477d442974c516196718e2ab66e3601e9a2de271bddde9368c1a85e6e64"
+      url: "https://pub.dev"
+    source: hosted
+    version: "9.0.3"
+  flutter_blue_plus_darwin:
+    dependency: transitive
+    description:
+      name: flutter_blue_plus_darwin
+      sha256: ce55b40e751da0d9a74bf14db3924d2553b7e67ca0270ea9260f2d46a44ead3a
+      url: "https://pub.dev"
+    source: hosted
+    version: "9.0.4"
+  flutter_blue_plus_linux:
+    dependency: transitive
+    description:
+      name: flutter_blue_plus_linux
+      sha256: "79387947c27d04fce505916d168a1f8b7a89846d22d11a659970aba316459622"
+      url: "https://pub.dev"
+    source: hosted
+    version: "9.0.3"
+  flutter_blue_plus_platform_interface:
+    dependency: transitive
+    description:
+      name: flutter_blue_plus_platform_interface
+      sha256: "9378ed463673ab51e7ab72cf4bad3633b134182ca184ddcc598d6f7474ada993"
+      url: "https://pub.dev"
+    source: hosted
+    version: "9.0.3"
+  flutter_blue_plus_web:
+    dependency: transitive
+    description:
+      name: flutter_blue_plus_web
+      sha256: "62670fd0072e9424661170c3439eb2784679e0cb8420907ae2fe979aab8eed71"
+      url: "https://pub.dev"
+    source: hosted
+    version: "9.0.3"
+  flutter_blue_plus_winrt:
+    dependency: transitive
+    description:
+      name: flutter_blue_plus_winrt
+      sha256: "0000b2d818e6f79ad07764206fdd8afb69426fd44453c6254c35828fd16aa09f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.20"
   flutter_contacts:
     dependency: "direct main"
     description:
@@ -356,10 +420,10 @@ packages:
     dependency: transitive
     description:
       name: geolocator_platform_interface
-      sha256: cdb082e4f048b69da244117b7914cc60d2a8897546ffaa4f2529c786ded7aee2
+      sha256: "94db8255dc183d268765df682580440617ca35877fc82cacb5420ad03b86198d"
       url: "https://pub.dev"
     source: hosted
-    version: "4.2.8"
+    version: "4.3.0"
   geolocator_web:
     dependency: transitive
     description:
@@ -644,10 +708,10 @@ packages:
     dependency: transitive
     description:
       name: objective_c
-      sha256: b7fb95a6d9a4f009edd63dc5ac69f07420b23a16161c6dd8660290b59c602e8e
+      sha256: ad56fd53a78ff6b1472fa59ff2a4e8b8ccabafc586fc263a1dfad0b99b5553e3
       url: "https://pub.dev"
     source: hosted
-    version: "9.5.0"
+    version: "9.6.0"
   package_config:
     dependency: transitive
     description:

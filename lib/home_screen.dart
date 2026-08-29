@@ -5,6 +5,8 @@ import 'screens/cart_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/ai_consultant_screen.dart';
 import 'screens/care/care_dashboard_screen.dart';
+import 'screens/care/scan_meal_module.dart';
+import 'screens/care/today_module.dart';
 import 'screens/notification_screen.dart';
 import 'screens/product_details_screen.dart';
 import 'screens/product_list_screen.dart';
@@ -12,6 +14,7 @@ import 'managers/cart_manager.dart';
 import 'managers/wishlist_manager.dart';
 import 'managers/language_manager.dart';
 import 'managers/notification_manager.dart';
+import 'managers/care_manager.dart';
 import 'services/api_service.dart';
 import 'widgets/banner_carousel.dart';
 import 'utils/keys.dart';
@@ -39,6 +42,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Timer? _refreshTimer;
 
   final GlobalKey<ProductListScreenState> _productListKey = GlobalKey<ProductListScreenState>();
+  final GlobalKey<CareDashboardScreenState> _careDashboardKey = GlobalKey<CareDashboardScreenState>();
 
   @override
   void initState() {
@@ -218,9 +222,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colorScheme.secondary.withOpacity(0.1),
+        color: colorScheme.secondary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.secondary.withOpacity(0.2)),
+        border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -246,23 +250,96 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  // --- NAVIGATION ACTION HELPERS ---
+  void _openPlateScan() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            title: const Text(
+              'AI Plate & Meal Scanner',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+          ),
+          body: const ScanMealModule(),
+        ),
+      ),
+    );
+  }
+
+  void _openSmartwatchSync() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DeviceManagementSheet(manager: CareManager()),
+    );
+  }
+
+  void _openAiConsultant() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const AiConsultantScreen()),
+    );
+  }
+
+  void _openCareTab(int tabIndex) {
+    setState(() => _selectedIndex = 2);
+    _careDashboardKey.currentState?.switchTab(tabIndex);
+  }
+
+  void _handleBannerTap(int index) {
+    if (index == 0) {
+      // Sweet monk banner -> Go to Products Tab
+      setState(() => _selectedIndex = 1);
+      _productListKey.currentState?.refreshData();
+    } else if (index == 1) {
+      // Scan plate banner -> Open Plate Scanner
+      _openPlateScan();
+    } else if (index == 2) {
+      // Social/community banner -> Go to Care Community Tab
+      _openCareTab(1);
+    }
+  }
+
+  // --- HOME BODY ---
   Widget _buildHomeBody(ColorScheme colorScheme, LanguageManager lang) {
-    return RefreshIndicator(
-      onRefresh: _refreshAllData,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 140),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_showUpdateBanner && _updateData != null) _buildUpdateBanner(colorScheme),
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFFE8F5E9), // Mint green ambient wash at top
+            Color(0xFFF4FBF7), // Soft transition
+            Colors.white,      // Clean pure white towards bottom
+          ],
+          stops: [0.0, 0.25, 0.7],
+        ),
+      ),
+      child: RefreshIndicator(
+        onRefresh: _refreshAllData,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.only(bottom: 140),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_showUpdateBanner && _updateData != null) _buildUpdateBanner(colorScheme),
+
+            // Top Search Bar
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Container(
                 decoration: BoxDecoration(
                   color: colorScheme.surface,
                   borderRadius: BorderRadius.circular(20),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, 10))],
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
                 ),
                 child: TextField(
                   onChanged: (value) => setState(() => _homeSearchQuery = value),
@@ -278,13 +355,60 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
               ),
             ),
-            const BannerCarousel(),
+
+            // Top Auto-Sliding Banner Carousel (Product & Features running at the top)
+            BannerCarousel(onBannerTap: _handleBannerTap),
+
+            const SizedBox(height: 20),
+
+            // ALL CLINICAL & CARE FEATURES (FRONT & CENTER)
+            _buildFeatureHubSection(colorScheme),
+
+            const SizedBox(height: 24),
+
+            // Products Header
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
-              child: Text(lang.translate('categories'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        lang.translate('bestsellers'),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Organic & clinically curated foods',
+                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() => _selectedIndex = 1);
+                      _productListKey.currentState?.refreshData();
+                    },
+                    icon: const Icon(Icons.storefront_rounded, size: 16),
+                    label: Text(lang.translate('view_all')),
+                    style: TextButton.styleFrom(
+                      foregroundColor: colorScheme.secondary,
+                      textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
             ),
+
+            const SizedBox(height: 12),
+
+            // Categories horizontal list
             SizedBox(
-              height: 40,
+              height: 38,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -296,22 +420,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 },
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(lang.translate('bestsellers'), style: Theme.of(context).textTheme.titleLarge?.copyWith(color: colorScheme.primary, fontWeight: FontWeight.bold)),
-                  TextButton(
-                    onPressed: () {
-                      setState(() => _selectedIndex = 1);
-                      _productListKey.currentState?.refreshData();
-                    },
-                    child: Text(lang.translate('view_all'), style: TextStyle(color: colorScheme.secondary)),
-                  ),
-                ],
-              ),
-            ),
+
+            const SizedBox(height: 16),
+
+            // Products Grid
             _isLoadingProducts 
               ? const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator()))
               : _filteredHomeProducts.isEmpty 
@@ -320,11 +432,407 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.7, crossAxisSpacing: 16, mainAxisSpacing: 16),
-                    itemCount: _filteredHomeProducts.length,
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 0.7,
+                      crossAxisSpacing: 14,
+                      mainAxisSpacing: 14,
+                    ),
+                    itemCount: _filteredHomeProducts.length > 6 ? 6 : _filteredHomeProducts.length,
                     itemBuilder: (context, index) => _buildProductCard(_filteredHomeProducts[index], colorScheme, lang),
                   ),
+
+            const SizedBox(height: 20),
+
+            // "Explore Full Store" Bottom Card
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: InkWell(
+                onTap: () {
+                  setState(() => _selectedIndex = 1);
+                  _productListKey.currentState?.refreshData();
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.shopping_bag_rounded, color: Colors.white, size: 20),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Explore Full Product Store',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                            Text(
+                              'View all diabetic care foods, sweeteners & herbal supplements',
+                              style: TextStyle(fontSize: 11, color: Colors.grey[700]),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.arrow_forward_ios_rounded, size: 16, color: colorScheme.primary),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ],
+        ),
+      ),
+    ),
+  );
+  }
+
+  // --- SMART HEALTH & CARE SUITE (FEATURE HUB) ---
+  Widget _buildFeatureHubSection(ColorScheme colorScheme) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFF0FDF4), // Emerald white
+            Colors.white,      // Pure white center
+            Color(0xFFE8F5E9), // Mint green glow
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFF10B981).withValues(alpha: 0.18),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF047857).withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(Icons.auto_awesome_rounded, color: colorScheme.primary, size: 16),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Smart Health & Care Suite',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: -0.3),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            'Clinical diabetes tools at your fingertips',
+                            style: TextStyle(fontSize: 10.5, color: Colors.grey[600]),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () => setState(() => _selectedIndex = 2),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: colorScheme.primary.withValues(alpha: 0.15)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Dashboard',
+                        style: TextStyle(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                      const SizedBox(width: 3),
+                      Icon(Icons.arrow_forward_rounded, color: colorScheme.primary, size: 12),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // 2x2 Grid of Essential Health Features (Balanced Light Green + White Gradient)
+          Row(
+            children: [
+              Expanded(
+                child: _buildFeatureCard(
+                  title: 'Plate AI Scan',
+                  subtitle: 'Carbs & GI from photo',
+                  icon: Icons.document_scanner_rounded,
+                  badge: '✨ AI Vision',
+                  cardGradient: const [Color(0xFF34D399), Color(0xFFA7F3D0), Color(0xFFF0FDF4), Colors.white],
+                  onTap: _openPlateScan,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildFeatureCard(
+                  title: 'Smartwatch Sync',
+                  subtitle: 'Live BLE biometrics',
+                  icon: Icons.watch_rounded,
+                  badge: '⚡ Live Sync',
+                  cardGradient: const [Color(0xFF2DD4BF), Color(0xFF99F6E4), Color(0xFFF0FDFA), Colors.white],
+                  onTap: _openSmartwatchSync,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildFeatureCard(
+                  title: 'Health Diary',
+                  subtitle: 'Log glucose & water',
+                  icon: Icons.monitor_heart_rounded,
+                  badge: '📊 Daily Log',
+                  cardGradient: const [Color(0xFF10B981), Color(0xFF6EE7B7), Color(0xFFECFDF5), Colors.white],
+                  onTap: () => _openCareTab(3), // Tab 3 is Log Entry
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildFeatureCard(
+                  title: 'Care Community',
+                  subtitle: 'Doctor SOS & network',
+                  icon: Icons.diversity_3_rounded,
+                  badge: '🤝 Support',
+                  cardGradient: const [Color(0xFF22C55E), Color(0xFF86EFAC), Color(0xFFF0FDF4), Colors.white],
+                  onTap: () => _openCareTab(1), // Tab 1 is Community
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeatureCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required String badge,
+    required List<Color> cardGradient,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: cardGradient,
+            stops: const [0.0, 0.35, 0.75, 1.0],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: const Color(0xFF10B981).withValues(alpha: 0.28),
+            width: 1.1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF047857).withValues(alpha: 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF059669), Color(0xFF047857)],
+                    ),
+                    borderRadius: BorderRadius.circular(11),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF047857).withValues(alpha: 0.3),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Icon(icon, color: Colors.white, size: 16),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.92),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF059669).withValues(alpha: 0.25)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 3,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (badge.contains('Live') || badge.contains('Active')) ...[
+                        Container(
+                          width: 4.5,
+                          height: 4.5,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF059669),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 3),
+                      ],
+                      Text(
+                        badge,
+                        style: const TextStyle(
+                          color: Color(0xFF047857),
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    letterSpacing: -0.2,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: Color(0xFF334155),
+                          fontSize: 10,
+                          height: 1.2,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    const Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 11,
+                      color: Color(0xFF059669),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryChip(String category, bool isSelected, ColorScheme colorScheme, LanguageManager lang) {
+    String translatedLabel = category;
+    if (category == 'All') translatedLabel = lang.translate('all');
+    if (category == 'Sweet Monk') translatedLabel = 'Sweet Monk';
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedHomeCategory = category;
+        });
+        _fetchProducts();
+      },
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? colorScheme.primary : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isSelected ? colorScheme.primary : colorScheme.outlineVariant.withValues(alpha: 0.3)),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          translatedLabel,
+          style: TextStyle(
+            color: isSelected ? Colors.white : colorScheme.primary,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            fontSize: 12,
+          ),
         ),
       ),
     );
@@ -339,8 +847,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => ProductDetailsScreen(product: product))).then((_) { if (mounted) setState(() {}); }),
       child: Card(
         elevation: 0,
-        color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: colorScheme.primary.withOpacity(0.1))),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.1))),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
@@ -362,7 +870,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         onTap: () { WishlistManager().toggleWishlist(product); setState(() {}); },
                         child: Container(
                           padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.8), shape: BoxShape.circle),
+                          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.8), shape: BoxShape.circle),
                           child: Icon(WishlistManager().isWishlisted(name) ? Icons.favorite : Icons.favorite_border, size: 18, color: WishlistManager().isWishlisted(name) ? Colors.red : colorScheme.primary),
                         ),
                       ),
@@ -378,7 +886,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Flexible(child: Text(price, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: colorScheme.primary, letterSpacing: 0.5), overflow: TextOverflow.ellipsis)),
+                  Flexible(child: Text(price, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: colorScheme.primary, letterSpacing: 0.5), overflow: TextOverflow.ellipsis)),
                   _buildAddToCartButton(product, colorScheme, lang),
                 ],
               ),
@@ -410,7 +918,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   decoration: BoxDecoration(
                     color: colorScheme.surface,
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: colorScheme.secondary.withOpacity(0.3)),
+                    border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.3)),
                   ),
                   child: Icon(Icons.remove, color: colorScheme.secondary, size: 14),
                 ),
@@ -451,56 +959,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           );
         }
 
-        return InkWell(
-          onTap: () {
-            final cart = CartManager();
-            if (cart.canAddMore(product, 1)) {
-              cart.addItem(product);
+        return ElevatedButton(
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            if (CartManager().canAddMore(product, 1)) {
+              CartManager().addItem(product, qtyToAdd: 1);
+            } else {
               scaffoldMessengerKey.currentState?.hideCurrentSnackBar();
-              scaffoldMessengerKey.currentState?.showSnackBar(SnackBar(content: Text(lang.translate('added_to_cart')), behavior: SnackBarBehavior.floating, backgroundColor: colorScheme.primary));
+              scaffoldMessengerKey.currentState?.showSnackBar(
+                SnackBar(content: Text(lang.translate('out_of_stock')), behavior: SnackBarBehavior.floating)
+              );
             }
           },
-          child: Container(
-            padding: const EdgeInsets.all(6), 
-            decoration: BoxDecoration(
-              color: colorScheme.secondary, 
-              borderRadius: BorderRadius.circular(8)
-            ), 
-            child: const Icon(Icons.add_shopping_cart_outlined, color: Colors.white, size: 18)
+          style: ElevatedButton.styleFrom(
+            backgroundColor: colorScheme.secondary,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            minimumSize: const Size(0, 30),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            elevation: 0,
           ),
+          child: Text(lang.translate('add_to_cart').replaceAll('_', ' ').toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
         );
       },
-    );
-  }
-
-  Widget _buildCategoryChip(String label, bool isSelected, ColorScheme colorScheme, LanguageManager lang) {
-    String key = label.toLowerCase().replaceAll(' ', '_');
-    String translatedLabel = lang.translate(key);
-    
-    // If no translation found, format the label (remove underscores, capitalize, fix typos)
-    if (translatedLabel == key && label != 'All') {
-      String formatted = label.replaceAll('_', ' ');
-      if (formatted.toLowerCase().contains('essesntials')) {
-        formatted = formatted.toLowerCase().replaceFirst('essesntials', 'essential');
-      }
-      translatedLabel = formatted.split(' ').map((word) => word.isNotEmpty ? word[0].toUpperCase() + word.substring(1) : '').join(' ');
-    }
-
-    if (label == 'All') translatedLabel = lang.currentLanguage == 'hi' ? 'सभी' : 'All';
-
-    return GestureDetector(
-      onTap: () { setState(() { _selectedHomeCategory = label; _fetchProducts(); }); },
-      child: Container(
-        margin: const EdgeInsets.only(right: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        decoration: BoxDecoration(
-          color: isSelected ? colorScheme.primary : colorScheme.surfaceContainerHighest.withOpacity(0.3),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isSelected ? colorScheme.primary : colorScheme.primary.withOpacity(0.1)),
-        ),
-        alignment: Alignment.center,
-        child: Text(translatedLabel, style: TextStyle(color: isSelected ? Colors.white : colorScheme.primary, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-      ),
     );
   }
 
@@ -542,13 +1023,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               children: [
                 _buildHomeBody(colorScheme, lang),
                 ProductListScreen(key: _productListKey),
-                const CareDashboardScreen(),
+                CareDashboardScreen(key: _careDashboardKey),
                 const ProfileScreen(),
               ],
             ),
             bottomNavigationBar: _buildBottomNav(colorScheme, lang),
             floatingActionButton: FloatingActionButton(
-              onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const AiConsultantScreen())),
+              onPressed: _openAiConsultant,
               backgroundColor: colorScheme.secondary,
               child: const Icon(Icons.assistant, color: Colors.white),
             ),
@@ -602,12 +1083,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(26),
         border: Border.all(
-          color: colorScheme.primary.withOpacity(0.15),
+          color: colorScheme.primary.withValues(alpha: 0.15),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 25,
             offset: const Offset(0, 10),
           ),
@@ -657,7 +1138,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: colorScheme.primary.withOpacity(0.3),
+                      color: colorScheme.primary.withValues(alpha: 0.3),
                       blurRadius: 16,
                       offset: const Offset(0, 8),
                       spreadRadius: 2,
@@ -679,7 +1160,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   curve: Curves.elasticOut,
                   child: Icon(
                     isSelected ? activeIcon : icon,
-                    color: isSelected ? Colors.white : colorScheme.onSurfaceVariant.withOpacity(0.8),
+                    color: isSelected ? Colors.white : colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
                     size: 22,
                   ),
                 ),

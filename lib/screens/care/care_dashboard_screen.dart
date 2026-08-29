@@ -4,30 +4,59 @@ import 'today_module.dart';
 import 'scan_meal_module.dart';
 import 'log_entry_module.dart';
 import 'care_network_module.dart';
+import 'community_module.dart';
+import 'sync_devices_module.dart';
+import '../../managers/bluetooth_manager.dart';
 
 class CareDashboardScreen extends StatefulWidget {
-  const CareDashboardScreen({super.key});
+  final int initialTabIndex;
+  const CareDashboardScreen({super.key, this.initialTabIndex = 0});
 
   @override
-  State<CareDashboardScreen> createState() => _CareDashboardScreenState();
+  State<CareDashboardScreen> createState() => CareDashboardScreenState();
 }
 
-class _CareDashboardScreenState extends State<CareDashboardScreen> with SingleTickerProviderStateMixin {
+class CareDashboardScreenState extends State<CareDashboardScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final ScrollController _scrollController = ScrollController();
 
   final List<String> _tabs = [
     'Today',
+    'Community',
     'Scan Meal',
     'Log Entry',
     'Care Network'
   ];
 
+  void switchTab(int index) {
+    if (index >= 0 && index < _tabs.length) {
+      _tabController.animateTo(index);
+      _scrollToTab(index);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: _tabs.length, vsync: this);
+    _tabController = TabController(
+      length: _tabs.length,
+      vsync: this,
+      initialIndex: widget.initialTabIndex.clamp(0, _tabs.length - 1),
+    );
     _tabController.addListener(_handleTabSelection);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.initialTabIndex != 0) {
+        _scrollToTab(widget.initialTabIndex);
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant CareDashboardScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialTabIndex != widget.initialTabIndex) {
+      switchTab(widget.initialTabIndex);
+    }
   }
 
   void _handleTabSelection() {
@@ -37,7 +66,6 @@ class _CareDashboardScreenState extends State<CareDashboardScreen> with SingleTi
   }
 
   void _scrollToTab(int index) {
-    // Simple logic to center the tab in the scroll view
     double offset = index * 100.0 - 150.0; 
     if (offset < 0) offset = 0;
     _scrollController.animateTo(
@@ -83,6 +111,75 @@ class _CareDashboardScreenState extends State<CareDashboardScreen> with SingleTi
             ),
           ],
         ),
+        actions: [
+          ListenableBuilder(
+            listenable: BluetoothManager(),
+            builder: (context, _) {
+              final bleManager = BluetoothManager();
+              final isConnected = bleManager.isConnected;
+
+              return Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Tooltip(
+                  message: 'Hardware & CGM Sync Hub',
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const SyncDevicesModule()),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isConnected
+                            ? Colors.green.withValues(alpha: 0.12)
+                            : colorScheme.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isConnected
+                              ? Colors.green.withValues(alpha: 0.3)
+                              : colorScheme.primary.withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isConnected ? Icons.sensors : Icons.bluetooth_searching,
+                            size: 16,
+                            color: isConnected ? Colors.green : colorScheme.primary,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            isConnected ? 'Synced' : 'Devices',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: isConnected ? Colors.green : colorScheme.primary,
+                            ),
+                          ),
+                          if (isConnected) ...[
+                            const SizedBox(width: 4),
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: Colors.green,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
           child: _buildAnimatedTabBar(colorScheme),
@@ -92,6 +189,7 @@ class _CareDashboardScreenState extends State<CareDashboardScreen> with SingleTi
         controller: _tabController,
         children: const [
           TodayModule(),
+          CommunityModule(),
           ScanMealModule(),
           LogEntryModule(),
           CareNetworkModule(),

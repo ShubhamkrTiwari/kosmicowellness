@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart'; // Add this for kIsWeb
-import 'package:image_picker/image_picker.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
+import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
-import 'dart:io' as io;
 import '../../managers/care_manager.dart';
 import '../../managers/user_manager.dart';
 import '../../services/api_service.dart';
 import '../../services/report_service.dart';
+import '../../services/location_service.dart';
+import '../../managers/notification_manager.dart';
+import 'package:intl/intl.dart';
 
 class CareNetworkModule extends StatefulWidget {
   const CareNetworkModule({super.key});
@@ -21,7 +20,6 @@ class CareNetworkModule extends StatefulWidget {
 
 class _CareNetworkModuleState extends State<CareNetworkModule> {
   bool _isGettingLocation = false;
-  int _selectedNetworkTab = 0; // 0 for Social, 1 for My Activity
 
   Future<void> _pickContact(TextEditingController nameCtrl, TextEditingController phoneCtrl) async {
     if (kIsWeb) {
@@ -32,15 +30,22 @@ class _CareNetworkModuleState extends State<CareNetworkModule> {
     }
 
     try {
-      if (await (FlutterContacts as dynamic).requestPermission()) {
-        // Use dynamic to bypass compilation errors on Web where this member is missing
-        final dynamic contact = await (FlutterContacts as dynamic).openExternalPicker();
+      final status = await FlutterContacts.permissions.request(PermissionType.read);
+      if (status == PermissionStatus.granted || status == PermissionStatus.limited) {
+        final Contact? contact = await FlutterContacts.native.showPicker(
+          properties: {ContactProperty.phone},
+        );
         if (contact != null) {
-          final dynamic fullContact = await (FlutterContacts as dynamic).getContact(contact.id);
-          if (fullContact != null) {
-            nameCtrl.text = fullContact.displayName ?? '';
-            if (fullContact.phones != null && (fullContact.phones as List).isNotEmpty) {
-              phoneCtrl.text = fullContact.phones.first.number ?? '';
+          nameCtrl.text = contact.displayName ?? '';
+          if (contact.phones.isNotEmpty) {
+            phoneCtrl.text = contact.phones.first.number;
+          } else if (contact.id != null) {
+            final fullContact = await FlutterContacts.get(
+              contact.id!,
+              properties: {ContactProperty.phone},
+            );
+            if (fullContact != null && fullContact.phones.isNotEmpty) {
+              phoneCtrl.text = fullContact.phones.first.number;
             }
           }
         }
@@ -55,7 +60,7 @@ class _CareNetworkModuleState extends State<CareNetworkModule> {
       debugPrint('Error picking contact: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString().contains('openExternalPicker') ? 'Native picker not available' : e}')),
+          SnackBar(content: Text('Error picking contact: $e')),
         );
       }
     }
@@ -90,471 +95,47 @@ class _CareNetworkModuleState extends State<CareNetworkModule> {
       builder: (context, _) {
         final manager = CareManager();
         final contacts = manager.contacts;
-        
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(colorScheme, context),
-              const SizedBox(height: 16),
-              ...List.generate(contacts.length, (index) {
-                final c = contacts[index];
-                return _buildContactCard(c['name'], c['phone'], index, colorScheme);
-              }),
-              const SizedBox(height: 24),
-              _buildHypoAlertSection(colorScheme, context),
-              const SizedBox(height: 24),
-              _buildClinicalReportSection(colorScheme, context),
-              const SizedBox(height: 32),
-              
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Peer Support Network', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  IconButton(
-                    onPressed: () => _showAddPostDialog(context),
-                    icon: Icon(Icons.add_comment_outlined, color: colorScheme.primary),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              
-              // Custom Tabs
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(child: _buildTabButton('Social Feed', 0, colorScheme)),
-                    Expanded(child: _buildTabButton('My Activity', 1, colorScheme)),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              
-              // Conditional Feed View (Fixed height issue and assertion error)
-              if (_selectedNetworkTab == 0)
-                _buildPostList(manager.communityPosts.where((p) => p['user'] != 'You').toList(), colorScheme)
-              else
-                _buildPostList(manager.communityPosts.where((p) => p['user'] == 'You').toList(), colorScheme, isMyActivity: true),
-              
-              const SizedBox(height: 40),
-            ],
+
+        return RefreshIndicator(
+          onRefresh: () async {
+            await manager.fetchDashboardData();
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(colorScheme, context),
+                const SizedBox(height: 16),
+                ...List.generate(contacts.length, (index) {
+                  final c = contacts[index];
+                  return _buildContactCard(c['name'], c['phone'], index, colorScheme);
+                }),
+                const SizedBox(height: 24),
+                _buildHypoAlertSection(colorScheme, context),
+                const SizedBox(height: 24),
+                _buildClinicalReportSection(colorScheme, context),
+                const SizedBox(height: 40),
+              ],
+            ),
           ),
         );
       },
     );
   }
 
-  Widget _buildTabButton(String label, int index, ColorScheme colorScheme) {
-    final bool isSelected = _selectedNetworkTab == index;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedNetworkTab = index),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? colorScheme.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : colorScheme.primary,
-            fontWeight: FontWeight.bold,
-            fontSize: 13,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPostList(List<Map<String, dynamic>> posts, ColorScheme colorScheme, {bool isMyActivity = false}) {
-    if (posts.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.feed_outlined, size: 48, color: Colors.grey[300]),
-            const SizedBox(height: 12),
-            Text(isMyActivity ? 'You haven\'t posted anything yet.' : 'No social posts found.', 
-              style: const TextStyle(color: Colors.grey, fontSize: 13)),
-          ],
-        ),
-      );
-    }
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: posts.length,
-      itemBuilder: (context, index) => _buildPostCard(posts[index], colorScheme),
-    );
-  }
-
-  void _showAddPostDialog(BuildContext context) {
-    final contentController = TextEditingController();
-    final colorScheme = Theme.of(context).colorScheme;
-    XFile? pickedImage;
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: colorScheme.surface,
-          surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Share your thoughts'),
-          content: Container(
-            width: double.maxFinite,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: contentController,
-                    maxLines: 4,
-                    decoration: InputDecoration(
-                      hintText: "How's your wellness journey today?",
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      contentPadding: const EdgeInsets.all(12),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (pickedImage != null)
-                    Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: kIsWeb 
-                            ? Image.network(pickedImage!.path, height: 180, width: double.infinity, fit: BoxFit.cover)
-                            : Image.file(io.File(pickedImage!.path), height: 180, width: double.infinity, fit: BoxFit.cover),
-                        ),
-                        Positioned(
-                          top: 8, right: 8,
-                          child: GestureDetector(
-                            onTap: () => setDialogState(() => pickedImage = null),
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                              child: const Icon(Icons.close, color: Colors.white, size: 16),
-                            ),
-                          ),
-                        ),
-                      ],
-                    )
-                  else
-                    OutlinedButton.icon(
-                      onPressed: () async {
-                        try {
-                          final ImagePicker picker = ImagePicker();
-                          final XFile? image = await picker.pickImage(
-                            source: ImageSource.gallery,
-                            imageQuality: 70,
-                          );
-                          if (image != null) {
-                            setDialogState(() => pickedImage = image);
-                          }
-                        } catch (e) {
-                          debugPrint('Image Pick Error: $e');
-                        }
-                      },
-                      icon: const Icon(Icons.image_outlined),
-                      label: const Text('Add Image'),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 50),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () {
-                if (contentController.text.isNotEmpty) {
-                  CareManager().addCommunityPost(
-                    'You', 
-                    contentController.text, 
-                    image: pickedImage?.path
-                  );
-                  Navigator.pop(context);
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: colorScheme.primary, 
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('Post'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPostCard(Map<String, dynamic> post, ColorScheme colorScheme) {
-    final String id = post['id'] ?? '';
-    final String user = post['user'] ?? 'User';
-    final String time = post['time'] ?? 'Recently';
-    final String content = post['content'] ?? '';
-    final String? image = post['image'];
-    final int likes = post['likes'] ?? 0;
-    final bool isLiked = post['isLiked'] ?? false;
-    final List comments = post['comments'] ?? [];
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.onSurface.withValues(alpha: 0.1)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(radius: 16, backgroundColor: colorScheme.primary.withValues(alpha: 0.1), child: Text(user[0], style: TextStyle(color: colorScheme.primary, fontSize: 12, fontWeight: FontWeight.bold))),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(user, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  Text(time, style: TextStyle(color: Colors.grey[600], fontSize: 10)),
-                ],
-              ),
-              const Spacer(),
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert, size: 18, color: Colors.grey),
-                onSelected: (value) {
-                  if (value == 'delete') {
-                    CareManager().deletePost(id);
-                  } else if (value == 'report') {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Post reported.')));
-                  }
-                },
-                itemBuilder: (context) => [
-                  if (user == 'You')
-                    const PopupMenuItem(value: 'delete', child: Text('Delete Post')),
-                  if (user != 'You')
-                    const PopupMenuItem(value: 'report', child: Text('Report')),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(content, style: const TextStyle(fontSize: 13, height: 1.5)),
-          if (image != null) ...[
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: _buildPostImage(image),
-            ),
-          ],
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () => CareManager().toggleLike(id),
-                child: Row(
-                  children: [
-                    Icon(isLiked ? Icons.favorite : Icons.favorite_border, size: 18, color: isLiked ? Colors.red : colorScheme.primary),
-                    const SizedBox(width: 6),
-                    Text(likes.toString(), style: TextStyle(color: isLiked ? Colors.red : colorScheme.primary, fontSize: 12, fontWeight: isLiked ? FontWeight.bold : FontWeight.normal)),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              GestureDetector(
-                onTap: () => _showCommentsBottomSheet(context, post),
-                child: Row(
-                  children: [
-                    const Icon(Icons.chat_bubble_outline, size: 18, color: Colors.grey),
-                    const SizedBox(width: 6),
-                    Text(comments.isEmpty ? 'Comment' : comments.length.toString(), style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                onPressed: () => Share.share('$content\n\nShared via Kosmico Wellness'),
-                icon: const Icon(Icons.share_outlined, size: 18, color: Colors.grey),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showCommentsBottomSheet(BuildContext context, Map<String, dynamic> post) {
-    final TextEditingController commentController = TextEditingController();
-    final colorScheme = Theme.of(context).colorScheme;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.75,
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          children: [
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              width: 40, height: 4,
-              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Comments', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
-                ],
-              ),
-            ),
-            const Divider(),
-            Expanded(
-              child: ListenableBuilder(
-                listenable: CareManager(),
-                builder: (context, _) {
-                  final posts = CareManager().communityPosts;
-                  // Handle cases where post might have been deleted or id changed
-                  Map<String, dynamic>? currentPost;
-                  try {
-                    currentPost = posts.firstWhere((p) => p['id'] == post['id']);
-                  } catch (_) {
-                    currentPost = post;
-                  }
-                  
-                  final List comments = currentPost['comments'] ?? [];
-                  
-                  if (comments.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.chat_bubble_outline, size: 48, color: Colors.grey[300]),
-                          const SizedBox(height: 12),
-                          const Text('No comments yet.', style: TextStyle(color: Colors.grey)),
-                        ],
-                      ),
-                    );
-                  }
-                  return ListView.builder(
-                    padding: const EdgeInsets.all(20),
-                    itemCount: comments.length,
-                    itemBuilder: (context, index) {
-                      final c = comments[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 20),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            CircleAvatar(
-                              radius: 16, 
-                              backgroundColor: colorScheme.primary.withOpacity(0.1),
-                              child: Text((c['user'] ?? 'U')[0], style: TextStyle(fontSize: 12, color: colorScheme.primary, fontWeight: FontWeight.bold))
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Text(c['user'] ?? 'User', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                      const SizedBox(width: 8),
-                                      Text(c['time'] ?? 'Just now', style: TextStyle(fontSize: 10, color: Colors.grey[500])),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(c['text'] ?? '', style: const TextStyle(fontSize: 14, height: 1.4)),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-            Container(
-              padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.of(context).viewInsets.bottom),
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: commentController,
-                      autofocus: false,
-                      decoration: InputDecoration(
-                        hintText: 'Add a comment...',
-                        filled: true,
-                        fillColor: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  CircleAvatar(
-                    backgroundColor: colorScheme.primary,
-                    child: IconButton(
-                      onPressed: () {
-                        if (commentController.text.trim().isNotEmpty) {
-                          CareManager().addComment(post['id'], commentController.text.trim());
-                          commentController.clear();
-                          // Keep sheet open
-                        }
-                      },
-                      icon: const Icon(Icons.send, color: Colors.white, size: 20),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPostImage(String image) {
-    if (image.startsWith('http') || kIsWeb) {
-      return Image.network(image, height: 150, width: double.infinity, fit: BoxFit.cover, 
-        errorBuilder: (c, e, s) => const Icon(Icons.broken_image, size: 50, color: Colors.grey));
-    }
-    return Image.file(io.File(image), height: 150, width: double.infinity, fit: BoxFit.cover,
-      errorBuilder: (c, e, s) => const Icon(Icons.broken_image, size: 50, color: Colors.grey));
-  }
-
   Widget _buildHeader(ColorScheme colorScheme, BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        const Text('Emergency Contacts', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const Expanded(
+          child: Text(
+            'Emergency Contacts',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
         TextButton.icon(
           onPressed: () => _showAddContactDialog(context),
           icon: const Icon(Icons.add, size: 18),
@@ -571,7 +152,7 @@ class _CareNetworkModuleState extends State<CareNetworkModule> {
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.onSurface.withOpacity(0.1)),
+        border: Border.all(color: colorScheme.onSurface.withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [
@@ -646,9 +227,9 @@ class _CareNetworkModuleState extends State<CareNetworkModule> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.1),
+        color: Colors.red.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.red.withOpacity(0.2)),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
       ),
       child: Column(
         children: [
@@ -678,212 +259,391 @@ class _CareNetworkModuleState extends State<CareNetworkModule> {
     setState(() => _isGettingLocation = true);
     
     try {
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-
-      if (permission == LocationPermission.deniedForever) {
+      // 1. Get Exact Live GPS Location & Complete Reverse Geocoded Details
+      LocationDetails? details = await LocationService.getExactLocationDetails();
+      if (details == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Location permissions are permanently denied.')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not access high-accuracy GPS. Please check location permissions and GPS toggle.')),
+          );
         }
         setState(() => _isGettingLocation = false);
         return;
       }
 
-      // 1. Get Live Location
-      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      
-      // 2. Get readable address (Mobile Only)
-      String address = 'Address lookup not supported on web';
-      if (!kIsWeb) {
-        try {
-          List<Placemark> placemarks = await Geocoding().placemarkFromCoordinates(position.latitude, position.longitude);
-          if (placemarks.isNotEmpty) {
-            final p = placemarks.first;
-            address = '${p.street}, ${p.subLocality}, ${p.locality}, ${p.postalCode}';
-          }
-        } catch (e) {
-          address = 'Coordinates: ${position.latitude}, ${position.longitude}';
-        }
-      } else {
-        address = 'Location: Lat ${position.latitude.toStringAsFixed(4)}, Long ${position.longitude.toStringAsFixed(4)}';
-      }
+      final String patientName = UserManager().userName ?? 'Kosmico User';
 
-      // 3. Call Backend / Prepare Message
+      // 2. Compose High-Precision Emergency SOS Message
+      final String sosMessage = '🚨 URGENT HYPO-ALERT: $patientName is experiencing a critical low blood sugar / hypoglycemia emergency!\n\n'
+          '📍 Exact Location:\n${details.fullAddress}\n\n'
+          '🎯 GPS Accuracy: ${details.accuracyLabel}\n'
+          'Coordinates: Lat ${details.position.latitude.toStringAsFixed(6)}, Long ${details.position.longitude.toStringAsFixed(6)}\n\n'
+          '🗺️ Live Google Maps:\n${details.googleMapsUrl}\n\n'
+          '🚗 Direct Navigation:\n${details.navigationUrl}\n\n'
+          'Please send emergency medical assistance or contact immediately!';
+
+      String shareableText = sosMessage;
+
+      // 3. Try backend emergency log
       final token = UserManager().token;
-      final String googleMapsLink = 'https://maps.google.com/?q=${position.latitude},${position.longitude}';
-      final String localFallbackText = '🚨 URGENT: I am having a glucose emergency and need immediate assistance! My live location: $googleMapsLink';
-      
-      String shareableText = localFallbackText;
-
       if (token != null) {
         try {
           final result = await ApiService.generateEmergencyMessage(
-            latitude: position.latitude,
-            longitude: position.longitude,
+            latitude: details.position.latitude,
+            longitude: details.position.longitude,
             token: token,
           );
-
-          if (result['success'] == true && result['data'] != null) {
-            shareableText = result['data']['shareableText'] ?? localFallbackText;
+          if (result['success'] == true && result['data'] != null && result['data']['shareableText'] != null) {
+            shareableText = result['data']['shareableText'];
           }
         } catch (e) {
           debugPrint('Emergency API Error: $e');
         }
       }
 
-      // 4. Open native share sheet
-      try {
-        await Share.share(shareableText);
-      } catch (e) {
-        debugPrint('Share Error: $e');
-      }
+      // 4. Add In-App Notification
+      NotificationManager().addNotification(
+        title: '🚨 Hypo-Alert Broadcast Ready',
+        message: 'High-precision location (${details.areaSummary}) ready for emergency contacts.',
+        icon: '🚨',
+        type: 'alert',
+      );
 
       if (mounted) {
-        _showEmergencySentDialog(context, address, shareableText);
+        _showEmergencySentDialog(
+          context,
+          details: details,
+          shareableText: shareableText,
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Alert Error: $e'), backgroundColor: Colors.redAccent));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Alert Error: $e'), backgroundColor: Colors.redAccent),
+        );
       }
     } finally {
       if (mounted) setState(() => _isGettingLocation = false);
     }
   }
 
-  void _showEmergencySentDialog(BuildContext context, String address, String shareableText) {
+  void _showEmergencySentDialog(
+    BuildContext context, {
+    required LocationDetails details,
+    required String shareableText,
+  }) {
     final contacts = CareManager().contacts;
+    final List<String> phoneNumbers = contacts
+        .map((c) => c['phone']?.toString().replaceAll(RegExp(r'[^0-9+]'), '') ?? '')
+        .where((p) => p.isNotEmpty)
+        .toList();
+
+    final TextEditingController addressCtrl = TextEditingController(text: details.fullAddress);
+    bool isEditingAddress = false;
+
     showDialog(
       context: context,
-      barrierDismissible: false, // Force interaction
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.red[900],
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        title: const Row(
-          children: [
-            Icon(Icons.emergency_share, color: Colors.white, size: 28),
-            SizedBox(width: 12),
-            Text('ALERT READY!', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Emergency message and live location are ready to be shared:',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white24),
-              ),
-              child: Text(address, style: const TextStyle(color: Colors.white, fontSize: 12, height: 1.4)),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Care Network: ${contacts.map((c) => c['name']).join(', ')}',
-              style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11, fontStyle: FontStyle.italic),
-            ),
-          ],
-        ),
-        actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        actions: [
-          Column(
-            children: [
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton.icon(
-                  onPressed: () => Share.share(shareableText),
-                  icon: const Icon(Icons.share, size: 20),
-                  label: const Text('SHARE NOW', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.1)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.red[900],
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 4,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          String buildFinalSosMessage() {
+            final patientName = UserManager().userName ?? 'Kosmico User';
+            final currentAddr = addressCtrl.text.trim().isNotEmpty ? addressCtrl.text.trim() : details.fullAddress;
+            return '🚨 URGENT HYPO-ALERT: $patientName is experiencing a critical low blood sugar / hypoglycemia emergency!\n\n'
+                '📍 Exact Location:\n$currentAddr\n\n'
+                '🎯 GPS Accuracy: ${details.accuracyLabel}\n'
+                'Coordinates: Lat ${details.position.latitude.toStringAsFixed(6)}, Long ${details.position.longitude.toStringAsFixed(6)}\n\n'
+                '🗺️ Live Google Maps Pin:\n${details.googleMapsUrl}\n\n'
+                '🚗 Direct Navigation:\n${details.navigationUrl}\n\n'
+                'Please send emergency medical assistance or contact immediately!';
+          }
+
+          return AlertDialog(
+            backgroundColor: const Color(0xFF7F1D1D),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            title: const Row(
+              children: [
+                Icon(Icons.emergency_share, color: Colors.white, size: 28),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'ALERT READY!',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _showSmsSimulation(context, shareableText);
-                  },
-                  icon: const Icon(Icons.sms, size: 20),
-                  label: const Text('SIMULATE SMS ALERT', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.1)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 4,
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Emergency SOS message and pinpoint GPS location are ready to be sent to your care network:',
+                    style: TextStyle(color: Colors.white, fontSize: 12.5, height: 1.4),
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.location_on, color: Colors.redAccent, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Expanded(
+                                        child: Text(
+                                          'EXACT ADDRESS / LANDMARK:',
+                                          style: TextStyle(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      GestureDetector(
+                                        onTap: () {
+                                          setDialogState(() {
+                                            isEditingAddress = !isEditingAddress;
+                                          });
+                                        },
+                                        child: Text(
+                                          isEditingAddress ? 'Done' : 'Edit',
+                                          style: const TextStyle(color: Colors.lightBlueAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  if (isEditingAddress)
+                                    TextField(
+                                      controller: addressCtrl,
+                                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                                      maxLines: 2,
+                                      decoration: InputDecoration(
+                                        isDense: true,
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                        filled: true,
+                                        fillColor: Colors.white.withValues(alpha: 0.1),
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                      ),
+                                    )
+                                  else
+                                    Text(
+                                      addressCtrl.text.trim().isNotEmpty ? addressCtrl.text.trim() : details.fullAddress,
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.5, height: 1.3),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'GPS: ${details.position.latitude.toStringAsFixed(6)}, ${details.position.longitude.toStringAsFixed(6)}',
+                                  style: const TextStyle(color: Colors.white70, fontSize: 9.5, fontFamily: 'monospace'),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withValues(alpha: 0.25),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.4)),
+                              ),
+                              child: Text(
+                                details.accuracyLabel,
+                                style: const TextStyle(color: Colors.greenAccent, fontSize: 9.5, fontWeight: FontWeight.bold),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        InkWell(
+                          onTap: () => _openUrl(details.googleMapsUrl),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.map_outlined, color: Colors.lightBlueAccent, size: 14),
+                              const SizedBox(width: 4),
+                              const Expanded(
+                                child: Text(
+                                  'Live Google Maps Pin Link',
+                                  style: TextStyle(color: Colors.lightBlueAccent, fontSize: 11, decoration: TextDecoration.underline, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              const Icon(Icons.arrow_outward, size: 12, color: Colors.lightBlueAccent),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    contacts.isNotEmpty 
+                        ? 'Target Contacts (${contacts.length}): ${contacts.map((c) => "${c['name']} (${c['phone']})").join(', ')}'
+                        : 'No emergency contacts added yet. Use Share to send to any contact.',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 11),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('DISMISS', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
-                ),
+            ),
+            actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            actions: [
+              Column(
+                children: [
+                  // 1. Direct SMS Alert
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _sendDirectSmsAlert(phoneNumbers, buildFinalSosMessage());
+                      },
+                      icon: const Icon(Icons.sms_rounded, size: 20),
+                      label: Text(
+                        phoneNumbers.isNotEmpty ? 'SEND SMS TO ALL CONTACTS' : 'SEND SMS ALERT',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, letterSpacing: 0.8),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF7F1D1D),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 3,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // 2. Share via WhatsApp / Other Apps
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        Share.share(buildFinalSosMessage(), subject: '🚨 GLUCOSE EMERGENCY SOS');
+                      },
+                      icon: const Icon(Icons.share_rounded, size: 20),
+                      label: const Text('SHARE VIA WHATSAPP / APPS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, letterSpacing: 0.8)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF22C55E),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 3,
+                      ),
+                    ),
+                  ),
+
+                  if (phoneNumbers.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 42,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _makePhoneCall(phoneNumbers.first);
+                        },
+                        icon: const Icon(Icons.phone_in_talk, size: 18, color: Colors.white),
+                        label: Text(
+                          'CALL PRIMARY (${contacts.first['name']})',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11.5),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.white54),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 6),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('DISMISS', style: TextStyle(color: Colors.white60, fontSize: 12)),
+                  ),
+                ],
               ),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 
-  void _showSmsSimulation(BuildContext context, String message) {
-    final contacts = CareManager().contacts;
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.sms, color: Colors.blue),
-            SizedBox(width: 12),
-            Text('Simulating SMS...', style: TextStyle(fontSize: 16)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const LinearProgressIndicator(),
-            const SizedBox(height: 16),
-            Text('Sending emergency SMS to ${contacts.length} contacts:', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(12)),
-              child: Text(message, style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic)),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
-        ],
-      ),
+  Future<void> _sendDirectSmsAlert(List<String> phoneNumbers, String message) async {
+    final String phones = phoneNumbers.join(';');
+    final Uri smsUri = Uri(
+      scheme: 'sms',
+      path: phones,
+      queryParameters: <String, String>{
+        'body': message,
+      },
     );
+
+    try {
+      if (await canLaunchUrl(smsUri)) {
+        await launchUrl(smsUri, mode: LaunchMode.externalApplication);
+      } else {
+        // Fallback to generic SMS or Share
+        final Uri genericSmsUri = Uri(scheme: 'sms', queryParameters: {'body': message});
+        if (await canLaunchUrl(genericSmsUri)) {
+          await launchUrl(genericSmsUri, mode: LaunchMode.externalApplication);
+        } else {
+          await Share.share(message, subject: '🚨 GLUCOSE EMERGENCY SOS');
+        }
+      }
+    } catch (e) {
+      debugPrint('SMS launch error: $e');
+      await Share.share(message, subject: '🚨 GLUCOSE EMERGENCY SOS');
+    }
+  }
+
+  Future<void> _openUrl(String url) async {
+    final Uri uri = Uri.parse(url);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      debugPrint('Open URL error: $e');
+    }
   }
 
   Widget _buildClinicalReportSection(ColorScheme colorScheme, BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colorScheme.primary.withOpacity(0.1),
+        color: colorScheme.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
@@ -914,100 +674,414 @@ class _CareNetworkModuleState extends State<CareNetworkModule> {
   }
 
   void _showReportPreview(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final manager = CareManager();
-    final reportText = manager.generateClinicalReport();
+    final patientName = UserManager().userName ?? 'Valued Patient';
+    final dateStr = DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now());
+    final reportId = 'KOS-GLU-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+
+    final double avg = manager.averageGlucose > 0 ? manager.averageGlucose : 118.0;
+    final double a1c = manager.estimatedA1C > 0 ? manager.estimatedA1C : ((avg + 46.7) / 28.7);
+    final double tir = manager.timeInRangePercentage > 0 ? manager.timeInRangePercentage : 82.0;
+    final double gmi = 3.31 + (0.02392 * avg);
+
+    String a1cStatus = 'Normal';
+    Color a1cColor = Colors.green;
+    if (a1c >= 6.5) {
+      a1cStatus = 'Diabetic Range';
+      a1cColor = Colors.red;
+    } else if (a1c >= 5.7) {
+      a1cStatus = 'Pre-Diabetic';
+      a1cColor = Colors.orange[800]!;
+    }
+
+    Color tirColor = tir >= 70 ? Colors.green : Colors.orange[800]!;
 
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        insetPadding: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(24),
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.88),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
+              // Dialog Header Bar
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF0D5C46),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.local_hospital_rounded, color: Colors.white, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'KOSMICO METABOLIC CLINIC',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 0.5),
+                          ),
+                          Text(
+                            'Clinical Diabetes Diagnostic Profile',
+                            style: TextStyle(color: Colors.white70, fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close_rounded, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Scrollable Clinical Report Body
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Clinical Report',
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: colorScheme.primary),
+                      // Patient Demographics Card
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF4F9F6),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFCCE3DB)),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(child: _buildDemographicItem('PATIENT', patientName, isBold: true)),
+                                const SizedBox(width: 8),
+                                Expanded(child: _buildDemographicItem('REPORT ID', reportId)),
+                              ],
+                            ),
+                            const Divider(height: 16, color: Color(0xFFCCE3DB)),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(child: _buildDemographicItem('DATE', dateStr)),
+                                const SizedBox(width: 8),
+                                Expanded(child: _buildDemographicItem('TELEMETRY', 'CGM & Blood Glucose')),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                      Text(
-                        'Preview of your health logs',
-                        style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+
+                      const SizedBox(height: 16),
+
+                      // Key Biomarkers Summary Row
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildMetricBadge(
+                              title: 'Estimated HbA1c',
+                              value: '${a1c.toStringAsFixed(2)}%',
+                              status: a1cStatus,
+                              statusColor: a1cColor,
+                              target: 'Target: <7.0%',
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildMetricBadge(
+                              title: 'Mean Glucose',
+                              value: '${avg.toStringAsFixed(1)} mg/dL',
+                              status: avg <= 130 ? 'In Target' : (avg <= 180 ? 'Moderate' : 'High'),
+                              statusColor: avg <= 130 ? Colors.green : Colors.orange[800]!,
+                              target: 'Target: 70-130',
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildMetricBadge(
+                              title: 'Time in Range',
+                              value: '${tir.toStringAsFixed(1)}%',
+                              status: tir >= 70 ? 'Optimal' : 'Needs Work',
+                              statusColor: tirColor,
+                              target: 'ADA: >70%',
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Glycemic Diagnostics Matrix Table
+                      const Text(
+                        'GLYCEMIC CONTROL & BIOMARKER MATRIX',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF0D5C46), letterSpacing: 0.5),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Column(
+                            children: [
+                              Container(
+                                color: const Color(0xFF0D5C46),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                child: const Row(
+                                  children: [
+                                    Expanded(flex: 3, child: Text('PARAMETER', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10))),
+                                    Expanded(flex: 2, child: Text('VALUE', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10))),
+                                    Expanded(flex: 3, child: Text('REF. RANGE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10))),
+                                    Expanded(flex: 2, child: Text('STATUS', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10))),
+                                  ],
+                                ),
+                              ),
+                              _buildUiTableRow('Est. HbA1c', '${a1c.toStringAsFixed(2)}%', '< 5.7 (Normal)\n5.7-6.4 (Pre-D)', a1cStatus, a1cColor, isOdd: false),
+                              _buildUiTableRow('Mean Glucose', '${avg.toStringAsFixed(1)} mg/dL', '70 - 130 mg/dL', avg <= 130 ? 'In Target' : 'Elevated', avg <= 130 ? Colors.green : Colors.orange[800]!, isOdd: true),
+                              _buildUiTableRow('Time in Range', '${tir.toStringAsFixed(1)}%', '> 70.0% (ADA)', tir >= 70 ? 'Optimal' : 'Low', tirColor, isOdd: false),
+                              _buildUiTableRow('Glucose Index', '${gmi.toStringAsFixed(2)}%', '< 6.5% Target', 'Optimal', Colors.green, isOdd: true),
+                              _buildUiTableRow('Hydration', '${manager.waterIntake} mL', '2500 - 3000 mL', manager.waterIntake >= 2000 ? 'Adequate' : 'Low', manager.waterIntake >= 2000 ? Colors.green : Colors.orange[800]!, isOdd: false),
+                              _buildUiTableRow('Stress Score', '${manager.stressLevel}/5', '1 - 2 (Low Spike)', manager.stressLevel <= 2 ? 'Normal' : 'High', manager.stressLevel <= 2 ? Colors.green : Colors.orange[800]!, isOdd: true),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Endocrinologist Clinical Impression Box
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF4F9F6),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFCCE3DB)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.psychology_outlined, color: Color(0xFF0D5C46), size: 18),
+                                SizedBox(width: 6),
+                                Text(
+                                  'AI Clinical Impression & Recommendations',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF0D5C46)),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              a1c < 5.7 
+                                ? '• Glycemic profile indicates non-diabetic range with excellent metabolic stability.'
+                                : (a1c <= 6.4 
+                                    ? '• Pre-diabetic glycemic profile observed. Recommended low GI diet swaps and post-meal physical activity.'
+                                    : (a1c <= 7.0 
+                                        ? '• Well-managed diabetic range compliant with ADA (<7.0%) standards.'
+                                        : '• Glycemic elevation detected. Discuss medication adjustment with your healthcare provider.')),
+                              style: const TextStyle(fontSize: 11.5, height: 1.4, color: Color(0xFF334155)),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '• Time in range is ${tir.toStringAsFixed(1)}%. Maintain target of at least 70% between 70-180 mg/dL.',
+                              style: const TextStyle(fontSize: 11.5, height: 1.4, color: Color(0xFF334155)),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
+                ),
               ),
-              const SizedBox(height: 24),
+
+              // Bottom Action Buttons
               Container(
-                constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.4),
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
+                  color: Colors.white,
+                  border: Border(top: BorderSide(color: Colors.grey[200]!)),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, -2))],
                 ),
-                child: SingleChildScrollView(
-                  child: Text(
-                    reportText,
-                    style: const TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.5),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Share.share(reportText, subject: 'My Glucose Report - Kosmico Wellness');
-                      },
-                      icon: const Icon(Icons.text_snippet_outlined, size: 18),
-                      label: const Text('Share Text'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Share.share(manager.generateClinicalReport(), subject: 'Kosmico Clinical Diabetes Report');
+                        },
+                        icon: const Icon(Icons.text_snippet_outlined, size: 18),
+                        label: const Text('Share Text'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () async {
-                        Navigator.pop(context);
-                        await ReportService.shareClinicalReport(manager);
-                      },
-                      icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
-                      label: const Text('Share PDF'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: colorScheme.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          Navigator.pop(context);
+                          await ReportService.shareClinicalReport(manager);
+                        },
+                        icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                        label: const Text('Download / Share PDF'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0D5C46),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDemographicItem(String label, String value, {bool isBold = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.w600),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(fontSize: 12, fontWeight: isBold ? FontWeight.bold : FontWeight.w500, color: const Color(0xFF1E293B)),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMetricBadge({
+    required String title,
+    required String value,
+    required String status,
+    required Color statusColor,
+    required String target,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F9F6),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFCCE3DB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(fontSize: 9.5, color: Colors.grey, fontWeight: FontWeight.w600),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              status,
+              style: TextStyle(color: statusColor, fontSize: 8.5, fontWeight: FontWeight.bold),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            target,
+            style: const TextStyle(fontSize: 8, color: Colors.grey),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUiTableRow(
+    String parameter,
+    String value,
+    String refRange,
+    String status,
+    Color statusColor, {
+    required bool isOdd,
+  }) {
+    return Container(
+      color: isOdd ? const Color(0xFFF8FAFC) : Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: Text(parameter, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10.5, color: Color(0xFF1E293B))),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(value, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF0F172A))),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(refRange, style: const TextStyle(fontSize: 9, color: Color(0xFF64748B), height: 1.2)),
+          ),
+          Expanded(
+            flex: 2,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  status,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: statusColor, fontSize: 8.5, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -30,6 +30,7 @@ dependencies:
   pdf: ^3.11.1
   printing: ^5.13.2
   google_generative_ai: ^0.4.7
+  flutter_blue_plus: ^2.3.12
 
 dev_dependencies:
   flutter_test:

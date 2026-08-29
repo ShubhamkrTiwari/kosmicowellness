@@ -691,7 +691,7 @@ class ProductListScreenState extends State<ProductListScreen> {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                             child: Text(
-                              LanguageManager().translate('add_to_cart'),
+                              LanguageManager().translate('add_to_cart').toUpperCase(),
                               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                             ),
                           );

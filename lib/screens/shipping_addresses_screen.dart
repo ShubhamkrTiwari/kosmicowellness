@@ -4,6 +4,7 @@ import 'package:geocoding/geocoding.dart';
 
 import '../managers/user_manager.dart';
 import '../services/api_service.dart';
+import '../services/location_service.dart';
 import 'map_picker_screen.dart';
 
 class ShippingAddressesScreen extends StatefulWidget {
@@ -107,38 +108,61 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
                             );
 
                             if (result != null && result is Map) {
-                              if (result['placemark'] != null) {
-                                Placemark place = result['placemark'];
-                                setModalState(() {
-                                  // Intelligent merging of Landmark (name) and Street
-                                  String landmark = place.name ?? '';
-                                  String street = place.street ?? '';
-                                  
-                                  List<String> addressParts = [];
-                                  
-                                  // If name is same as street or house number, don't duplicate
-                                  if (landmark.isNotEmpty && landmark != street) {
-                                    addressParts.add(landmark);
-                                  }
-                                  
-                                  if (street.isNotEmpty) {
-                                    addressParts.add(street);
-                                  }
-                                  
-                                  if (place.subLocality != null && place.subLocality!.isNotEmpty) {
-                                    addressParts.add(place.subLocality!);
-                                  }
+                              setModalState(() {
+                                String street = result['street']?.toString().trim() ?? '';
+                                String city = result['city']?.toString().trim() ?? '';
+                                String pincode = result['pincode']?.toString().trim() ?? '';
+                                String fullAddr = result['address']?.toString().trim() ?? '';
 
-                                  addressController.text = addressParts.join(', ');
-                                  cityController.text = place.locality ?? place.subAdministrativeArea ?? '';
-                                  pincodeController.text = place.postalCode ?? '';
-                                });
-                              } else if (result['address'] != null) {
-                                // Web fallback
-                                setModalState(() {
-                                  addressController.text = result['address'];
-                                });
-                              }
+                                // Fallback parser if city or pincode is empty
+                                if ((city.isEmpty || pincode.isEmpty) && fullAddr.isNotEmpty) {
+                                  final parsed = LocationService.parseAddressText(fullAddr);
+                                  if (street.isEmpty) street = parsed['street'] ?? '';
+                                  if (city.isEmpty) city = parsed['city'] ?? '';
+                                  if (pincode.isEmpty) pincode = parsed['pincode'] ?? '';
+                                }
+
+                                // Placemark fallback
+                                if (result['placemark'] != null) {
+                                  Placemark place = result['placemark'];
+                                  if (street.isEmpty) {
+                                    String landmark = place.name ?? '';
+                                    String pStreet = place.street ?? '';
+                                    List<String> addressParts = [];
+                                    if (landmark.isNotEmpty && landmark != pStreet) {
+                                      addressParts.add(landmark);
+                                    }
+                                    if (pStreet.isNotEmpty) {
+                                      addressParts.add(pStreet);
+                                    }
+                                    if (place.subLocality != null && place.subLocality!.isNotEmpty) {
+                                      addressParts.add(place.subLocality!);
+                                    }
+                                    street = addressParts.join(', ');
+                                  }
+                                  if (city.isEmpty) {
+                                    city = place.locality ?? place.subAdministrativeArea ?? '';
+                                  }
+                                  if (pincode.isEmpty) {
+                                    pincode = place.postalCode ?? '';
+                                  }
+                                }
+
+                                if (street.isNotEmpty) {
+                                  addressController.text = street;
+                                } else if (fullAddr.isNotEmpty) {
+                                  addressController.text = fullAddr;
+                                }
+
+                                if (city.isNotEmpty) {
+                                  cityController.text = city;
+                                }
+
+                                if (pincode.isNotEmpty) {
+                                  final pinMatch = RegExp(r'\b([1-9][0-9]{5})\b').firstMatch(pincode);
+                                  pincodeController.text = pinMatch != null ? pinMatch.group(1)! : pincode;
+                                }
+                              });
                             }
                           },
                           icon: const Icon(Icons.map_outlined, size: 18),

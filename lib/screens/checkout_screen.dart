@@ -905,8 +905,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             children: [
               Icon(Icons.confirmation_number_outlined, color: colorScheme.primary),
               const SizedBox(width: 12),
-              Text('Select a coupon code', style: TextStyle(color: colorScheme.onSurfaceVariant)),
-              const Spacer(),
+              Expanded(
+                child: Text(
+                  'Select a coupon code', 
+                  style: TextStyle(color: colorScheme.onSurfaceVariant),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
               Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant),
             ],
           ),

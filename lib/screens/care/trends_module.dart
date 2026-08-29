@@ -39,8 +39,15 @@ class TrendsModule extends StatelessWidget {
             children: [
               const Icon(Icons.auto_awesome, color: Colors.deepPurple, size: 20),
               const SizedBox(width: 8),
-              const Text('AI Spike Predictor', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
-              const Spacer(),
+              const Expanded(
+                child: Text(
+                  'AI Spike Predictor',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(

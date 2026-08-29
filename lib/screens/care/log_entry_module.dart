@@ -220,9 +220,16 @@ class _LogEntryModuleState extends State<LogEntryModule> {
       child: Row(
         children: [
           Icon(icon, color: color),
-          const SizedBox(width: 16),
-          Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-          const Spacer(),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label, 
+              style: const TextStyle(fontWeight: FontWeight.bold),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
           SizedBox(
             width: 100,
             child: TextField(

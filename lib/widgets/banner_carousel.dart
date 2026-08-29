@@ -19,7 +19,8 @@ class BannerItem {
 
 class BannerCarousel extends StatefulWidget {
   final VoidCallback? onTap;
-  const BannerCarousel({super.key, this.onTap});
+  final void Function(int index)? onBannerTap;
+  const BannerCarousel({super.key, this.onTap, this.onBannerTap});
 
   @override
   State<BannerCarousel> createState() => _BannerCarouselState();
@@ -103,7 +104,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
             },
             itemCount: _banners.length,
             itemBuilder: (context, index) {
-              return _buildBannerCard(_banners[index], colorScheme);
+              return _buildBannerCard(_banners[index], index, colorScheme);
             },
           ),
         ),
@@ -140,11 +141,17 @@ class _BannerCarouselState extends State<BannerCarousel> {
     );
   }
 
-  Widget _buildBannerCard(BannerItem banner, ColorScheme colorScheme) {
+  Widget _buildBannerCard(BannerItem banner, int index, ColorScheme colorScheme) {
     final bool hasText = banner.title.isNotEmpty || banner.subtitle.isNotEmpty;
     
     return InkWell(
-      onTap: widget.onTap,
+      onTap: () {
+        if (widget.onBannerTap != null) {
+          widget.onBannerTap!(index);
+        } else if (widget.onTap != null) {
+          widget.onTap!();
+        }
+      },
       child: Container(
         width: double.infinity,
         margin: const EdgeInsets.symmetric(horizontal: 16), // Re-added margin for visible rounded corners

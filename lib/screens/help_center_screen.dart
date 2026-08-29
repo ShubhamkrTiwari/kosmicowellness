@@ -149,12 +149,6 @@ class HelpCenterScreen extends StatelessWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {},
-        backgroundColor: colorScheme.secondary,
-        icon: const Icon(Icons.headset_mic_outlined, color: Colors.white),
-        label: const Text('Start Chat', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-      ),
     );
   }
 

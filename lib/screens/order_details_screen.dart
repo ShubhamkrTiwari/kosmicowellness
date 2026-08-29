@@ -3,6 +3,7 @@ import '../managers/user_manager.dart';
 import '../services/api_service.dart';
 import '../services/shiprocket_service.dart';
 import '../widgets/rating_dialog.dart';
+import 'help_center_screen.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> order;
@@ -368,7 +369,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               width: double.infinity,
               height: 55,
               child: ElevatedButton.icon(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const HelpCenterScreen()),
+                    );
+                  },
                   icon: const Icon(Icons.help_outline),
                   label: const Text('Need Help?'),
                   style: ElevatedButton.styleFrom(

@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:http/http.dart' as http;
+import '../services/location_service.dart';
 
 class MapPickerScreen extends StatefulWidget {
   const MapPickerScreen({super.key});
@@ -221,54 +222,21 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   }
 
   Future<void> _getAddressFromLatLng(LatLng position) async {
-    if (kIsWeb) {
-      try {
-        final response = await http.get(
-          Uri.parse('https://nominatim.openstreetmap.org/reverse?lat=${position.latitude}&lon=${position.longitude}&format=json'),
-          headers: {'User-Agent': 'KosmicoApp/1.0'},
-        );
-        if (response.statusCode == 200) {
-          final dynamic data = jsonDecode(response.body);
-          if (mounted && data is Map) {
-            setState(() {
-              _currentAddress = data['display_name'] ?? "Address found";
-            });
-          }
-        }
-      } catch (e) {
-        if (mounted) {
-          setState(() {
-            _currentAddress = "Coordinates: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}";
-          });
-        }
-      }
-      return;
-    }
     try {
-      final placemarks = await Geocoding().placemarkFromCoordinates(
+      final address = await LocationService.getAddressFromCoordinates(
         position.latitude,
         position.longitude,
       );
-
-      if (placemarks.isNotEmpty) {
-        final place = placemarks[0];
+      if (mounted) {
         setState(() {
-          final List<String> addressParts = [
-            place.street?.toString() ?? '',
-            place.subLocality?.toString() ?? '',
-            place.locality?.toString() ?? '',
-            place.postalCode?.toString() ?? ''
-          ]..removeWhere((part) => part.isEmpty || part == 'null');
-          
-          _currentAddress = addressParts.join(', ');
-          if (_currentAddress.isEmpty) _currentAddress = "Address found but no details available";
+          _currentAddress = address;
         });
       }
     } catch (e) {
       debugPrint("Error reverse geocoding: $e");
       if (mounted) {
         setState(() {
-          _currentAddress = "Address details not available for this point";
+          _currentAddress = "Lat: ${position.latitude.toStringAsFixed(4)}, Long: ${position.longitude.toStringAsFixed(4)}";
         });
       }
     }
@@ -485,35 +453,40 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                         height: 50,
                         child: ElevatedButton(
                           onPressed: () async {
-                            if (kIsWeb) {
-                              Navigator.pop(context, {
-                                'lat': _currentCenter.latitude,
-                                'lng': _currentCenter.longitude,
-                                'address': _currentAddress,
-                              });
-                              return;
-                            }
+                            setState(() => _isLoading = true);
                             try {
-                              final placemarks = await Geocoding().placemarkFromCoordinates(
+                              final parsed = await LocationService.getParsedAddress(
                                 _currentCenter.latitude,
                                 _currentCenter.longitude,
                               );
-                              if (placemarks.isNotEmpty) {
-                                if (context.mounted) {
-                                  Navigator.pop(context, {
-                                    'lat': _currentCenter.latitude,
-                                    'lng': _currentCenter.longitude,
-                                    'placemark': placemarks[0],
-                                  });
-                                }
-                              }
-                            } catch (e) {
                               if (context.mounted) {
                                 Navigator.pop(context, {
                                   'lat': _currentCenter.latitude,
                                   'lng': _currentCenter.longitude,
+                                  'street': parsed.street.isNotEmpty ? parsed.street : _currentAddress,
+                                  'city': parsed.city,
+                                  'pincode': parsed.pincode,
+                                  'state': parsed.state,
+                                  'address': parsed.fullAddress.isNotEmpty ? parsed.fullAddress : _currentAddress,
+                                  'placemark': parsed.placemark,
                                 });
                               }
+                            } catch (e) {
+                              debugPrint("Confirm location parsing error: $e");
+                              if (context.mounted) {
+                                final fallback = LocationService.parseAddressText(_currentAddress);
+                                Navigator.pop(context, {
+                                  'lat': _currentCenter.latitude,
+                                  'lng': _currentCenter.longitude,
+                                  'street': (fallback['street']?.isNotEmpty == true) ? fallback['street'] : _currentAddress,
+                                  'city': fallback['city'] ?? '',
+                                  'pincode': fallback['pincode'] ?? '',
+                                  'state': fallback['state'] ?? '',
+                                  'address': _currentAddress,
+                                });
+                              }
+                            } finally {
+                              if (mounted) setState(() => _isLoading = false);
                             }
                           },
                           style: ElevatedButton.styleFrom(
