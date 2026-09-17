@@ -15,6 +15,7 @@ class UserManager {
   String? _profilePicture;
   String? _token;
   String? _userId;
+  String? _sessionLoginTime;
 
   String? get userName => _userName;
   String? get userEmail => _userEmail;
@@ -22,6 +23,7 @@ class UserManager {
   String? get profilePicture => _profilePicture;
   String? get token => _token;
   String? get userId => _userId;
+  String? get sessionLoginTime => _sessionLoginTime;
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
@@ -31,6 +33,12 @@ class UserManager {
     _profilePicture = prefs.getString('profile_picture');
     _token = prefs.getString('auth_token');
     _userId = prefs.getString('user_id');
+    _sessionLoginTime = prefs.getString('session_login_time');
+    
+    if (_sessionLoginTime == null && _token != null) {
+      _sessionLoginTime = DateTime.now().toIso8601String();
+      await prefs.setString('session_login_time', _sessionLoginTime!);
+    }
     
     if ((_userName == null || _userName!.trim().isEmpty || _userName == 'User') && _userEmail != null && _userEmail!.contains('@')) {
       _userName = _userEmail!.split('@').first;
@@ -85,6 +93,9 @@ class UserManager {
       await prefs.remove('profile_picture');
     }
 
+    _sessionLoginTime = DateTime.now().toIso8601String();
+    await prefs.setString('session_login_time', _sessionLoginTime!);
+
     // Refresh notifications for the new user
     NotificationManager().clearAndReload();
   }
@@ -123,6 +134,7 @@ class UserManager {
     _userEmail = null;
     _token = null;
     _userId = null;
+    _sessionLoginTime = null;
 
     // Reset notification manager for next user
     await NotificationManager().clearAndReload();

@@ -32,6 +32,12 @@ class NotificationManager extends ChangeNotifier {
     final token = UserManager().token;
     if (token == null) return;
 
+    final sessionLoginTimeStr = UserManager().sessionLoginTime;
+    DateTime? sessionLoginTime;
+    if (sessionLoginTimeStr != null) {
+      sessionLoginTime = DateTime.tryParse(sessionLoginTimeStr);
+    }
+
     if (isInitial) {
       _isLoading = true;
       _currentPage = 1;
@@ -50,7 +56,18 @@ class NotificationManager extends ChangeNotifier {
         final List<Map<String, String>> apiNotifications = apiData
             .where((item) {
               final id = item['_id']?.toString() ?? item['id']?.toString() ?? '';
-              return !_deletedIds.contains(id); // Filter out deleted notifications
+              if (_deletedIds.contains(id)) return false;
+
+              if (sessionLoginTime != null) {
+                final createdAtStr = item['createdAt']?.toString();
+                if (createdAtStr != null) {
+                  final createdAt = DateTime.tryParse(createdAtStr);
+                  if (createdAt != null && createdAt.isBefore(sessionLoginTime)) {
+                    return false;
+                  }
+                }
+              }
+              return true;
             })
             .map((item) {
           final String id = item['_id']?.toString() ?? item['id']?.toString() ?? '';
@@ -144,6 +161,17 @@ class NotificationManager extends ChangeNotifier {
             for (final f in fList) {
               if (f is Map<String, dynamic> && f['status'] == 'pending') {
                 final reqId = (f['_id'] ?? f['id'] ?? '').toString();
+
+                if (sessionLoginTime != null) {
+                  final createdAtStr = f['createdAt']?.toString();
+                  if (createdAtStr != null) {
+                    final createdAt = DateTime.tryParse(createdAtStr);
+                    if (createdAt != null && createdAt.isBefore(sessionLoginTime)) {
+                      continue;
+                    }
+                  }
+                }
+
                 if (reqId.isNotEmpty && !_deletedIds.contains(reqId) && !_notifications.any((n) => n['id'] == reqId)) {
                   final sender = f['sender'] is Map ? f['sender'] : {};
                   final sName = (sender['name'] ?? sender['userName'] ?? sender['fullName'] ?? 'Someone').toString();
