@@ -1,0 +1,4 @@
+- [x] Create interactive Bluetooth Scanning simulation
+- [x] Implement "Available Devices" selection list
+- [x] Add "Pairing..." progress and handshake logic
+- [x] Show "Live Data" (e.g., 98 mg/dL) upon successful connection

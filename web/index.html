@@ -31,6 +31,37 @@
 
   <title>kosmico</title>
   <link rel="manifest" href="manifest.json">
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <script>
+    window.openRazorpayCheckout = function(optionsJson) {
+      try {
+        var options = JSON.parse(optionsJson);
+        options.handler = function (response) {
+          if (window.onRazorpaySuccess) {
+            window.onRazorpaySuccess(response.razorpay_payment_id, response.razorpay_order_id, response.razorpay_signature);
+          }
+        };
+        options.modal = {
+          "ondismiss": function() {
+            if (window.onRazorpayError) {
+              window.onRazorpayError("Payment cancelled by user", 0);
+            }
+          }
+        };
+        var rzp = new Razorpay(options);
+        rzp.on('payment.failed', function (response){
+          if (window.onRazorpayError) {
+            window.onRazorpayError(response.error.description, response.error.code);
+          }
+        });
+        rzp.open();
+      } catch (e) {
+        if (window.onRazorpayError) {
+          window.onRazorpayError(e.message || "Failed to open Razorpay", 0);
+        }
+      }
+    };
+  </script>
 </head>
 <body>
   <!--

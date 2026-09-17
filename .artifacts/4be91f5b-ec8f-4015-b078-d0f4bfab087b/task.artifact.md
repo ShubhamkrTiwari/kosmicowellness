@@ -1,0 +1,6 @@
+- [x] Remove deprecated `android.bundle.enableUncompressedNativeLibs` from `gradle.properties`
+- [x] Fix plural `keepDebugSymbol` in `app/build.gradle.kts`
+- [x] Accept Android licenses
+- [x] Configure Flutter SDK and JDK paths
+- [x] Remove `keepDebugSymbols` to fix symbol stripping failure
+- [x] Build App Bundle successfully

@@ -1,0 +1,4 @@
+- [x] Add `cancelPendingRazorpayOrder` to `ApiService`
+- [x] Track `razorpayOrderId` in `CheckoutScreen`
+- [x] Call cancellation API in `_handlePaymentFailure`
+- [x] Verify changes

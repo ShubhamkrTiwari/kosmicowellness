@@ -1,0 +1,9 @@
+- [x] Integrate Razorpay and fix 404 issue
+- [x] Integrate Shiprocket order syncing
+- [x] Implement Full Shiprocket Lifecycle
+- [x] Fix "Unknown Product" and Profile Screen crashes
+- [x] Implement `returnOrder` in `ApiService`
+- [x] Implement `createReturnOrder` in `ShiprocketService`
+- [x] Add Return Order button and reason selection to `OrderDetailsScreen`
+- [x] Implement Return sync with Shiprocket
+- [x] Verify the Return/Refund flow

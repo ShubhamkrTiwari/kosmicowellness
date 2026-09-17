@@ -1,0 +1,5 @@
+- [x] Implement `PopScope` on `HomeScreen` in `home_screen.dart`
+- [x] Update `AboutKosmicoScreen` to use `kosmicologo.png` in `profile_screen.dart`
+- [x] Add back button to `CheckoutScreen` in `checkout_screen.dart`
+- [x] Verify back navigation behavior
+- [x] Verify logo appearance

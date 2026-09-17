@@ -1,0 +1,4 @@
+- [x] Fix overflow in `sync_devices_module.dart` (Auto-Sync card & Telemetry card)
+- [x] Fix overflow in `today_module.dart` (Sync banner)
+- [x] Fix overflow in `care_network_module.dart` (Report preview demographics)
+- [x] Verify with analyzer

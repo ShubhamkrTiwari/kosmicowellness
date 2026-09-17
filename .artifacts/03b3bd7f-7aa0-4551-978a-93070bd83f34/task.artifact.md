@@ -1,0 +1,4 @@
+- `[x]` Update `CartManager` with stock validation logic
+- `[x]` Update `ProductDetailsScreen` quantity selector and add button
+- `[x]` Update `CartScreen` increment button with stock check
+- `[x]` Verify stock limits in app

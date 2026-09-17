@@ -66,5 +66,13 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSContactsUsageDescription</key>
+	<string>We need access to your contacts to let you easily pick emergency contacts.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>We need Bluetooth access to scan, connect, and sync live health and glucose vitals from your smartwatch and health sensors.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>We need Bluetooth peripheral access to communicate with your smartwatch and biometric sensors.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>We need access to your camera and flash to measure your blood pressure and heart rate using optical PPG sensing.</string>
 </dict>
 </plist>
