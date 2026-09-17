@@ -343,6 +343,16 @@ class NotificationManager extends ChangeNotifier {
     _deletedIds.clear();
     notifyListeners();
     
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final keys = prefs.getKeys().where((k) => k.contains('notification')).toList();
+      for (var k in keys) {
+        await prefs.remove(k);
+      }
+    } catch (e) {
+      debugPrint('Error clearing notification storage: $e');
+    }
+    
     await init();
   }
 

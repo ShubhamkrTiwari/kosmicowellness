@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'notification_manager.dart';
+import '../services/api_service.dart';
 
 class UserManager {
   static final UserManager _instance = UserManager._internal();
@@ -110,6 +111,13 @@ class UserManager {
 
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
+    if (_token != null) {
+      try {
+        await ApiService.clearAllNotifications(_token!);
+      } catch (e) {
+        debugPrint('Error clearing notifications on logout: $e');
+      }
+    }
     await prefs.clear();
     _userName = null;
     _userEmail = null;
@@ -117,7 +125,7 @@ class UserManager {
     _userId = null;
 
     // Reset notification manager for next user
-    NotificationManager().clearAndReload();
+    await NotificationManager().clearAndReload();
   }
 
   bool get isLoggedIn => _token != null;
