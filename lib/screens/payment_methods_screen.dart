@@ -112,7 +112,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Add a bank account or UPI ID to get started',
+                              'Add a UPI ID to get started',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 12,
@@ -127,6 +127,8 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                     ...List.generate(paymentMethods.length, (index) {
                       final method = paymentMethods[index];
                       if (method == null) return const SizedBox.shrink();
+                      // Filter out bank accounts
+                      if (method['type'] == 'BANK_ACCOUNT') return const SizedBox.shrink();
                       return _buildPremiumPaymentCard(method, index, colorScheme);
                     }),
                   const SizedBox(height: 32),

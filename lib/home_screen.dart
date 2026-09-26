@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:math' as math;
 import 'screens/cart_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/ai_consultant_screen.dart';
@@ -43,6 +44,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<Map<String, dynamic>> _apiProducts = [];
   bool _isLoadingProducts = false;
   Timer? _refreshTimer;
+  
+  int _previousUnreadCount = 0;
+  final ValueNotifier<bool> _showNotificationHighlight = ValueNotifier<bool>(false);
+  Timer? _highlightTimer;
 
   final GlobalKey<ProductListScreenState> _productListKey = GlobalKey<ProductListScreenState>();
   final GlobalKey<CareDashboardScreenState> _careDashboardKey = GlobalKey<CareDashboardScreenState>();
@@ -64,6 +69,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _refreshTimer?.cancel();
+    _highlightTimer?.cancel();
+    _showNotificationHighlight.dispose();
     super.dispose();
   }
 
@@ -1100,19 +1107,91 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Widget _buildNotificationIcon(ColorScheme colorScheme) {
     return ListenableBuilder(
-      listenable: NotificationManager(),
+      listenable: Listenable.merge([NotificationManager(), _showNotificationHighlight]),
       builder: (context, _) {
         final int unread = NotificationManager().unreadCount;
-        return IconButton(
-          icon: Stack(
-            children: [
-              Icon(Icons.notifications_none_outlined, color: colorScheme.primary),
-              if (unread > 0) Positioned(right: 0, top: 0, child: Container(padding: const EdgeInsets.all(2), decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle), constraints: const BoxConstraints(minWidth: 14, minHeight: 14), child: Text(unread.toString(), style: const TextStyle(color: Colors.white, fontSize: 8), textAlign: TextAlign.center))),
-            ],
+        
+        // Trigger highlight when unread count increases (using scheduleMicrotask to avoid setState during build)
+        if (unread > _previousUnreadCount && _previousUnreadCount >= 0) {
+          Future.microtask(() {
+            _showNotificationHighlight.value = true;
+            _highlightTimer?.cancel();
+            _highlightTimer = Timer(const Duration(seconds: 2), () {
+              _showNotificationHighlight.value = false;
+            });
+          });
+        }
+        _previousUnreadCount = unread;
+        
+        final bool showHighlight = _showNotificationHighlight.value;
+        
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: showHighlight
+                ? [
+                    BoxShadow(
+                      color: colorScheme.primary.withValues(alpha: 0.6),
+                      blurRadius: 20,
+                      spreadRadius: 5,
+                    ),
+                    BoxShadow(
+                      color: Colors.red.withValues(alpha: 0.4),
+                      blurRadius: 15,
+                      spreadRadius: 3,
+                    ),
+                  ]
+                : null,
           ),
-          onPressed: () => _checkAuthAndProceed(() {
-            Navigator.of(context).push(MaterialPageRoute(builder: (context) => const NotificationScreen()));
-          }),
+          child: AnimatedScale(
+            scale: showHighlight ? 1.2 : 1.0,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.elasticOut,
+            child: IconButton(
+              icon: Stack(
+                children: [
+                  Icon(
+                    Icons.notifications_none_outlined, 
+                    color: showHighlight ? Colors.red : colorScheme.primary,
+                  ),
+                  if (unread > 0) 
+                    Positioned(
+                      right: 0, 
+                      top: 0, 
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: showHighlight ? Colors.orange : Colors.red,
+                          shape: BoxShape.circle,
+                          boxShadow: showHighlight
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.orange.withValues(alpha: 0.6),
+                                    blurRadius: 8,
+                                    spreadRadius: 2,
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                        child: Text(
+                          unread.toString(),
+                          style: const TextStyle(color: Colors.white, fontSize: 8),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              onPressed: () => _checkAuthAndProceed(() {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const NotificationScreen())
+                );
+              }),
+            ),
+          ),
         );
       },
     );

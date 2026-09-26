@@ -14,12 +14,12 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _isLogin = true;
   bool _isLoading = false;
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _inputController = TextEditingController();
   final _nameController = TextEditingController();
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _inputController.dispose();
     _nameController.dispose();
     super.dispose();
   }
@@ -28,11 +28,24 @@ class _AuthScreenState extends State<AuthScreen> {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
-      final Map<String, dynamic> result;
-      if (_isLogin) {
-        result = await ApiService.login(_emailController.text);
-      } else {
-        result = await ApiService.register(_nameController.text, _emailController.text);
+      final identifier = _inputController.text.trim();
+      
+      // Try login first
+      var result = await ApiService.login(identifier);
+      bool isLoginFlow = true;
+
+      if (!result['success']) {
+        final message = (result['message'] ?? '').toLowerCase();
+        // If account doesn't exist, automatically sign up (register)
+        if (message.contains('not found') || message.contains('exist') || message.contains('register') || message.contains('account') || message.contains('user') || message.contains('invalid')) {
+          String defaultName = identifier.contains('@') 
+              ? identifier.split('@').first 
+              : 'User ${identifier.replaceAll(RegExp(r'[^0-9]'), '')}';
+          if (defaultName.trim().isEmpty || defaultName == 'User ') defaultName = 'Wellness User';
+
+          result = await ApiService.register(defaultName, identifier);
+          isLoginFlow = false;
+        }
       }
 
       setState(() => _isLoading = false);
@@ -42,9 +55,9 @@ class _AuthScreenState extends State<AuthScreen> {
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) => OtpVerificationScreen(
-                email: _emailController.text,
-                name: _isLogin ? null : _nameController.text,
-                isLogin: _isLogin,
+                email: identifier,
+                name: isLoginFlow ? null : identifier,
+                isLogin: isLoginFlow,
               ),
             ),
           );
@@ -108,11 +121,12 @@ class _AuthScreenState extends State<AuthScreen> {
                     const SizedBox(height: 8),
                     Text(
                       _isLogin
-                          ? 'Enter your email to receive an OTP'
-                          : 'Sign up to start your wellness journey',
+                          ? 'Enter your email or phone number to receive an OTP'
+                          : 'Sign up with email or phone number for your wellness journey',
                       style: TextStyle(color: colorScheme.onSurfaceVariant),
+                      textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
                     if (!_isLogin) ...[
                       TextFormField(
                         controller: _nameController,
@@ -136,22 +150,31 @@ class _AuthScreenState extends State<AuthScreen> {
                       const SizedBox(height: 16),
                     ],
                     TextFormField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
+                      controller: _inputController,
+                      keyboardType: TextInputType.text,
                       decoration: InputDecoration(
-                        labelText: 'Email Address',
-                        prefixIcon: const Icon(Icons.email_outlined),
+                        labelText: 'Email or Phone Number',
+                        hintText: 'name@example.com or +91 9876543210',
+                        prefixIcon: const Icon(Icons.contact_mail_outlined),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                       validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your email';
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter your email or phone number';
                         }
-                        final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-                        if (!emailRegex.hasMatch(value)) {
-                          return 'Please enter a valid email address';
+                        final val = value.trim();
+                        if (val.contains('@')) {
+                          final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                          if (!emailRegex.hasMatch(val)) {
+                            return 'Please enter a valid email address';
+                          }
+                        } else {
+                          final digits = val.replaceAll(RegExp(r'[^0-9]'), '');
+                          if (digits.length < 10) {
+                            return 'Please enter a valid phone number (at least 10 digits)';
+                          }
                         }
                         return null;
                       },

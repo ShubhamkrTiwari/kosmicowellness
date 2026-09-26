@@ -164,9 +164,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       _showLoadingDialog();
       
       // Start both the API call and a 3-second timer
-      final resultFuture = widget.isLogin 
-          ? ApiService.verifyLogin(widget.email, otp)
-          : ApiService.verifySignup(widget.email, otp);
+      final resultFuture = ApiService.verifyOtp(widget.email, otp, widget.isLogin);
       
       final delayFuture = Future.delayed(const Duration(seconds: 3));
 

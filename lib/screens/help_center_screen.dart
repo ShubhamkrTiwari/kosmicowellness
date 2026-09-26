@@ -122,7 +122,7 @@ class HelpCenterScreen extends StatelessWidget {
                 _buildInfoTile(
                   Icons.location_on_outlined,
                   'Main Office Address',
-                  '1305 & 1307 A, 13th Floor, Tower 3, NX One Tower, Greater Noida (West), Gautam Buddha Nagar, UP, India - 201306',
+                  '423A, 4th Floor, Tower 3, NX-One Tower, Greater Noida (West), Gautam Buddha Nagar, UP, India - 201306',
                   colorScheme,
                 ),
                 _buildInfoTile(
@@ -134,7 +134,7 @@ class HelpCenterScreen extends StatelessWidget {
                 _buildInfoTile(
                   Icons.email_outlined,
                   'Official Email Support',
-                  'supportkosmicowellness@gmail.com',
+                  'support@kosmicowellness.com',
                   colorScheme,
                 ),
                 _buildInfoTile(

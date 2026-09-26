@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../services/api_service.dart';
@@ -258,6 +259,13 @@ class NotificationManager extends ChangeNotifier {
     required String icon,
     String? type,
   }) async {
+    try {
+      SystemSound.play(SystemSoundType.click);
+      HapticFeedback.mediumImpact();
+    } catch (e) {
+      debugPrint('Error playing notification sound: $e');
+    }
+
     final newNotification = {
       'id': DateTime.now().millisecondsSinceEpoch.toString(),
       'title': title,

@@ -138,12 +138,18 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                                 if (product['name']?.toString().toLowerCase().contains('sweet monk') ?? false)
                                   Padding(
                                     padding: const EdgeInsets.only(bottom: 12),
-                                    child: Row(
-                                      children: [
-                                        _buildFeatureTag('Zero Calories', Icons.close, const Color(0xFFFF6B6B), colorScheme),
-                                        const SizedBox(width: 8),
-                                        _buildFeatureTag('100% Natural', Icons.eco, const Color(0xFF4CAF50), colorScheme),
-                                      ],
+                                    child: SizedBox(
+                                      height: 35,
+                                      child: SingleChildScrollView(
+                                        scrollDirection: Axis.horizontal,
+                                        child: Row(
+                                          children: [
+                                            _buildFeatureTag('Zero Calories', Icons.close, const Color(0xFFFF6B6B), colorScheme),
+                                            const SizedBox(width: 8),
+                                            _buildFeatureTag('100% Natural', Icons.eco, const Color(0xFF4CAF50), colorScheme),
+                                          ],
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 Builder(
@@ -656,14 +662,20 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: colorScheme.outline.withValues(alpha: 0.05)),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _trustBadge(Icons.verified_user_rounded, 'Certified', colorScheme),
-          _trustBadge(Icons.health_and_safety_rounded, 'Non-GMO', colorScheme),
-          _trustBadge(Icons.biotech_rounded, 'Lab Tested', colorScheme),
-          _trustBadge(Icons.nature_people_rounded, 'Ethical', colorScheme),
-        ],
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _trustBadge(Icons.verified_user_rounded, 'Certified', colorScheme),
+            const SizedBox(width: 16),
+            _trustBadge(Icons.health_and_safety_rounded, 'Non-GMO', colorScheme),
+            const SizedBox(width: 16),
+            _trustBadge(Icons.biotech_rounded, 'Lab Tested', colorScheme),
+            const SizedBox(width: 16),
+            _trustBadge(Icons.nature_people_rounded, 'Ethical', colorScheme),
+          ],
+        ),
       ),
     );
   }

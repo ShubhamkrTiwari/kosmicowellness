@@ -23,7 +23,9 @@ class _AiConsultantScreenState extends State<AiConsultantScreen> {
     'Skin Glow',
     'Order kab aayega?',
     'Ashwagandha benefits',
+    'Ayurvedic remedies',
     'Stress management'
+
   ];
 
   @override

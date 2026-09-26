@@ -6,6 +6,7 @@ import 'log_entry_module.dart';
 import 'care_network_module.dart';
 import 'community_module.dart';
 import 'sync_devices_module.dart';
+import 'camera_ppg_bp_screen.dart';
 import '../../managers/bluetooth_manager.dart';
 
 class CareDashboardScreen extends StatefulWidget {
@@ -22,6 +23,7 @@ class CareDashboardScreenState extends State<CareDashboardScreen> with SingleTic
 
   final List<String> _tabs = [
     'Today',
+    'BP Scan',
     'Community',
     'Scan Meal',
     'Log Entry',
@@ -189,6 +191,7 @@ class CareDashboardScreenState extends State<CareDashboardScreen> with SingleTic
         controller: _tabController,
         children: const [
           TodayModule(),
+          CameraPpgBpScreen(),
           CommunityModule(),
           ScanMealModule(),
           LogEntryModule(),

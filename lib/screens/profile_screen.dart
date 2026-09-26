@@ -10,12 +10,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../managers/notification_manager.dart';
 import '../managers/theme_manager.dart';
 import '../managers/language_manager.dart';
 import '../managers/user_manager.dart';
 import '../managers/wishlist_manager.dart';
 import '../services/api_service.dart';
+import '../services/socket_service.dart';
 import 'auth_screen.dart';
 import 'coupons_screen.dart';
 import 'help_center_screen.dart';
@@ -60,6 +60,16 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     _fetchCouponCount();
     _fetchOrderCount();
 
+    SocketService().onProfileUpdated = () {
+      if (mounted) {
+        setState(() {
+          userName = UserManager().userName ?? userName;
+          userEmail = UserManager().userEmail ?? userEmail;
+          userPhone = UserManager().userPhone ?? userPhone;
+        });
+      }
+    };
+
     _logoutAnimController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -68,6 +78,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
 
   @override
   void dispose() {
+    SocketService().onProfileUpdated = null;
     _logoutAnimController?.dispose();
     super.dispose();
   }
@@ -118,11 +129,24 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
 
   Future<void> _loadUserData() async {
     await UserManager().init();
-    setState(() {
-      userName = UserManager().userName ?? 'Guest User';
-      userEmail = UserManager().userEmail ?? 'Not logged in';
-      userPhone = UserManager().userPhone ?? 'Add phone number';
-    });
+    final token = UserManager().token;
+    if (token != null && token.isNotEmpty) {
+      try {
+        final result = await ApiService.getProfile(token);
+        if (result != null && result['success'] == true && result['data'] != null) {
+          await UserManager().saveUser(result['data']);
+        }
+      } catch (e) {
+        debugPrint('Error loading profile: $e');
+      }
+    }
+    if (mounted) {
+      setState(() {
+        userName = UserManager().userName ?? 'Guest User';
+        userEmail = UserManager().userEmail ?? 'Not logged in';
+        userPhone = UserManager().userPhone ?? 'Add phone number';
+      });
+    }
   }
 
   String _getInitials(String name) {
@@ -188,12 +212,14 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         if (result['success']) {
           await UserManager().saveUser(result['data']);
           
-          NotificationManager().addNotification(
-            title: 'Profile Updated',
-            message: 'Your profile picture has been updated successfully.',
-            icon: '📸',
-            type: 'profile',
-          );
+          if (mounted) {
+            setState(() {
+              _pickedImage = null;
+              userName = UserManager().userName ?? userName;
+              userEmail = UserManager().userEmail ?? userEmail;
+              userPhone = UserManager().userPhone ?? userPhone;
+            });
+          }
 
           messenger.showSnackBar(
             const SnackBar(
@@ -319,13 +345,6 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         setState(() {
           _pickedImage = null;
         });
-
-        NotificationManager().addNotification(
-          title: 'Profile Updated',
-          message: 'Your profile picture has been removed.',
-          icon: '🗑️',
-          type: 'profile',
-        );
 
         messenger.showSnackBar(
           const SnackBar(
@@ -518,13 +537,6 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                               if (result['success']) {
                                 // Backend returns the new user data including image URL
                                 await UserManager().saveUser(result['data']);
-                                
-                                NotificationManager().addNotification(
-                                  title: 'Profile Updated',
-                                  message: 'Your personal details have been updated.',
-                                  icon: '👤',
-                                  type: 'profile',
-                                );
 
                                 setState(() {
                                   userName = UserManager().userName ?? newName;
@@ -577,6 +589,29 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     );
   }
 
+  Future<void> _refreshProfile() async {
+    await UserManager().init();
+    final token = UserManager().token;
+    if (token != null && token.isNotEmpty) {
+      try {
+        final result = await ApiService.getProfile(token);
+        if (result != null && result['success'] == true && result['data'] != null) {
+          await UserManager().saveUser(result['data']);
+        }
+      } catch (e) {
+        debugPrint('Error refreshing profile: $e');
+      }
+    }
+    if (mounted) {
+      setState(() {
+        userName = UserManager().userName ?? 'User';
+        userEmail = UserManager().userEmail ?? 'No Email';
+        userPhone = UserManager().userPhone ?? 'Add phone number';
+        _pickedImage = null;
+      });
+    }
+  }
+
   InputDecoration _inputDecoration(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
@@ -598,9 +633,12 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       child: SafeArea(
         top: false, // AppBar is already handled by HomeScreen
         bottom: false,
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
+        child: RefreshIndicator(
+          onRefresh: _refreshProfile,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              children: [
               const SizedBox(height: 20),
               // Profile Header
               Padding(
@@ -975,6 +1013,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             ],
           ),
         ),
+       ),
       ),
     );
   }

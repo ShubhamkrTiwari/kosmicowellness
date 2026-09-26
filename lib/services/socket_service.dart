@@ -11,6 +11,7 @@ class SocketService {
 
   IO.Socket? _socket;
   bool _isConnected = false;
+  Function? onProfileUpdated;
 
   bool get isConnected => _isConnected;
 
@@ -102,6 +103,23 @@ class SocketService {
 
       _socket!.on('glucose_update', (data) {
         debugPrint('🩸 Real-time Glucose Update received: $data');
+      });
+
+      _socket!.on('profileUpdated', (data) async {
+        debugPrint('👤 Real-time Profile Updated received: $data');
+        if (data is Map) {
+          final eventUserId = data['userId']?.toString() ?? data['id']?.toString() ?? data['uid']?.toString();
+          final currentUserId = UserManager().userId;
+
+          if (eventUserId == null || eventUserId.isEmpty || (currentUserId != null && eventUserId == currentUserId)) {
+            await UserManager().saveUser(Map<String, dynamic>.from(data));
+            if (onProfileUpdated != null) {
+              onProfileUpdated!();
+            }
+          } else {
+            debugPrint('👤 Ignored profileUpdated event for other user ID: $eventUserId (Current: $currentUserId)');
+          }
+        }
       });
 
     } catch (e) {

@@ -17,9 +17,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
   bool _isSavingLocal = false;
   final _formKey = GlobalKey<FormState>();
 
-  final _bankAccountController = TextEditingController();
-  final _ifscController = TextEditingController();
-  final _bankNameController = TextEditingController();
   final _holderNameController = TextEditingController();
   final _upiIdController = TextEditingController();
 
@@ -28,29 +25,18 @@ class _PaymentScreenState extends State<PaymentScreen> {
     super.initState();
     final method = widget.editMethod;
     if (method != null) {
-      _selectedMethod = method['type'] == 'BANK_ACCOUNT' ? 'Bank' : 'UPI';
+      _selectedMethod = 'UPI';
       _isDefault = method['isDefault'] == true;
-      
-      if (_selectedMethod == 'Bank') {
-        _holderNameController.text = method['accountHolderName'] ?? '';
-        _bankNameController.text = method['bankName'] ?? '';
-        _bankAccountController.text = method['accountNumber'] ?? '';
-        _ifscController.text = method['ifscCode'] ?? '';
-      } else {
-        _holderNameController.text = method['displayName'] ?? '';
-        _upiIdController.text = method['upiId'] ?? '';
-      }
+      _holderNameController.text = method['displayName'] ?? '';
+      _upiIdController.text = method['upiId'] ?? '';
     } else {
-      _selectedMethod = 'Bank';
+      _selectedMethod = 'UPI';
       _isDefault = false;
     }
   }
 
   @override
   void dispose() {
-    _bankAccountController.dispose();
-    _ifscController.dispose();
-    _bankNameController.dispose();
     _holderNameController.dispose();
     _upiIdController.dispose();
     super.dispose();
@@ -60,25 +46,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
     if (_isSavingLocal) return;
     if (!_formKey.currentState!.validate()) return;
 
-    Map<String, dynamic> method;
-    if (_selectedMethod == 'Bank') {
-      method = {
-        "type": "BANK_ACCOUNT",
-        "accountHolderName": _holderNameController.text.trim(),
-        "bankName": _bankNameController.text.trim(),
-        "accountNumber": _bankAccountController.text.trim(),
-        "ifscCode": _ifscController.text.trim(),
-        "isDefault": _isDefault,
-      };
-    } else {
-      method = {
-        "type": "UPI",
-        "upiId": _upiIdController.text.trim(),
-        "upild": _upiIdController.text.trim(), // Send both for compatibility
-        "displayName": _holderNameController.text.trim(),
-        "isDefault": _isDefault,
-      };
-    }
+    Map<String, dynamic> method = {
+      "type": "UPI",
+      "upiId": _upiIdController.text.trim(),
+      "upild": _upiIdController.text.trim(), // Send both for compatibility
+      "displayName": _holderNameController.text.trim(),
+      "isDefault": _isDefault,
+    };
 
     setState(() => _isSavingLocal = true);
 
@@ -156,172 +130,57 @@ class _PaymentScreenState extends State<PaymentScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            if (!isEditing) ...[
-              Text(
-                'Select Payment Type',
-                style: TextStyle(
-                  fontSize: 18, 
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('UPI Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
+                const SizedBox(height: 20),
+                _buildTextField(
+                  controller: _holderNameController, 
+                  label: 'Display Name', 
+                  icon: Icons.person_outline, 
+                  enabled: !_isSavingLocal,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                  ],
+                  validator: (v) => v?.isEmpty == true ? 'Display name required' : null,
                 ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildTypeCard(
-                      title: 'Bank Account',
-                      logo: Image.network(
-                        'https://cdn-icons-png.flaticon.com/512/2830/2830284.png', 
-                        height: 32,
-                        width: 32,
-                        color: _selectedMethod == 'Bank' ? colorScheme.primary : colorScheme.onSurfaceVariant,
-                        errorBuilder: (context, error, stackTrace) => Icon(
-                          Icons.account_balance, 
-                          size: 32,
-                          color: _selectedMethod == 'Bank' ? colorScheme.primary : colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      isSelected: _selectedMethod == 'Bank',
-                      onTap: _isSavingLocal ? () {} : () => setState(() => _selectedMethod = 'Bank'),
-                    ),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  controller: _upiIdController, 
+                  label: 'UPI ID (e.g. name@bank)', 
+                  icon: Icons.alternate_email_outlined, 
+                  enabled: !_isSavingLocal,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'UPI ID is required';
+                    if (!v.contains('@')) return 'Invalid UPI ID format';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: isDark ? 0.2 : 0.1),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildTypeCard(
-                      title: 'UPI ID',
-                      logo: Image.network(
-                        'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/UPI-Logo-vector.svg/640px-UPI-Logo-vector.svg.png', 
-                        height: 32,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) => Icon(
-                          Icons.qr_code_scanner, 
-                          size: 32,
-                          color: _selectedMethod == 'UPI' ? colorScheme.primary : colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      isSelected: _selectedMethod == 'UPI',
-                      onTap: _isSavingLocal ? () {} : () => setState(() => _selectedMethod = 'UPI'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
-            ],
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: _selectedMethod == 'Bank'
-                  ? Column(
-                      key: const ValueKey('BankFields'),
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Bank Account Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
-                        const SizedBox(height: 20),
-                        _buildTextField(
-                          controller: _holderNameController, 
-                          label: 'Account Holder Name', 
-                          icon: Icons.person_outline, 
-                          enabled: !_isSavingLocal,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
-                          ],
-                          validator: (v) => v?.isEmpty == true ? 'Name is required' : null,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildTextField(
-                          controller: _bankNameController, 
-                          label: 'Bank Name', 
-                          icon: Icons.business_outlined, 
-                          enabled: !_isSavingLocal,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
-                          ],
-                          validator: (v) => v?.isEmpty == true ? 'Bank name is required' : null,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildTextField(
-                          controller: _bankAccountController, 
-                          label: 'Account Number', 
-                          icon: Icons.numbers_outlined, 
-                          keyboardType: TextInputType.number, 
-                          enabled: !_isSavingLocal,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
-                          validator: (v) => (v == null || v.isEmpty) ? 'Account number required' : null,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildTextField(
-                          controller: _ifscController, 
-                          label: 'IFSC Code', 
-                          icon: Icons.code_outlined, 
-                          capitalization: TextCapitalization.characters, 
-                          enabled: !_isSavingLocal,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
-                            LengthLimitingTextInputFormatter(11),
-                          ],
-                          validator: (v) {
-                            if (v == null || v.isEmpty) return 'IFSC is required';
-                            if (v.length < 11) return 'Invalid IFSC (11 chars)';
-                            return null;
-                          },
-                        ),
-                      ],
-                    )
-                  : Column(
-                      key: const ValueKey('UPIFields'),
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('UPI Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
-                        const SizedBox(height: 20),
-                        _buildTextField(
-                          controller: _holderNameController, 
-                          label: 'Display Name', 
-                          icon: Icons.person_outline, 
-                          enabled: !_isSavingLocal,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
-                          ],
-                          validator: (v) => v?.isEmpty == true ? 'Display name required' : null,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildTextField(
-                          controller: _upiIdController, 
-                          label: 'UPI ID (e.g. name@bank)', 
-                          icon: Icons.alternate_email_outlined, 
-                          enabled: !_isSavingLocal,
-                          validator: (v) {
-                            if (v == null || v.isEmpty) return 'UPI ID is required';
-                            if (!v.contains('@')) return 'Invalid UPI ID format';
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.amber.withValues(alpha: isDark ? 0.2 : 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.info_outline, size: 18, color: isDark ? Colors.amber[200] : Colors.amber.shade900),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Ensure your UPI ID is correct to avoid payment failures.',
-                                  style: TextStyle(
-                                    color: isDark ? Colors.amber[100] : Colors.amber.shade900, 
-                                    fontSize: 12
-                                  ),
-                                ),
-                              ),
-                            ],
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, size: 18, color: isDark ? Colors.amber[200] : Colors.amber.shade900),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Ensure your UPI ID is correct to avoid payment failures.',
+                          style: TextStyle(
+                            color: isDark ? Colors.amber[100] : Colors.amber.shade900, 
+                            fontSize: 12
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 24),
             SwitchListTile(

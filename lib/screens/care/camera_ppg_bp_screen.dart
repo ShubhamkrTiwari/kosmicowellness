@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../managers/bluetooth_manager.dart';
+import 'care_dashboard_screen.dart';
 
 class CameraPpgBpScreen extends StatefulWidget {
   const CameraPpgBpScreen({super.key});
@@ -194,7 +195,13 @@ class _CameraPpgBpScreenState extends State<CameraPpgBpScreen> with WidgetsBindi
         backgroundColor: Colors.green,
       ),
     );
-    Navigator.pop(context);
+
+    final careDashboardState = context.findAncestorStateOfType<CareDashboardScreenState>();
+    if (careDashboardState != null) {
+      careDashboardState.switchTab(0);
+    } else if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    }
   }
 
   @override
