@@ -7,7 +7,6 @@ import '../services/api_service.dart';
 import '../services/razorpay_service.dart';
 import '../services/shiprocket_service.dart';
 import 'shipping_addresses_screen.dart';
-import 'payment_methods_screen.dart';
 import 'coupons_screen.dart';
 import 'my_orders_screen.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
@@ -22,7 +21,6 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   Map<String, dynamic>? _selectedAddress;
-  Map<String, dynamic>? _selectedPaymentMethod;
   Map<String, dynamic>? _appliedCoupon;
   double _discountAmount = 0.0;
   double _deliveryFee = 0.0;
@@ -224,20 +222,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           // Fetch delivery estimation for initial address
           _fetchDeliveryEstimation();
         }
-
-        // Load payment methods
-        debugPrint('Checkout: Loading payment methods...');
-        await PaymentManager().fetchPaymentMethods().timeout(const Duration(seconds: 15));
-        final methods = PaymentManager().paymentMethods;
-        if (methods.isNotEmpty) {
-          setState(() {
-            _selectedPaymentMethod = methods.firstWhere(
-              (m) => m['isDefault'] == true || m['isDefault'].toString() == 'true',
-              orElse: () => methods.first,
-            );
-          });
-          debugPrint('Checkout: Payment methods loaded');
-        }
       }
     } catch (e) {
       debugPrint('Checkout Error during load: $e');
@@ -261,10 +245,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     debugPrint('Checkout: _placeOrder called');
     if (_selectedAddress == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a shipping address')));
-      return;
-    }
-    if (!_isCOD && _selectedPaymentMethod == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select an online payment method')));
       return;
     }
 
@@ -470,7 +450,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _handleOrderResponse(result);
       } else {
         final addressId = _selectedAddress!['_id']?.toString() ?? _selectedAddress!['id']?.toString() ?? '';
-        final paymentMethodId = _selectedPaymentMethod?['_id']?.toString() ?? _selectedPaymentMethod?['id']?.toString() ?? 'RAZORPAY';
+        final paymentMethodId = 'RAZORPAY'; // Direct razorpay
         
         final apiItems = CartManager().items.map((item) => {
           'product': item['id'],
@@ -654,19 +634,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 _buildCodCard(colorScheme),
                 const SizedBox(height: 24),
 
-                if (!_isCOD) ...[
-                  _buildSectionHeader('Payment Method', () async {
-                    final result = await Navigator.of(context).push(
-                      MaterialPageRoute(builder: (context) => const PaymentMethodsScreen(isSelectionMode: true))
-                    );
-                    if (result != null && result is Map<String, dynamic>) {
-                      setState(() => _selectedPaymentMethod = result);
-                    }
-                  }),
-                  _buildPaymentCard(colorScheme),
-                  const SizedBox(height: 24),
-                ],
-
                 _buildSectionHeader('Apply Coupon', () async {
                   final result = await Navigator.of(context).push(
                     MaterialPageRoute(builder: (context) => const CouponsScreen(isSelectionMode: true))
@@ -849,79 +816,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ),
                       ),
                     ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPaymentCard(ColorScheme colorScheme) {
-    if (_selectedPaymentMethod == null) {
-      return Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: colorScheme.secondary.withValues(alpha: 0.1), shape: BoxShape.circle),
-              child: Icon(Icons.payment_rounded, color: colorScheme.secondary, size: 20),
-            ),
-            const SizedBox(width: 16),
-            Text('Select payment method', style: TextStyle(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
-          ],
-        ),
-      );
-    }
-
-    final bool isBank = _selectedPaymentMethod!['type'] == 'BANK_ACCOUNT';
-    final Color cardColor = isBank ? const Color(0xFF1B264F) : const Color(0xFF00833E);
-    
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: cardColor.withValues(alpha: 0.3), blurRadius: 15, offset: const Offset(0, 8))],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: Stack(
-          children: [
-            Positioned(right: -20, top: -20, child: CircleAvatar(radius: 50, backgroundColor: Colors.white.withValues(alpha: 0.05))),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(8)),
-                        child: Text(isBank ? 'BANK' : 'UPI', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                      ),
-                      const Icon(Icons.verified_rounded, color: Colors.white, size: 18),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    isBank ? (_selectedPaymentMethod!['accountNumber']?.toString() ?? 'XXXX') : (_selectedPaymentMethod!['upiId'] ?? '').toString(),
-                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    (isBank ? (_selectedPaymentMethod!['accountHolderName'] ?? 'NAME') : (_selectedPaymentMethod!['displayName'] ?? 'NAME')).toString().toUpperCase(),
-                    style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
                   ),
                 ],
               ),

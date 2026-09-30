@@ -60,6 +60,12 @@ class _CameraPpgBpScreenState extends State<CameraPpgBpScreen> with WidgetsBindi
       await _cameraController!.initialize();
       await _cameraController!.setFlashMode(FlashMode.torch);
 
+      try {
+        await _cameraController!.startImageStream(_processCameraImage);
+      } catch (e) {
+        debugPrint('Initial start image stream error: $e');
+      }
+
       if (mounted) {
         setState(() {
           _isCameraInitialized = true;
@@ -71,7 +77,7 @@ class _CameraPpgBpScreenState extends State<CameraPpgBpScreen> with WidgetsBindi
   }
 
   void _startMeasurement() {
-    if (!_isCameraInitialized || _isMeasuring) return;
+    if (!_isCameraInitialized || _isMeasuring || _isCompleted || !_hasFinger) return;
 
     setState(() {
       _isMeasuring = true;
@@ -81,17 +87,13 @@ class _CameraPpgBpScreenState extends State<CameraPpgBpScreen> with WidgetsBindi
       _rawBuffer.clear();
     });
 
-    try {
-      _cameraController?.startImageStream(_processCameraImage);
-    } catch (e) {
-      debugPrint('Start image stream error: $e');
-    }
-
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_countdownSeconds > 0) {
-        setState(() {
-          _countdownSeconds--;
-        });
+        if (_hasFinger) {
+          setState(() {
+            _countdownSeconds--;
+          });
+        }
       } else {
         _stopMeasurement();
       }
@@ -99,34 +101,49 @@ class _CameraPpgBpScreenState extends State<CameraPpgBpScreen> with WidgetsBindi
   }
 
   void _processCameraImage(CameraImage image) {
-    if (!_isMeasuring) return;
-
     try {
-      // Extract average brightness / red intensity from YUV or planes
-      // For YUV420, plane 0 is Y (luminance)
-      final plane = image.planes[0];
-      final bytes = plane.bytes;
-      
-      double sum = 0;
-      final step = max(1, bytes.length ~/ 200);
-      int count = 0;
-      for (int i = 0; i < bytes.length; i += step) {
-        sum += bytes[i];
-        count++;
+      if (image.planes.length < 3) return;
+
+      final yPlane = image.planes[0];
+      final vPlane = image.planes[2]; // V (Cr) plane for redness / blood chrominance
+
+      double ySum = 0;
+      final yStep = max(1, yPlane.bytes.length ~/ 100);
+      int yCount = 0;
+      for (int i = 0; i < yPlane.bytes.length; i += yStep) {
+        ySum += yPlane.bytes[i];
+        yCount++;
       }
-      final avgBrightness = sum / count;
+      final avgY = ySum / yCount;
 
-      // Finger detection check (with flashlight ON, a finger covering lens yields high brightness/red absorption)
-      final hasFingerDetected = avgBrightness > 40 && avgBrightness < 245;
+      double vSum = 0;
+      final vStep = max(1, vPlane.bytes.length ~/ 50);
+      int vCount = 0;
+      for (int i = 0; i < vPlane.bytes.length; i += vStep) {
+        vSum += vPlane.bytes[i];
+        vCount++;
+      }
+      final avgV = vSum / vCount;
 
-      if (mounted) {
+      // Strict finger detection check:
+      // 1. Moderate luminance (avgY between 20 and 160) - filters out open air/bright flash (>160) and total darkness (<20).
+      // 2. High red chrominance (avgV > 132) - filters out keyboards, tables, white walls, and non-blood surfaces.
+      final hasFingerDetected = avgY > 20 && avgY < 160 && avgV > 132;
+
+      if (mounted && _hasFinger != hasFingerDetected) {
         setState(() {
           _hasFinger = hasFingerDetected;
         });
       }
 
-      if (hasFingerDetected) {
-        _rawBuffer.add(avgBrightness);
+      // Auto-start measurement ONLY when finger is detected and not already measuring or completed
+      if (!_isMeasuring && !_isCompleted && hasFingerDetected) {
+        _startMeasurement();
+        return;
+      }
+
+      if (_isMeasuring && hasFingerDetected) {
+        _rawBuffer.add(avgY);
         if (_rawBuffer.length > 150) {
           _rawBuffer.removeAt(0);
         }
@@ -138,15 +155,17 @@ class _CameraPpgBpScreenState extends State<CameraPpgBpScreen> with WidgetsBindi
 
         double normalized = 0.5;
         if (range > 0.001) {
-          normalized = (avgBrightness - minVal) / range;
+          normalized = (avgY - minVal) / range;
         }
 
-        setState(() {
-          _ppgValues.add(normalized);
-          if (_ppgValues.length > 100) {
-            _ppgValues.removeAt(0);
-          }
-        });
+        if (mounted) {
+          setState(() {
+            _ppgValues.add(normalized);
+            if (_ppgValues.length > 100) {
+              _ppgValues.removeAt(0);
+            }
+          });
+        }
       }
     } catch (e) {
       // Ignore frame processing errors
@@ -261,12 +280,12 @@ class _CameraPpgBpScreenState extends State<CameraPpgBpScreen> with WidgetsBindi
                       children: const [
                         Text(
                           'Instructions',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                         ),
                         SizedBox(height: 4),
                         Text(
-                          'Place your fingertip gently over the REAR camera lens and flash. Keep still until the countdown completes.',
-                          style: TextStyle(color: Colors.white70, fontSize: 13),
+                          'Place fingertip on rear camera & flash. Keep still until countdown completes.',
+                          style: TextStyle(color: Colors.white70, fontSize: 11),
                         ),
                       ],
                     ),
@@ -277,31 +296,33 @@ class _CameraPpgBpScreenState extends State<CameraPpgBpScreen> with WidgetsBindi
             const SizedBox(height: 24),
 
             // Camera Viewfinder or Animation Circle
-            Container(
-              height: 260,
-              width: 260,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [
-                    _hasFinger ? Colors.red.shade800 : const Color(0xFF334155),
-                    const Color(0xFF1E293B),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: (_hasFinger ? Colors.red : Colors.blue).withOpacity(0.4),
-                    blurRadius: 25,
-                    spreadRadius: 5,
+            GestureDetector(
+              onTap: !_isMeasuring && !_isCompleted && _hasFinger ? _startMeasurement : null,
+              child: Container(
+                height: 260,
+                width: 260,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [
+                      _hasFinger ? Colors.red.shade800 : const Color(0xFF334155),
+                      const Color(0xFF1E293B),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                ],
-                border: Border.all(
-                  color: _hasFinger ? Colors.redAccent : Colors.blueAccent,
-                  width: 4,
+                  boxShadow: [
+                    BoxShadow(
+                      color: (_hasFinger ? Colors.red : Colors.blue).withOpacity(0.4),
+                      blurRadius: 25,
+                      spreadRadius: 5,
+                    ),
+                  ],
+                  border: Border.all(
+                    color: _hasFinger ? Colors.redAccent : Colors.blueAccent,
+                    width: 4,
+                  ),
                 ),
-              ),
               child: Stack(
                 alignment: Alignment.center,
                 children: [
@@ -345,7 +366,7 @@ class _CameraPpgBpScreenState extends State<CameraPpgBpScreen> with WidgetsBindi
                       Text(
                         _isMeasuring
                             ? (_hasFinger ? 'Analyzing PPG Pulse...' : 'Cover Lens & Flash')
-                            : 'Tap Start Below',
+                            : 'Place Finger on Camera',
                         style: TextStyle(
                           color: _hasFinger ? Colors.greenAccent : Colors.amberAccent,
                           fontSize: 13,
@@ -355,6 +376,7 @@ class _CameraPpgBpScreenState extends State<CameraPpgBpScreen> with WidgetsBindi
                     ],
                   ),
                 ],
+              ),
               ),
             ),
             const SizedBox(height: 24),
@@ -439,21 +461,6 @@ class _CameraPpgBpScreenState extends State<CameraPpgBpScreen> with WidgetsBindi
               ),
               const SizedBox(height: 20),
             ],
-
-            // Action Button
-            if (!_isMeasuring && !_isCompleted)
-              ElevatedButton.icon(
-                onPressed: _startMeasurement,
-                icon: const Icon(Icons.camera_alt),
-                label: const Text('Start PPG Measurement'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(52),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
 
             if (_isMeasuring)
               OutlinedButton.icon(

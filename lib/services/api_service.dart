@@ -645,6 +645,79 @@ class ApiService {
     }
   }
 
+  // Cart API Methods
+  static Future<Map<String, dynamic>> getCart(String token) async {
+    try {
+      final response = await http.get(
+        _getUri('/api/cart'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> addToCart({
+    required String productId,
+    required int quantity,
+    required String token,
+  }) async {
+    try {
+      final response = await http.post(
+        _getUri('/api/cart/add'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({
+          'productId': productId,
+          'quantity': quantity,
+        }),
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> removeFromCart({
+    required String productId,
+    required String token,
+  }) async {
+    try {
+      final response = await http.delete(
+        _getUri('/api/cart/remove/$productId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> clearCart(String token) async {
+    try {
+      final response = await http.delete(
+        _getUri('/api/cart/clear'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
   static Future<Map<String, dynamic>> placeCodOrder({
     required double amount,
     required String addressId,
@@ -658,7 +731,7 @@ class ApiService {
   }) async {
     try {
       final response = await http.post(
-        _getUri('/api/payment/cod'),
+        _getUri('/api/order/place/cod'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -763,7 +836,7 @@ class ApiService {
     double? gstCharge,
   }) async {
     try {
-      final url = _getUri('/api/payment/razorpay/create');
+      final url = _getUri('/api/order/place/razorpay');
       final body = jsonEncode({
         'amount': amount,
         'deliveryAddressId': addressId,
@@ -905,7 +978,7 @@ class ApiService {
   }) async {
     try {
       final response = await http.post(
-        _getUri('/api/payment/verify'),
+        _getUri('/api/payment/razorpay/verify'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -924,15 +997,20 @@ class ApiService {
 
   static Future<Map<String, dynamic>> getUserOrders(String token, {int page = 1, int limit = 10}) async {
     try {
+      final url = _getUri('/api/payment/myorders?page=$page&limit=$limit');
+      debugPrint('DEBUG: Requesting User Orders -> $url');
       final response = await http.get(
-        _getUri('/api/payment/myorders?page=$page&limit=$limit'),
+        url,
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
         },
       ).timeout(const Duration(seconds: 30));
+      debugPrint('DEBUG: User Orders Response Status: ${response.statusCode}');
+      debugPrint('DEBUG: User Orders Response Body: ${response.body}');
       return _processResponse(response);
     } catch (e) {
+      debugPrint('DEBUG: User Orders Error -> $e');
       return _handleError(e);
     }
   }

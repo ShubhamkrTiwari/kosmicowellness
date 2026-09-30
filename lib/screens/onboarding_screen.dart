@@ -90,11 +90,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
             ],
           ),
           child: Image.asset(
-            'assets/images/sweetmonk.png',
-            height: 300,
-            fit: BoxFit.contain,
-          ),
-        ),
+            'assets/images/sweetmonkbg.png',
+        height: 300,
+        fit: BoxFit.contain,
+      ),
+    ),
       );
     } else if (index == 1) {
       // AI Scanning Visual Illustration

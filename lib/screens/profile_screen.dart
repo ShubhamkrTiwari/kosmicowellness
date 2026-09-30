@@ -815,13 +815,6 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                   );
                 });
               }),
-              _buildMenuItem(Icons.payment_outlined, 'Payment Methods', 'Saved cards and UPI', colorScheme, onTap: () {
-                _checkAuthAndProceed(() {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (context) => const PaymentMethodsScreen()),
-                  );
-                });
-              }),
               
 
               const SizedBox(height: 20),

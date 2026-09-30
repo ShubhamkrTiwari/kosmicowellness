@@ -10,6 +10,7 @@ import 'screens/auth_screen.dart';
 import 'screens/care/care_dashboard_screen.dart';
 import 'screens/care/scan_meal_module.dart';
 import 'screens/care/today_module.dart';
+import 'screens/care/camera_ppg_bp_screen.dart';
 import 'screens/notification_screen.dart';
 import 'screens/product_details_screen.dart';
 import 'screens/product_list_screen.dart';
@@ -328,6 +329,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _checkAuthAndProceed(() {
       Navigator.of(context).push(
         MaterialPageRoute(builder: (context) => const AiConsultantScreen()),
+      );
+    });
+  }
+
+  void _openBpScan() {
+    _checkAuthAndProceed(() {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (context) => const CameraPpgBpScreen()),
       );
     });
   }
@@ -689,12 +698,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             children: [
               Expanded(
                 child: _buildFeatureCard(
-                  title: 'Health Diary',
-                  subtitle: 'Log glucose & water',
-                  icon: Icons.monitor_heart_rounded,
-                  badge: '📊 Daily Log',
-                  cardGradient: const [Color(0xFF10B981), Color(0xFF6EE7B7), Color(0xFFECFDF5), Colors.white],
-                  onTap: () => _openCareTab(3), // Tab 3 is Log Entry
+                  title: 'BP Scan',
+                  subtitle: 'Camera PPG measurement',
+                  icon: Icons.favorite_rounded,
+                  badge: '❤️ PPG Scan',
+                  cardGradient: const [Color(0xFFEF4444), Color(0xFFF87171), Color(0xFFFEF2F2), Colors.white],
+                  onTap: _openBpScan,
                 ),
               ),
               const SizedBox(width: 8),
