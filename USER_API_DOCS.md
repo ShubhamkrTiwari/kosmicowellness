@@ -224,9 +224,86 @@ This document provides a comprehensive reference for all client/user-side API en
   }
   ```
 
-### 3. COD Upfront Payment (Partial COD via Razorpay)
-- **Create:** `POST /api/payment/cod-upfront/create`
-- **Verify:** `POST /api/payment/cod-upfront/verify`
+### 3. COD Upfront Payment (Partial COD / Advance via Razorpay)
+
+> **Flow:** User places a COD order but pays a non-refundable **advance** (delivery fee + GST) online via Razorpay at checkout. The **product price** is collected by the courier (Shiprocket) on delivery. These orders are tagged `PART_COD`.
+
+#### 3a. Create COD Upfront Order
+- **Endpoint:** `POST /api/payment/cod-upfront/create`
+- **Auth Required:** Yes
+- **Request Body (sent by app / website):**
+  ```json
+  {
+    "amount": 599.0,
+    "upfrontAmount": 100.0,
+    "deliveryFee": 50.0,
+    "gstCharge": 50.0,
+    "deliveryAddressId": "address_id",
+    "items": [{"product": "prod_id", "qty": 1, "price": 499.0, "name": "..."}],
+    "couponCode": "KOSMICO10",
+    "discountAmount": 0.0
+  }
+  ```
+  - `amount` = full order total (product + delivery + GST - discount).
+  - `upfrontAmount` = advance to charge now (= `deliveryFee + gstCharge`).
+  - `balanceAmount` (to collect on delivery) = `amount - upfrontAmount`.
+- **Backend must:**
+  1. Create the order in **pending** state with `paymentType = PART_COD`, `isCodUpfront = true`, `paidAmount = upfrontAmount`, `balanceAmount = amount - upfrontAmount`.
+  2. Create a **Razorpay order** for exactly the `upfrontAmount`.
+  3. Return the Razorpay order id so the client can open checkout.
+- **Response Body (client reads `data.id` or `data.razorpay_order_id`):**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": "order_KOSMICOxxxx",          // Razorpay order id for the advance
+      "razorpay_order_id": "order_...",
+      "amount_due": 10000                  // advance amount in paise
+    }
+  }
+  ```
+
+#### 3b. Verify COD Upfront Payment
+- **Endpoint:** `POST /api/payment/cod-upfront/verify`
+- **Auth Required:** Yes
+- **Request Body (after Razorpay success):**
+  ```json
+  {
+    "razorpay_order_id": "order_...",
+    "razorpay_payment_id": "pay_...",
+    "razorpay_signature": "..."
+  }
+  ```
+- **Backend must:**
+  1. Verify the Razorpay signature; mark the advance as **paid** (`paidAmount` confirmed).
+  2. **Place / confirm** the order (status → `Order Placed` / `processing`), keeping `balanceAmount` as due-on-delivery.
+  3. **Create the Shiprocket shipment as partial COD**: `payment_method: "COD"` and **`cod_amount = balanceAmount`** so the courier collects only the balance at delivery.
+  4. Return the placed order id.
+- **Response Body (client reads `data.order._id` or `data.orderId`):**
+  ```json
+  {
+    "success": true,
+    "data": { "order": { "_id": "64f..." }, "orderId": "64f..." }
+  }
+  ```
+
+#### 3c. Order fields required for Part-COD display (app + website)
+`GET /api/payment/myorders` and `GET /api/order/track/{orderId}` **must** include the following on every order so the client can show the advance vs balance split:
+
+| Field | Type | Description |
+|---|---|---|
+| `paymentType` / `paymentMethod` | string | `COD`, `ONLINE`, or `PART_COD` |
+| `amount` / `totalPrice` | **number** | Full order total |
+| `paidAmount` | **number** | Advance already collected online (0 for pure COD, full for online) |
+| `balanceAmount` | **number** | Amount the courier collects on delivery |
+| `isCodUpfront` | boolean | `true` for part-COD orders |
+| `shiprocketCodAmount` | number | Value pushed to Shiprocket as `cod_amount` |
+
+> **Client compatibility:** the app reads paid amount from any of `paidAmount` / `upfrontAmount` / `advanceAmount` / `amountPaid` / `collectedAmount`, and balance from any of `balanceAmount` / `pendingAmount` / `remainingAmount` / `dueAmount` / `codAmount` / `amountToCollect`. **Standardize on `paidAmount` + `balanceAmount`.** Send them as **numbers, not strings** (the client calls `.toDouble()`).
+
+> **Refund / cancel policy:** the advance (delivery + GST) is **non-refundable**. On cancel/return only the on-delivery balance is dropped. When any refund is processed, persist `refundId`, `refundAmount`, `razorpayPaymentId` on the order (via the Razorpay `refund.processed` webhook) so the Refunds screen can display it.
+
+> **Shiprocket ownership (recommended):** Shiprocket shipment creation (including the part-COD `cod_amount`) should be done **server-side by the backend**, not from the client, so the app and website stay consistent and courier credentials never ship to clients.
 
 ### 4. Razorpay Orders
 - **Create Order:** `POST /api/payment/razorpay/create`

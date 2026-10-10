@@ -441,4 +441,38 @@ class LocationService {
     final parsed = await getParsedAddress(latitude, longitude);
     return parsed.fullAddress;
   }
+
+  /// Fetches city and state from Indian PIN code using pincode.in API
+  static Future<Map<String, String>?> getCityFromPincode(String pincode) async {
+    if (pincode.length != 6) return null;
+
+    try {
+      debugPrint('Fetching city for pincode: $pincode');
+      final uri = Uri.parse('https://api.postalpincode.in/pincode/$pincode');
+      final response = await http.get(uri).timeout(const Duration(seconds: 5));
+
+      debugPrint('API Response status: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        debugPrint('API Response data: $data');
+        if (data is List && data.isNotEmpty && data[0]['Status'] == 'Success') {
+          final postOffice = data[0]['PostOffice'];
+          if (postOffice is List && postOffice.isNotEmpty) {
+            final first = postOffice[0];
+            final city = first['District']?.toString() ?? first['Block']?.toString() ?? '';
+            debugPrint('Fetched city: $city');
+            return {
+              'city': city,
+              'state': first['State']?.toString() ?? '',
+              'region': first['Region']?.toString() ?? '',
+            };
+          }
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching city from pincode: $e');
+      return null;
+    }
+  }
 }

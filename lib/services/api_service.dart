@@ -279,6 +279,7 @@ class ApiService {
     required String fullName,
     required String streetAddress,
     required String city,
+    required String state,
     required String pincode,
     required String phoneNumber,
     required String token,
@@ -296,6 +297,7 @@ class ApiService {
           'fullName': fullName,
           'streetAddress': streetAddress,
           'city': city,
+          'state': state,
           'pincode': pincode,
           'phoneNumber': phoneNumber,
           'isDefault': isDefault,
@@ -327,6 +329,7 @@ class ApiService {
     required String fullName,
     required String streetAddress,
     required String city,
+    required String state,
     required String pincode,
     required String phoneNumber,
     required String token,
@@ -338,6 +341,7 @@ class ApiService {
         'fullName': fullName,
         'streetAddress': streetAddress,
         'city': city,
+        'state': state,
         'pincode': pincode,
         'phoneNumber': phoneNumber,
       };
@@ -899,86 +903,93 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> placeOrder({
-    required List<Map<String, dynamic>> items,
-    required String addressId,
-    required String paymentMethodId,
-    required double totalPrice,
-    required String token,
-    String? couponCode,
-    String? razorpayPaymentId,
-  }) async {
-    final body = {
-      'items': items,
-      'addressId': addressId,
-      'paymentMethodId': paymentMethodId,
-      'totalPrice': totalPrice,
-    };
-    if (couponCode != null) body['couponCode'] = couponCode;
-    if (razorpayPaymentId != null) body['razorpayPaymentId'] = razorpayPaymentId;
-
-    // List of potential endpoints to try
-    final endpoints = [
-      '/api/orders/place',
-      '/api/orders',
-      '/api/order/place',
-      '/api/order',
-      '/api/user/orders/place',
-      '/api/orders/create',
-      '/api/order/create',
-      '/api/user/order/place',
-      '/api/user/orders/create',
-      '/api/user/order/create',
-      '/api/orders/user/place',
-      '/api/orders/user/create',
-      '/api/v1/orders/place',
-      '/api/v1/order/place',
-      '/api/order/add',
-      '/api/orders/add',
-      '/api/order/checkout',
-      '/api/orders/checkout',
-      '/api/order/place-order',
-      '/api/orders/place-order',
-    ];
-
-    for (String path in endpoints) {
-      try {
-        final url = _getUri(path);
-        debugPrint('DEBUG: Attempting Place Order to $url');
-        
-        final response = await http.post(
-          url,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-            'Accept': 'application/json',
-          },
-          body: jsonEncode(body),
-        ).timeout(const Duration(seconds: 30));
-
-        debugPrint('DEBUG: $path response: ${response.statusCode}');
-        
-        if (response.statusCode != 404) {
-          debugPrint('DEBUG: Found working or erroring endpoint at $path (not 404)');
-          return _processResponse(response);
-        }
-      } catch (e) {
-        debugPrint('DEBUG: Error trying $path: $e');
-      }
-    }
-
-    return {'success': false, 'message': 'Could not find order placement endpoint (404 on all attempts)'};
-  }
-
+  /// Verifies a Razorpay payment with the backend, which confirms the pending
+  /// order created by createRazorpayOrder and places it.
   static Future<Map<String, dynamic>> verifyPayment({
     required String paymentId,
     required String orderId,
     required String signature,
     required String token,
   }) async {
+    final body = jsonEncode({
+      'razorpay_payment_id': paymentId,
+      'razorpay_order_id': orderId,
+      'razorpay_signature': signature,
+    });
+
+    // Documented endpoint first, legacy path as fallback
+    const endpoints = ['/api/payment/verify', '/api/payment/razorpay/verify'];
+
+    for (final path in endpoints) {
+      try {
+        final url = _getUri(path);
+        debugPrint('API: Verifying Razorpay Payment at $url');
+        final response = await http.post(
+          url,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: body,
+        ).timeout(const Duration(seconds: 30));
+
+        debugPrint('API: Verify Payment ($path) Status: ${response.statusCode}');
+        if (response.statusCode != 404) {
+          return _processResponse(response);
+        }
+      } catch (e) {
+        debugPrint('API: Verify Payment Error at $path: $e');
+      }
+    }
+
+    return {'success': false, 'message': 'Payment verified but order could not be confirmed. Please contact support with your payment ID.'};
+  }
+
+  // --- Premium Subscription (₹99 one-time) ---
+
+  /// Creates a server-side Razorpay order for the ₹99 subscription.
+  /// Price is fixed by the backend; the client never sends it.
+  /// Returns success:false with message 'endpoint_not_available' when the
+  /// backend route isn't deployed yet, so callers can fall back to a direct
+  /// (order-less) Razorpay checkout.
+  static Future<Map<String, dynamic>> createSubscriptionOrder({
+    required String token,
+  }) async {
     try {
+      final url = _getUri('/api/subscription/create-order');
+      debugPrint('API: Creating Subscription Order at $url');
       final response = await http.post(
-        _getUri('/api/payment/razorpay/verify'),
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({}),
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 404) {
+        return {'success': false, 'message': 'endpoint_not_available'};
+      }
+      return _processResponse(response);
+    } catch (e) {
+      debugPrint('API: Subscription Order Creation Error: $e');
+      return {'success': false, 'message': 'endpoint_not_available'};
+    }
+  }
+
+  /// Verifies the subscription payment server-side, which flags the
+  /// authenticated user's id as subscribed (survives logout / new device).
+  static Future<Map<String, dynamic>> verifySubscriptionPayment({
+    required String paymentId,
+    required String orderId,
+    required String signature,
+    required String token,
+  }) async {
+    try {
+      final url = _getUri('/api/subscription/verify');
+      debugPrint('API: Verifying Subscription Payment at $url');
+      final response = await http.post(
+        url,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -988,7 +999,64 @@ class ApiService {
           'razorpay_order_id': orderId,
           'razorpay_signature': signature,
         }),
-      );
+      ).timeout(const Duration(seconds: 30));
+
+      debugPrint('API: Subscription Verify Status: ${response.statusCode}');
+      if (response.statusCode == 404) {
+        return {'success': false, 'message': 'endpoint_not_available'};
+      }
+      return _processResponse(response);
+    } catch (e) {
+      debugPrint('API: Subscription Verify Error: $e');
+      return {'success': false, 'message': 'endpoint_not_available'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> getSubscriptionStatus(String token) async {
+    try {
+      final url = _getUri('/api/subscription/status');
+      final response = await http.get(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> getSubscriptionAmount() async {
+    try {
+      final url = _getUri('/api/settings/subscription-amount');
+      final response = await http.get(
+        url,
+        headers: {
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+      return _processResponse(response);
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  static Future<Map<String, dynamic>> consumeTrialFeature({
+    required String feature,
+    required String token,
+  }) async {
+    try {
+      final url = _getUri('/api/subscription/trial/consume');
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'feature': feature}),
+      ).timeout(const Duration(seconds: 30));
       return _processResponse(response);
     } catch (e) {
       return _handleError(e);

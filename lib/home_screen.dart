@@ -11,6 +11,7 @@ import 'screens/care/care_dashboard_screen.dart';
 import 'screens/care/scan_meal_module.dart';
 import 'screens/care/today_module.dart';
 import 'screens/care/camera_ppg_bp_screen.dart';
+import 'screens/activity_screen.dart';
 import 'screens/notification_screen.dart';
 import 'screens/product_details_screen.dart';
 import 'screens/product_list_screen.dart';
@@ -22,6 +23,7 @@ import 'managers/care_manager.dart';
 import 'managers/user_manager.dart';
 import 'services/api_service.dart';
 import 'widgets/banner_carousel.dart';
+import 'widgets/clinical_report_dialog.dart';
 import 'utils/keys.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -337,6 +339,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _checkAuthAndProceed(() {
       Navigator.of(context).push(
         MaterialPageRoute(builder: (context) => const CameraPpgBpScreen()),
+      );
+    });
+  }
+
+  void _openActivityScreen() {
+    _checkAuthAndProceed(() {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (context) => const ActivityScreen()),
       );
     });
   }
@@ -719,6 +729,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildFeatureCard(
+                  title: 'Footstep Counter',
+                  subtitle: 'Live steps & hydration',
+                  icon: Icons.directions_walk_rounded,
+                  badge: '👟 Live Steps',
+                  cardGradient: const [Color(0xFFF59E0B), Color(0xFFFDE68A), Color(0xFFFFF7ED), Colors.white],
+                  onTap: _openActivityScreen,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildFeatureCard(
+                  title: 'Clinical Report',
+                  subtitle: 'Mood, stress, water & BP summary',
+                  icon: Icons.description_rounded,
+                  badge: '📄 Medical PDF',
+                  cardGradient: const [Color(0xFF0D5C46), Color(0xFF1B8A6B), Color(0xFFF4F9F6), Colors.white],
+                  onTap: () => ClinicalReportDialog.show(context),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -737,9 +774,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         HapticFeedback.lightImpact();
         onTap();
       },
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -747,7 +784,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             colors: cardGradient,
             stops: const [0.0, 0.35, 0.75, 1.0],
           ),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: const Color(0xFF10B981).withValues(alpha: 0.28),
             width: 1.1,
@@ -755,8 +792,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           boxShadow: [
             BoxShadow(
               color: const Color(0xFF047857).withValues(alpha: 0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
@@ -768,34 +805,34 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(7),
+                  padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [Color(0xFF059669), Color(0xFF047857)],
                     ),
-                    borderRadius: BorderRadius.circular(11),
+                    borderRadius: BorderRadius.circular(10),
                     boxShadow: [
                       BoxShadow(
                         color: const Color(0xFF047857).withValues(alpha: 0.3),
-                        blurRadius: 6,
+                        blurRadius: 5,
                         offset: const Offset(0, 2),
                       ),
                     ],
                   ),
-                  child: Icon(icon, color: Colors.white, size: 16),
+                  child: Icon(icon, color: Colors.white, size: 15),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.92),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(7),
                     border: Border.all(color: const Color(0xFF059669).withValues(alpha: 0.25)),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 3,
+                        blurRadius: 2,
                         offset: const Offset(0, 1),
                       ),
                     ],
@@ -805,20 +842,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     children: [
                       if (badge.contains('Live') || badge.contains('Active')) ...[
                         Container(
-                          width: 4.5,
-                          height: 4.5,
+                          width: 4,
+                          height: 4,
                           decoration: const BoxDecoration(
                             color: Color(0xFF059669),
                             shape: BoxShape.circle,
                           ),
                         ),
-                        const SizedBox(width: 3),
+                        const SizedBox(width: 2.5),
                       ],
                       Text(
                         badge,
                         style: const TextStyle(
                           color: Color(0xFF047857),
-                          fontSize: 8.5,
+                          fontSize: 8,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 0.1,
                         ),
@@ -828,7 +865,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -836,7 +873,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   title,
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: 13,
+                    fontSize: 12.5,
                     letterSpacing: -0.2,
                     color: Color(0xFF0F172A),
                   ),
@@ -849,7 +886,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         subtitle,
                         style: const TextStyle(
                           color: Color(0xFF334155),
-                          fontSize: 10,
+                          fontSize: 9.5,
                           height: 1.2,
                           fontWeight: FontWeight.w500,
                         ),
@@ -860,7 +897,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     const SizedBox(width: 2),
                     const Icon(
                       Icons.arrow_forward_rounded,
-                      size: 11,
+                      size: 10,
                       color: Color(0xFF059669),
                     ),
                   ],
@@ -961,7 +998,54 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Flexible(child: Text(price, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: colorScheme.primary, letterSpacing: 0.5), overflow: TextOverflow.ellipsis)),
+                  Flexible(
+                    child: Builder(
+                      builder: (context) {
+                        final dynamic rawPrice = product['price'] ?? product['selling_price'] ?? product['sale_price'] ?? 0;
+                        final double priceVal = double.tryParse(rawPrice.toString().replaceAll('₹', '').replaceAll(',', '').trim()) ?? 0.0;
+                        
+                        final dynamic rawOriginalPrice = product['original_price'] ?? product['mrp'] ?? product['compare_price'] ?? product['list_price'] ?? product['old_price'] ?? product['originalPrice'] ?? product['comparePrice'] ?? product['mrpPrice'];
+                        double? originalPriceVal;
+                        if (rawOriginalPrice != null && rawOriginalPrice.toString().isNotEmpty) {
+                          originalPriceVal = double.tryParse(rawOriginalPrice.toString().replaceAll('₹', '').replaceAll(',', '').trim());
+                        }
+
+                        final bool hasDiscount = originalPriceVal != null && originalPriceVal > priceVal;
+                        final String formattedOriginalPrice = originalPriceVal != null ? '₹${originalPriceVal.toStringAsFixed(originalPriceVal % 1 == 0 ? 0 : 2)}' : '';
+
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '₹${priceVal.toStringAsFixed(priceVal % 1 == 0 ? 0 : 2)}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: colorScheme.primary,
+                                letterSpacing: 0.5,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                            if (hasDiscount) ...[
+                              const SizedBox(width: 4),
+                              Text(
+                                formattedOriginalPrice,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                                  decoration: TextDecoration.lineThrough,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ],
+                          ],
+                        );
+                      },
+                    ),
+                  ),
                   _buildAddToCartButton(product, colorScheme, lang),
                 ],
               ),

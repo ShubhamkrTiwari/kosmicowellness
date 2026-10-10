@@ -14,8 +14,10 @@ import '../managers/theme_manager.dart';
 import '../managers/language_manager.dart';
 import '../managers/user_manager.dart';
 import '../managers/wishlist_manager.dart';
+import '../managers/subscription_manager.dart';
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
+import '../utils/phone_utils.dart';
 import 'auth_screen.dart';
 import 'coupons_screen.dart';
 import 'help_center_screen.dart';
@@ -105,7 +107,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     try {
       final token = UserManager().token;
       if (token != null && token.isNotEmpty) {
-        final result = await ApiService.getUserOrders(token);
+        // Fetch with a high limit so the count reflects ALL orders, not just one page
+        final result = await ApiService.getUserOrders(token, page: 1, limit: 500);
         if (result != null && result['success'] == true && result['data'] != null) {
           final dynamic data = result['data'];
           List allOrders = [];
@@ -113,8 +116,12 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             allOrders = data;
           } else if (data is Map && data['orders'] is List) {
             allOrders = data['orders'];
+          } else if (data is Map && data['data'] is List) {
+            allOrders = data['data'];
           }
-          
+
+          // Count every order regardless of payment mode or status:
+          // COD, Online, Part-COD, active, delivered, cancelled — all included.
           if (mounted) {
             setState(() {
               _orderCount = allOrders.length;
@@ -423,7 +430,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   void _showEditProfileSheet() {
     final nameController = TextEditingController(text: userName);
     final emailController = TextEditingController(text: userEmail);
-    final phoneController = TextEditingController(text: userPhone == 'Add phone number' ? '' : userPhone);
+    final phoneController = TextEditingController(text: PhoneUtils.digits(userPhone == 'Add phone number' ? '' : userPhone));
     bool isSaving = false;
     final formKey = GlobalKey<FormState>();
 
@@ -480,7 +487,10 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                         TextFormField(
                           controller: phoneController,
                           keyboardType: TextInputType.phone,
-                          decoration: _inputDecoration('Phone Number', Icons.phone_outlined),
+                          decoration: _inputDecoration('Phone Number', Icons.phone_outlined).copyWith(
+                            prefixText: '${PhoneUtils.countryCode} ',
+                            prefixStyle: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
+                          ),
                           inputFormatters: [
                             FilteringTextInputFormatter.digitsOnly,
                             LengthLimitingTextInputFormatter(10),
@@ -501,7 +511,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                               if (!formKey.currentState!.validate()) return;
                               
                               final newName = nameController.text.trim();
-                              final newPhone = phoneController.text.trim();
+                              final newPhone = PhoneUtils.normalize(phoneController.text.trim());
                               setModalState(() => isSaving = true);
                               
                               final messenger = ScaffoldMessenger.of(context);
@@ -721,7 +731,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
-                            userPhone,
+                            PhoneUtils.display(userPhone),
                             style: TextStyle(color: colorScheme.onSurfaceVariant ?? Colors.grey, fontSize: 14),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -790,10 +800,57 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 ),
               ),
 
-              const SizedBox(height: 30),
+              const SizedBox(height: 10),
 
               // Settings Section
               _buildSectionHeader(LanguageManager().translate('settings'), colorScheme),
+              ListenableBuilder(
+                listenable: SubscriptionManager(),
+                builder: (context, _) {
+                  final subManager = SubscriptionManager();
+                  final isSubbed = subManager.isSubscribed;
+                  int totalTrialsLeft = PremiumFeature.values.fold(0, (sum, f) => sum + subManager.remainingTrials(f));
+                  
+                  return _buildMenuItem(
+                    isSubbed ? Icons.workspace_premium : Icons.bolt,
+                    isSubbed ? 'Kosmico Premium (Active)' : 'Kosmico Premium (Free Trials)',
+                    isSubbed ? 'Monthly subscription active • ${subManager.daysLeft} days left' : '$totalTrialsLeft free trials remaining • Upgrade ₹${SubscriptionManager.subscriptionPrice.toStringAsFixed(0)}/mo',
+                    colorScheme,
+                    trailing: isSubbed 
+                        ? const Icon(Icons.check_circle, color: Colors.green, size: 20)
+                        : Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text('Upgrade', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                    onTap: () async {
+                      if (!isSubbed) {
+                        final success = await subManager.payAndUnlock();
+                        if (!mounted) return;
+                        if (success) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Subscription activated successfully! 🎉'), backgroundColor: Colors.green),
+                          );
+                        }
+                      } else {
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Premium Active ⭐'),
+                            content: Text('You have active monthly unlimited access to all AI features (Plate Scan, BP Scan, Community Post, Smartwatch Connect).\n\nValidity remaining: ${subManager.daysLeft} days.'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
+                            ],
+                          ),
+                        );
+                      }
+                    },
+                  );
+                },
+              ),
               _buildMenuItem(Icons.shopping_bag_outlined, LanguageManager().translate('my_orders'), 'Track and manage your orders', colorScheme, onTap: () {
                 _checkAuthAndProceed(() {
                   Navigator.of(context).push(
@@ -1068,7 +1125,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     );
   }
 
-  Widget _buildMenuItem(IconData icon, String title, String subtitle, ColorScheme colorScheme, {VoidCallback? onTap}) {
+  Widget _buildMenuItem(IconData icon, String title, String subtitle, ColorScheme colorScheme, {VoidCallback? onTap, Widget? trailing}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4),
       child: Material(
@@ -1090,7 +1147,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             subtitle,
             style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
           ),
-          trailing: Icon(Icons.chevron_right, size: 20, color: colorScheme.onSurfaceVariant),
+          trailing: trailing ?? Icon(Icons.chevron_right, size: 20, color: colorScheme.onSurfaceVariant),
           onTap: onTap ?? () {},
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
@@ -1220,7 +1277,7 @@ class AboutKosmicoScreen extends StatelessWidget {
                   _buildSectionCard(
                     context,
                     'Developed By',
-                    'This application was crafted and engineered by Shubham kr Tiwari and Abhay Kumar (Kosmico Engineering & Development Team), combining modern mobile app architecture (Flutter & AI Vision) with ancient Ayurvedic wellness principles.',
+                    'This application was crafted and engineered by Shubham kumar Tiwari and Abhay Kumar (Kosmico Engineering & Development Team), combining modern mobile app architecture (Flutter & AI Vision) with ancient Ayurvedic wellness principles.',
                     Icons.code_rounded,
                     colorScheme,
                   ),
@@ -1389,7 +1446,7 @@ class AboutKosmicoScreen extends StatelessWidget {
                     children: [
                       const TextSpan(text: 'This application was crafted and engineered by '),
                       TextSpan(
-                        text: 'Shubham kr Tiwari',
+                        text: 'Shubham kumar Tiwari',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: colorScheme.primary,

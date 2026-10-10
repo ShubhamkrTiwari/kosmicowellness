@@ -4,6 +4,7 @@ import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import '../managers/care_manager.dart';
 import '../managers/user_manager.dart';
+import '../managers/bluetooth_manager.dart';
 
 class ReportService {
   static Future<void> shareClinicalReport(CareManager manager) async {
@@ -271,12 +272,23 @@ class ReportService {
                   'Hydration Index (Daily Water Intake)',
                   '${manager.waterIntake}',
                   'mL',
-                  '2500 - 3500 mL (Adult Target)',
-                  manager.waterIntake >= 2000 ? 'ADEQUATE' : 'LOW HYDRATION',
-                  manager.waterIntake >= 2000 ? normalGreen : warningAmber,
+                  'Adaptive Target: ${manager.waterGoal} mL\n(Base 2000 mL + 150 mL / 1,000 steps)',
+                  manager.waterIntake >= manager.waterGoal ? 'ADEQUATE' : 'LOW HYDRATION',
+                  manager.waterIntake >= manager.waterGoal ? normalGreen : warningAmber,
                   boldFont,
                   font,
                   PdfColors.white,
+                ),
+                _buildTableRow(
+                  'Footstep Count (Daily Activity)',
+                  '${manager.stepsToday}',
+                  'steps',
+                  '${manager.stepGoal} steps (Goal)\n~${manager.distanceKm.toStringAsFixed(2)} km | ~${manager.caloriesBurned.toStringAsFixed(0)} kcal burned',
+                  manager.stepsToday >= manager.stepGoal ? 'GOAL ACHIEVED' : (manager.stepsToday >= manager.stepGoal * 0.5 ? 'ON TRACK' : 'SEDENTARY'),
+                  manager.stepsToday >= manager.stepGoal * 0.5 ? normalGreen : warningAmber,
+                  boldFont,
+                  font,
+                  lightBg,
                 ),
                 _buildTableRow(
                   'Neuro-Endocrine Stress Score',
@@ -287,7 +299,18 @@ class ReportService {
                   manager.stressLevel <= 2 ? normalGreen : warningAmber,
                   boldFont,
                   font,
-                  lightBg,
+                  PdfColors.white,
+                ),
+                _buildTableRow(
+                  'Blood Pressure (Systolic / Diastolic)',
+                  '${BluetoothManager().latestSystolic ?? 118} / ${BluetoothManager().latestDiastolic ?? 76}',
+                  'mmHg',
+                  '< 120 / 80 (Optimal)\n120-129 / <80 (Normal)\n130-139 / 80-89 (Stage 1)',
+                  BluetoothManager().bloodPressureCategory,
+                  BluetoothManager().bloodPressureCategory.contains('Optimal') ? normalGreen : (BluetoothManager().bloodPressureCategory.contains('Elevated') ? warningAmber : PdfColors.red),
+                  boldFont,
+                  font,
+                  PdfColors.white,
                 ),
               ],
             ),

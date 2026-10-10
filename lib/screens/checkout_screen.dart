@@ -6,6 +6,7 @@ import '../managers/user_manager.dart';
 import '../services/api_service.dart';
 import '../services/razorpay_service.dart';
 import '../services/shiprocket_service.dart';
+import '../utils/phone_utils.dart';
 import 'shipping_addresses_screen.dart';
 import 'coupons_screen.dart';
 import 'my_orders_screen.dart';
@@ -334,7 +335,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             
             _razorpayService.openCheckout(
               amount: advanceAmount,
-              contact: UserManager().userPhone ?? '9999999999',
+              contact: PhoneUtils.digits(UserManager().userPhone ?? '9999999999'),
               email: UserManager().userEmail ?? 'test@example.com',
               description: 'Advance Delivery + GST (Non-Refundable) for Cash on Delivery Order',
               orderId: razorpayOrderId,
@@ -389,7 +390,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           
           _razorpayService.openCheckout(
             amount: _finalTotal,
-            contact: UserManager().userPhone ?? '9999999999',
+            contact: PhoneUtils.digits(UserManager().userPhone ?? '9999999999'),
             email: UserManager().userEmail ?? 'test@example.com',
             description: 'Order Payment for Kosmico Wellness Private Limited',
             orderId: razorpayOrderId,
@@ -449,24 +450,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         );
         _handleOrderResponse(result);
       } else {
-        final addressId = _selectedAddress!['_id']?.toString() ?? _selectedAddress!['id']?.toString() ?? '';
-        final paymentMethodId = 'RAZORPAY'; // Direct razorpay
-        
-        final apiItems = CartManager().items.map((item) => {
-          'product': item['id'],
-          'qty': item['quantity'],
-          'price': item['price'],
-          'name': item['name'],
-        }).toList();
-
-        final result = await ApiService.placeOrder(
-          items: apiItems,
-          addressId: addressId,
-          paymentMethodId: paymentMethodId,
-          totalPrice: _finalTotal,
+        // Full online payment: the pending order was created by
+        // createRazorpayOrder before checkout; verify the payment so the
+        // backend confirms and places the order.
+        debugPrint('Checkout: Verifying Razorpay payment & confirming order...');
+        final result = await ApiService.verifyPayment(
+          paymentId: response.paymentId ?? '',
+          orderId: response.orderId ?? _currentRazorpayOrderId ?? '',
+          signature: response.signature ?? '',
           token: token,
-          couponCode: _appliedCoupon?['code'],
-          razorpayPaymentId: response.paymentId,
         );
 
         _handleOrderResponse(result);
@@ -486,6 +478,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       String firstName = nameParts.first;
       String lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : 'User';
 
+      final double productSubTotal = (cart.totalPrice - _discountAmount).clamp(0.0, double.infinity);
+
       final Map<String, dynamic> shiprocketData = {
         'order_id': orderId,
         'order_date': DateTime.now().toString().split('.').first, // YYYY-MM-DD HH:mm:ss
@@ -495,10 +489,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'billing_address': _selectedAddress?['address'] ?? 'No Address',
         'billing_city': _selectedAddress?['city'] ?? 'City',
         'billing_pincode': _selectedAddress?['pincode'] ?? '',
-        'billing_state': 'Maharashtra', // Fallback as app doesn't have state field
+        'billing_state': (_selectedAddress?['state']?.toString().trim().isNotEmpty == true)
+            ? _selectedAddress!['state']
+            : 'Maharashtra', // Fallback when address has no state
         'billing_country': 'India',
         'billing_email': user.userEmail ?? 'test@example.com',
-        'billing_phone': _selectedAddress?['phone'] ?? user.userPhone ?? '',
+        'billing_phone': PhoneUtils.digits(_selectedAddress?['phone'] ?? user.userPhone ?? ''),
         'shipping_is_billing': true,
         'order_items': cart.items.map((item) => {
           'name': item['name'],
@@ -510,7 +506,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           'hsn': '',
         }).toList(),
         'payment_method': _isCOD ? 'COD' : 'Prepaid',
-        'sub_total': _finalTotal,
+        // Part-COD: the advance (delivery + GST) is already collected online via
+        // Razorpay, so the courier should collect only the remaining balance at
+        // delivery (product price). Shiprocket reads `cod_amount` as the amount to collect.
+        if (_isCOD) 'cod_amount': productSubTotal,
+        'sub_total': productSubTotal,
+        'shipping_charges': _deliveryFee,
+        'tax': _gstAmount,
         'length': 10,
         'breadth': 10,
         'height': 10,
@@ -801,9 +803,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   const SizedBox(height: 12),
                   Text(_selectedAddress!['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17, letterSpacing: -0.5)),
                   const SizedBox(height: 4),
-                  Text('${_selectedAddress!['address']}, ${_selectedAddress!['city']} - ${_selectedAddress!['pincode']}', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.w500)),
+                  Text(
+                    () {
+                      final state = _selectedAddress!['state'] ?? '';
+                      final statePart = state.isNotEmpty ? ', $state' : '';
+                      return '${_selectedAddress!['address']}, ${_selectedAddress!['city']}$statePart - ${_selectedAddress!['pincode']}';
+                    }(),
+                    style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
                   const SizedBox(height: 8),
-                  Text(_selectedAddress!['phone'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  Text(PhoneUtils.display(_selectedAddress!['phone'] ?? ''), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   const Divider(height: 24, thickness: 0.5),
                   Row(
                     children: [

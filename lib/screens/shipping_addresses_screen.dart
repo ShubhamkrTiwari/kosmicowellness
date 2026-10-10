@@ -5,6 +5,7 @@ import 'package:geocoding/geocoding.dart';
 import '../managers/user_manager.dart';
 import '../services/api_service.dart';
 import '../services/location_service.dart';
+import '../utils/phone_utils.dart';
 import 'map_picker_screen.dart';
 
 class ShippingAddressesScreen extends StatefulWidget {
@@ -44,6 +45,7 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
                 'name': addr['fullName']?.toString() ?? '',
                 'address': addr['streetAddress']?.toString() ?? '',
                 'city': addr['city']?.toString() ?? '',
+                'state': addr['state']?.toString() ?? '',
                 'pincode': addr['pincode']?.toString() ?? '',
                 'phone': addr['phoneNumber']?.toString() ?? '',
                 'isDefault': addr['isDefault']?.toString() ?? 'false',
@@ -62,14 +64,24 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
 
     final labelController = TextEditingController(text: address?['label'] ?? 'Home');
     final nameController = TextEditingController(text: address?['name'] ?? '');
-    final addressController = TextEditingController(text: address?['address'] ?? '');
+    // Split a stored combined address into "Flat/Building" and "Area/Landmark" parts
+    final String storedAddress = address?['address'] ?? '';
+    final int commaIndex = storedAddress.indexOf(',');
+    final flatController = TextEditingController(
+      text: commaIndex > 0 ? storedAddress.substring(0, commaIndex).trim() : storedAddress.trim(),
+    );
+    final addressController = TextEditingController(
+      text: commaIndex > 0 ? storedAddress.substring(commaIndex + 1).trim() : '',
+    );
     final cityController = TextEditingController(text: address?['city'] ?? '');
+    final stateController = TextEditingController(text: address?['state'] ?? '');
     final pincodeController = TextEditingController(text: address?['pincode'] ?? '');
-    final phoneController = TextEditingController(text: address?['phone'] ?? '');
+    final phoneController = TextEditingController(text: PhoneUtils.digits(address?['phone'] ?? ''));
 
     bool isSaving = false;
     bool isDefaultValue = address?['isDefault'] == 'true';
     final formKey = GlobalKey<FormState>();
+    bool isFetchingCity = false;
 
     showModalBottomSheet(
       context: context,
@@ -111,6 +123,7 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
                               setModalState(() {
                                 String street = result['street']?.toString().trim() ?? '';
                                 String city = result['city']?.toString().trim() ?? '';
+                                String state = result['state']?.toString().trim() ?? '';
                                 String pincode = result['pincode']?.toString().trim() ?? '';
                                 String fullAddr = result['address']?.toString().trim() ?? '';
 
@@ -119,6 +132,7 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
                                   final parsed = LocationService.parseAddressText(fullAddr);
                                   if (street.isEmpty) street = parsed['street'] ?? '';
                                   if (city.isEmpty) city = parsed['city'] ?? '';
+                                  if (state.isEmpty) state = parsed['state'] ?? '';
                                   if (pincode.isEmpty) pincode = parsed['pincode'] ?? '';
                                 }
 
@@ -143,6 +157,9 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
                                   if (city.isEmpty) {
                                     city = place.locality ?? place.subAdministrativeArea ?? '';
                                   }
+                                  if (state.isEmpty) {
+                                    state = place.administrativeArea ?? '';
+                                  }
                                   if (pincode.isEmpty) {
                                     pincode = place.postalCode ?? '';
                                   }
@@ -156,6 +173,10 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
 
                                 if (city.isNotEmpty) {
                                   cityController.text = city;
+                                }
+
+                                if (state.isNotEmpty) {
+                                  stateController.text = state;
                                 }
 
                                 if (pincode.isNotEmpty) {
@@ -187,9 +208,16 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
+                      controller: flatController,
+                      decoration: _inputDecorationRequired('Flat, House no., Building, Company, Apartment'),
+                      textInputAction: TextInputAction.next,
+                      validator: (value) => value?.isEmpty == true ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
                       controller: addressController,
-                      decoration: _inputDecoration('Street Address / Landmark'),
-                      validator: (value) => value?.isEmpty == true ? 'Address is required' : null,
+                      decoration: _inputDecoration('Area, Colony, Landmark (Optional)'),
+                      textInputAction: TextInputAction.next,
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -210,7 +238,18 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
                           child: TextFormField(
                             controller: pincodeController,
                             keyboardType: TextInputType.number,
-                            decoration: _inputDecoration('Pincode'),
+                            decoration: _inputDecoration('Pincode').copyWith(
+                              suffixIcon: isFetchingCity
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: Padding(
+                                        padding: EdgeInsets.all(12.0),
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      ),
+                                    )
+                                  : null,
+                            ),
                             inputFormatters: [
                               FilteringTextInputFormatter.digitsOnly,
                               LengthLimitingTextInputFormatter(6),
@@ -220,15 +259,63 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
                               if (value.length != 6) return 'Enter 6 digits';
                               return null;
                             },
+                            onChanged: (value) async {
+                              if (value.length == 6) {
+                                setModalState(() => isFetchingCity = true);
+                                final locationData = await LocationService.getCityFromPincode(value);
+                                if (locationData != null && mounted) {
+                                  setModalState(() {
+                                    cityController.text = locationData['city'] ?? '';
+                                    if (locationData['state']?.isNotEmpty == true) {
+                                      stateController.text = locationData['state']!;
+                                    }
+                                    isFetchingCity = false;
+                                  });
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('City fetched: ${locationData['city']}'),
+                                        duration: const Duration(seconds: 2),
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  }
+                                } else {
+                                  setModalState(() => isFetchingCity = false);
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Could not fetch city. Please enter manually.'),
+                                        backgroundColor: Colors.orange,
+                                        duration: Duration(seconds: 2),
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  }
+                                }
+                              }
+                            },
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
+                      controller: stateController,
+                      decoration: _inputDecoration('State'),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                      ],
+                      validator: (value) => value?.isEmpty == true ? 'State required' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
                       controller: phoneController,
                       keyboardType: TextInputType.phone,
-                      decoration: _inputDecoration('Phone Number'),
+                      decoration: _inputDecoration('Phone Number').copyWith(
+                        prefixText: '${PhoneUtils.countryCode} ',
+                        prefixStyle: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
+                      ),
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
                         LengthLimitingTextInputFormatter(10),
@@ -259,10 +346,13 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
                           
                           final label = labelController.text.trim();
                           final name = nameController.text.trim();
-                          final street = addressController.text.trim();
+                          final flat = flatController.text.trim();
+                          final area = addressController.text.trim();
+                          final street = [flat, area].where((s) => s.isNotEmpty).join(', ');
                           final city = cityController.text.trim();
+                          final state = stateController.text.trim();
                           final pincode = pincodeController.text.trim();
-                          final phone = phoneController.text.trim();
+                          final phone = PhoneUtils.normalize(phoneController.text.trim());
 
                           setModalState(() => isSaving = true);
                           
@@ -291,6 +381,7 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
                               fullName: name,
                               streetAddress: street,
                               city: city,
+                              state: state,
                               pincode: pincode,
                               phoneNumber: phone,
                               token: token,
@@ -302,6 +393,7 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
                               fullName: name,
                               streetAddress: street,
                               city: city,
+                              state: state,
                               pincode: pincode,
                               phoneNumber: phone,
                               token: token,
@@ -361,6 +453,25 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
   InputDecoration _inputDecoration(String label) {
     return InputDecoration(
       labelText: label,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+    );
+  }
+
+  InputDecoration _inputDecorationRequired(String label) {
+    return InputDecoration(
+      label: RichText(
+        text: TextSpan(
+          text: label,
+          style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+          children: const [
+            TextSpan(text: ' *', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -585,7 +696,11 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            '${address['address']!}, ${address['city']!} - ${address['pincode']!}',
+                            () {
+                              final state = address['state'] ?? '';
+                              final statePart = state.isNotEmpty ? ', $state' : '';
+                              return '${address['address']!}, ${address['city']!}$statePart - ${address['pincode']!}';
+                            }(),
                             style: TextStyle(color: colorScheme.onSurfaceVariant, height: 1.4, fontSize: 13, fontWeight: FontWeight.w500),
                           ),
                         ),
@@ -604,7 +719,7 @@ class _ShippingAddressesScreenState extends State<ShippingAddressesScreen> {
                           Icon(Icons.phone_iphone_rounded, size: 14, color: colorScheme.primary),
                           const SizedBox(width: 8),
                           Text(
-                            address['phone']!,
+                            PhoneUtils.display(address['phone'] ?? ''),
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                           ),
                         ],

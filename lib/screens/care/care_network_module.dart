@@ -4,10 +4,12 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../managers/care_manager.dart';
 import '../../managers/user_manager.dart';
+import '../../managers/bluetooth_manager.dart';
 import '../../services/api_service.dart';
 import '../../services/report_service.dart';
 import '../../services/location_service.dart';
 import '../../managers/notification_manager.dart';
+import '../../utils/phone_utils.dart';
 import 'package:intl/intl.dart';
 
 class CareNetworkModule extends StatefulWidget {
@@ -29,7 +31,7 @@ class _CareNetworkModuleState extends State<CareNetworkModule> {
   Future<void> _makePhoneCall(String phoneNumber) async {
     final Uri launchUri = Uri(
       scheme: 'tel',
-      path: phoneNumber,
+      path: PhoneUtils.telSafe(phoneNumber),
     );
     try {
       if (await canLaunchUrl(launchUri)) {
@@ -123,7 +125,7 @@ class _CareNetworkModuleState extends State<CareNetworkModule> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                Text(phone, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                Text(PhoneUtils.display(phone), style: const TextStyle(fontSize: 12, color: Colors.grey)),
               ],
             ),
           ),
@@ -164,7 +166,11 @@ class _CareNetworkModuleState extends State<CareNetworkModule> {
               const SizedBox(height: 16),
             ],
             TextField(controller: nameController, decoration: const InputDecoration(hintText: 'Name')),
-            TextField(controller: phoneController, decoration: const InputDecoration(hintText: 'Phone'), keyboardType: TextInputType.phone),
+            TextField(
+              controller: phoneController,
+              decoration: const InputDecoration(hintText: 'Phone (${PhoneUtils.countryCode} XXXXXXXXXX)'),
+              keyboardType: TextInputType.phone,
+            ),
           ],
         ),
         actions: [
@@ -172,7 +178,7 @@ class _CareNetworkModuleState extends State<CareNetworkModule> {
           TextButton(
             onPressed: () {
               if (nameController.text.isNotEmpty && phoneController.text.isNotEmpty) {
-                CareManager().saveContact(nameController.text, phoneController.text);
+                CareManager().saveContact(nameController.text.trim(), PhoneUtils.normalize(phoneController.text));
                 Navigator.pop(context);
               }
             },
@@ -816,8 +822,10 @@ class _CareNetworkModuleState extends State<CareNetworkModule> {
                               _buildUiTableRow('Mean Glucose', '${avg.toStringAsFixed(1)} mg/dL', '70 - 130 mg/dL', avg <= 130 ? 'In Target' : 'Elevated', avg <= 130 ? Colors.green : Colors.orange[800]!, isOdd: true),
                               _buildUiTableRow('Time in Range', '${tir.toStringAsFixed(1)}%', '> 70.0% (ADA)', tir >= 70 ? 'Optimal' : 'Low', tirColor, isOdd: false),
                               _buildUiTableRow('Glucose Index', '${gmi.toStringAsFixed(2)}%', '< 6.5% Target', 'Optimal', Colors.green, isOdd: true),
-                              _buildUiTableRow('Hydration', '${manager.waterIntake} mL', '2500 - 3000 mL', manager.waterIntake >= 2000 ? 'Adequate' : 'Low', manager.waterIntake >= 2000 ? Colors.green : Colors.orange[800]!, isOdd: false),
-                              _buildUiTableRow('Stress Score', '${manager.stressLevel}/5', '1 - 2 (Low Spike)', manager.stressLevel <= 2 ? 'Normal' : 'High', manager.stressLevel <= 2 ? Colors.green : Colors.orange[800]!, isOdd: true),
+                              _buildUiTableRow('Hydration', '${manager.waterIntake} mL', 'Adaptive: ${manager.waterGoal} mL', manager.waterIntake >= manager.waterGoal ? 'Adequate' : 'Low', manager.waterIntake >= manager.waterGoal ? Colors.green : Colors.orange[800]!, isOdd: false),
+                              _buildUiTableRow('Footsteps', '${manager.stepsToday}', '${manager.stepGoal} steps (Goal)', manager.stepsToday >= manager.stepGoal ? 'Goal Hit' : (manager.stepsToday >= manager.stepGoal * 0.5 ? 'On Track' : 'Sedentary'), manager.stepsToday >= manager.stepGoal * 0.5 ? Colors.green : Colors.orange[800]!, isOdd: true),
+                              _buildUiTableRow('Stress Score', '${manager.stressLevel}/5', '1 - 2 (Low Spike)', manager.stressLevel <= 2 ? 'Normal' : 'High', manager.stressLevel <= 2 ? Colors.green : Colors.orange[800]!, isOdd: false),
+                              _buildUiTableRow('Blood Pressure', '${BluetoothManager().latestSystolic ?? 118}/${BluetoothManager().latestDiastolic ?? 76} mmHg', '< 120 / 80 mmHg', BluetoothManager().bloodPressureCategory, BluetoothManager().bloodPressureColor, isOdd: true),
                             ],
                           ),
                         ),

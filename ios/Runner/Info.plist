@@ -74,5 +74,7 @@
 	<string>We need Bluetooth peripheral access to communicate with your smartwatch and biometric sensors.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>We need access to your camera and flash to measure your blood pressure and heart rate using optical PPG sensing.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>We use the motion coprocessor to count your footsteps and adapt your daily hydration and activity targets.</string>
 </dict>
 </plist>

@@ -4,6 +4,7 @@ import '../managers/cart_manager.dart';
 import '../managers/language_manager.dart';
 import '../managers/wishlist_manager.dart';
 import '../managers/user_manager.dart';
+import '../widgets/product_price_display.dart';
 import 'checkout_screen.dart';
 import 'cart_screen.dart';
 import 'auth_screen.dart';
@@ -253,37 +254,45 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                         ],
                       ),
                       const SizedBox(height: 24),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Text(
-                            '₹',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              color: colorScheme.primary,
-                            ),
-                          ),
-                          Text(
-                            (product['price'] ?? 0).toString().replaceAll('₹', '').trim(),
-                            style: TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w900,
-                              color: colorScheme.onSurface,
-                              letterSpacing: -1.0,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            LanguageManager().translate('inclusive_of_taxes').replaceAll('_', ' '),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
+                      Builder(
+                        builder: (context) {
+                          final dynamic rawPrice = product['price'] ?? product['selling_price'] ?? product['sale_price'] ?? 0;
+                          final double sellingPrice = double.tryParse(rawPrice.toString().replaceAll('₹', '').replaceAll(',', '').trim()) ?? 0.0;
+                          
+                          final dynamic rawOriginalPrice = product['original_price'] ?? product['mrp'] ?? product['compare_price'] ?? product['list_price'] ?? product['old_price'] ?? product['originalPrice'] ?? product['comparePrice'] ?? product['mrpPrice'];
+                          double originalPrice = sellingPrice;
+                          if (rawOriginalPrice != null && rawOriginalPrice.toString().isNotEmpty) {
+                            originalPrice = double.tryParse(rawOriginalPrice.toString().replaceAll('₹', '').replaceAll(',', '').trim()) ?? sellingPrice;
+                          }
+
+                          final dynamic rawDiscount = product['discount'] ?? product['discount_percentage'] ?? product['discountPercentage'];
+                          int discountPercentage = 0;
+                          if (rawDiscount != null && rawDiscount.toString().isNotEmpty) {
+                            discountPercentage = int.tryParse(rawDiscount.toString().replaceAll('%', '').replaceAll('OFF', '').replaceAll('off', '').trim()) ?? 0;
+                          } else if (originalPrice > sellingPrice && originalPrice > 0) {
+                            discountPercentage = (((originalPrice - sellingPrice) / originalPrice) * 100).round();
+                          }
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ProductPriceDisplay(
+                                sellingPrice: sellingPrice,
+                                originalPrice: originalPrice,
+                                discountPercentage: discountPercentage,
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                LanguageManager().translate('inclusive_of_taxes').replaceAll('_', ' '),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                       const SizedBox(height: 32),
                       _buildDescriptionCard(product, colorScheme),

@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../managers/care_manager.dart';
 import '../../managers/bluetooth_manager.dart';
+import '../../managers/subscription_manager.dart';
 import 'sync_devices_module.dart';
+import '../activity_screen.dart';
+import '../../widgets/clinical_report_dialog.dart';
 
 class TodayModule extends StatefulWidget {
   const TodayModule({super.key});
@@ -567,13 +570,186 @@ class _TodayModuleState extends State<TodayModule> {
         ),
         const SizedBox(height: 12),
         _buildEnergyCard(colorScheme, manager),
+        const SizedBox(height: 12),
+        _buildActivitySummaryCard(colorScheme, manager),
+        const SizedBox(height: 12),
+        _buildClinicalReportCard(colorScheme, manager),
       ],
+    );
+  }
+
+  Widget _buildClinicalReportCard(ColorScheme colorScheme, CareManager manager) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [colorScheme.primary.withValues(alpha: 0.12), colorScheme.primary.withValues(alpha: 0.03)],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.description_rounded, color: colorScheme.primary, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Clinical & Wellness Report',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0D5C46)),
+                    ),
+                    Text(
+                      'Includes Mood, Stress, Water, BP & Step count metrics',
+                      style: TextStyle(fontSize: 11, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _reportStatPill('Hydration', '${manager.waterIntake} mL', Icons.water_drop, Colors.blue),
+              const SizedBox(width: 8),
+              _reportStatPill('Steps', '${manager.stepsToday}', Icons.directions_walk, Colors.green),
+              const SizedBox(width: 8),
+              _reportStatPill('Stress', '${manager.stressLevel}/5', Icons.psychology, Colors.orange),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => ClinicalReportDialog.show(context),
+              icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+              label: const Text('View & Export Clinical Report'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: colorScheme.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _reportStatPill(String label, String value, IconData icon, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: const TextStyle(fontSize: 9, color: Colors.grey)),
+                  Text(value, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActivitySummaryCard(ColorScheme colorScheme, CareManager manager) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.directions_walk, color: colorScheme.primary, size: 20),
+                  const SizedBox(width: 8),
+                  const Text('Footsteps', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                ],
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ActivityScreen()),
+                  );
+                },
+                child: const Text('Open Activity', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text('${manager.stepsToday}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: Color(0xFF00833E))),
+              const SizedBox(width: 6),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 3),
+                child: Text('/ ${manager.stepGoal} steps \u2022 ${manager.distanceKm.toStringAsFixed(2)} km \u2022 ${manager.caloriesBurned.toStringAsFixed(0)} kcal',
+                    style: const TextStyle(fontSize: 11, color: Colors.grey)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: manager.stepProgress,
+              backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
+              valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
+              minHeight: 6,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildHydrationCard(ColorScheme colorScheme, CareManager manager) {
     final int water = manager.waterIntake;
-    final double progress = (water / 2000).clamp(0.0, 1.0);
+    final int goal = manager.waterGoal;
+    final double progress = manager.hydrationProgress;
     
     return Container(
       padding: const EdgeInsets.all(16),
@@ -594,7 +770,7 @@ class _TodayModuleState extends State<TodayModule> {
           ),
           const SizedBox(height: 12),
           const Text('Hydration', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-          Text('$water / 2000 ml', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+          Text('$water / $goal ml', style: const TextStyle(fontSize: 10, color: Colors.grey)),
           const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
@@ -1444,7 +1620,12 @@ class _DeviceManagementSheetState extends State<DeviceManagementSheet> {
                       onPressed: bleManager.isConnecting
                           ? null
                           : () async {
+                              // Premium gate: only 2 free smartwatch connections, then ₹99 unlock
+                              final subscription = SubscriptionManager();
+                              final granted = await subscription.ensureAccess(context, PremiumFeature.smartwatchConnect);
+                              if (!granted || !context.mounted) return;
                               final success = await bleManager.connectToDevice(result.device);
+                              if (success) await subscription.recordUse(PremiumFeature.smartwatchConnect);
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
@@ -1536,7 +1717,15 @@ class _DeviceManagementSheetState extends State<DeviceManagementSheet> {
               else
                 ElevatedButton(
                   onPressed: () async {
+                    // Premium gate: only 2 free smartwatch connections, then ₹99 unlock
+                    final subscription = SubscriptionManager();
+                    final bool isWatch = item['category'] == HardwareCategory.smartwatch;
+                    if (isWatch) {
+                      final granted = await subscription.ensureAccess(context, PremiumFeature.smartwatchConnect);
+                      if (!granted || !context.mounted) return;
+                    }
                     await bleManager.connectPresetDevice(item['name'] as String, item['category'] as HardwareCategory);
+                    if (isWatch) await subscription.recordUse(PremiumFeature.smartwatchConnect);
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
@@ -1611,7 +1800,8 @@ class GlucosePainter extends CustomPainter {
       for (int i = 0; i < curve.length; i++) {
         final double x = (size.width / (curve.length == 1 ? 1 : curve.length - 1)) * i;
         final dynamic rawVal = curve[i]['level'];
-        final double val = double.tryParse(rawVal?.toString() ?? '110') ?? 110.0;
+        double val = double.tryParse(rawVal?.toString() ?? '110') ?? 110.0;
+        if (!val.isFinite) val = 110.0; // guard backend NaN/Infinity (crashes web canvas & int casts)
         
         double y = size.height - ((val - 40) / 180) * size.height;
         y = y.clamp(0, size.height);
@@ -1621,7 +1811,8 @@ class GlucosePainter extends CustomPainter {
         } else {
           final prevX = (size.width / (curve.length == 1 ? 1 : curve.length - 1)) * (i - 1);
           final dynamic prevRaw = curve[i - 1]['level'];
-          final double prevVal = double.tryParse(prevRaw?.toString() ?? '110') ?? 110.0;
+          double prevVal = double.tryParse(prevRaw?.toString() ?? '110') ?? 110.0;
+          if (!prevVal.isFinite) prevVal = 110.0;
           double prevY = (size.height - ((prevVal - 40) / 180) * size.height).clamp(0.0, size.height);
 
           final controlX = (prevX + x) / 2;

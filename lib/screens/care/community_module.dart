@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../managers/post_manager.dart';
 import '../../managers/user_manager.dart';
+import '../../managers/subscription_manager.dart';
 import '../../models/post.dart';
 import '../../widgets/image_viewer_dialog.dart';
 import '../../services/location_service.dart';
@@ -157,6 +158,10 @@ class _PostInputWidgetState extends State<PostInputWidget> {
   Future<void> _handleCreatePost() async {
     if (_postController.text.trim().isEmpty && _pickedImage == null) return;
 
+    // Premium gate: 2 free community posts per user, then locked behind ₹99 subscription
+    final granted = await SubscriptionManager().ensureAccess(context, PremiumFeature.communityPost);
+    if (!granted || !mounted) return;
+
     setState(() => _isSubmitting = true);
     final success = await PostManager().createPost(
       _postController.text.trim(),
@@ -166,6 +171,8 @@ class _PostInputWidgetState extends State<PostInputWidget> {
     setState(() => _isSubmitting = false);
 
     if (success) {
+      // Only consume a trial use when the post actually went through
+      await SubscriptionManager().recordUse(PremiumFeature.communityPost);
       _postController.clear();
       setState(() {
         _pickedImage = null;

@@ -7,12 +7,14 @@ import 'managers/notification_manager.dart';
 import 'managers/payment_manager.dart';
 import 'managers/care_manager.dart';
 import 'managers/language_manager.dart';
+import 'managers/subscription_manager.dart';
 import 'services/socket_service.dart';
 import 'utils/keys.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await UserManager().init();
+  await SubscriptionManager().init();
   await ThemeManager().init();
   await LanguageManager().init();
   await NotificationManager().init();

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../../managers/bluetooth_manager.dart';
+import '../../managers/subscription_manager.dart';
 import 'camera_ppg_bp_screen.dart';
 
 class SyncDevicesModule extends StatefulWidget {
@@ -1352,7 +1353,16 @@ class _SyncDevicesModuleState extends State<SyncDevicesModule> with SingleTicker
                             ? null
                             : () async {
                                 HapticFeedback.mediumImpact();
+                                // Premium gate: only 2 free smartwatch connections, then ₹99 unlock
+                                final subscription = SubscriptionManager();
+                                if (isSmartwatch) {
+                                  final granted = await subscription.ensureAccess(context, PremiumFeature.smartwatchConnect);
+                                  if (!granted || !context.mounted) return;
+                                }
                                 final success = await bleManager.connectToDevice(result.device);
+                                if (success && isSmartwatch) {
+                                  await subscription.recordUse(PremiumFeature.smartwatchConnect);
+                                }
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(

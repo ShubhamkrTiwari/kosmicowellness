@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'notification_manager.dart';
+import 'subscription_manager.dart';
 import '../services/api_service.dart';
 
 class UserManager {
@@ -96,6 +97,11 @@ class UserManager {
     _sessionLoginTime = DateTime.now().toIso8601String();
     await prefs.setString('session_login_time', _sessionLoginTime!);
 
+    // Restore/refresh subscription state for this user id (locked features
+    // unlock only after the ₹99 subscription is bought against this id)
+    await SubscriptionManager().loadForUser(_userId);
+    SubscriptionManager().syncFromProfile(user is Map ? Map<String, dynamic>.from(user.cast<String, dynamic>()) : null);
+
     // Refresh notifications for the new user
     NotificationManager().clearAndReload();
   }
@@ -129,12 +135,41 @@ class UserManager {
         debugPrint('Error clearing notifications on logout: $e');
       }
     }
+
+    // Per-user-id subscription data must SURVIVE logout, so that logging back
+    // in with the same id does not refill the 2 free trials or re-lock a
+    // purchased ₹99 subscription. Only session data gets cleared below.
+    final Map<String, Object> preservedSubData = {};
+    for (final key in prefs.getKeys()) {
+      if (key.startsWith('trial_') ||
+          key.startsWith('subscribed_') ||
+          key.startsWith('sub_payment_')) {
+        final value = prefs.get(key);
+        if (value != null) preservedSubData[key] = value;
+      }
+    }
+
     await prefs.clear();
+
+    for (final entry in preservedSubData.entries) {
+      final value = entry.value;
+      if (value is bool) {
+        await prefs.setBool(entry.key, value);
+      } else if (value is int) {
+        await prefs.setInt(entry.key, value);
+      } else if (value is String) {
+        await prefs.setString(entry.key, value);
+      }
+    }
+
     _userName = null;
     _userEmail = null;
     _token = null;
     _userId = null;
     _sessionLoginTime = null;
+
+    // Reset subscription/trial state so the next user starts fresh
+    await SubscriptionManager().loadForUser(null);
 
     // Reset notification manager for next user
     await NotificationManager().clearAndReload();

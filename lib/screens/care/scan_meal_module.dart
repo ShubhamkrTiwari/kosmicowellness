@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../services/gemini_service.dart';
 import '../../managers/care_manager.dart';
+import '../../managers/subscription_manager.dart';
 
 class ScanMealModule extends StatefulWidget {
   const ScanMealModule({super.key});
@@ -193,6 +194,10 @@ class _ScanMealModuleState extends State<ScanMealModule> with SingleTickerProvid
 
   Future<void> _startScan(ImageSource source) async {
     try {
+      // Premium gate: allow only 2 free plate scans, then lock behind ₹99 subscription
+      final granted = await SubscriptionManager().ensureAccess(context, PremiumFeature.plateScan);
+      if (!granted || !mounted) return;
+
       final XFile? image = await _picker.pickImage(
         source: source,
         maxWidth: 1024,
@@ -201,6 +206,9 @@ class _ScanMealModuleState extends State<ScanMealModule> with SingleTickerProvid
       );
       
       if (image == null) return;
+      // Photo captured: consume one trial use (no-op if subscribed)
+      await SubscriptionManager().recordUse(PremiumFeature.plateScan);
+      if (!mounted) return;
       await _startScanWithImage(image);
     } catch (e) {
       debugPrint('Scan Error: $e');

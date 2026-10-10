@@ -38,10 +38,12 @@ class _ReturnsHistoryScreenState extends State<ReturnsHistoryScreen> with Single
       final results = await Future.wait([
         ApiService.getMyRefunds(token),
         ApiService.getMyReturns(token),
+        ApiService.getUserOrders(token, page: 1, limit: 50),
       ]);
 
       final refundResult = results[0];
       final returnResult = results[1];
+      final ordersResult = results[2];
       
       if (mounted) {
         setState(() {
@@ -50,6 +52,15 @@ class _ReturnsHistoryScreenState extends State<ReturnsHistoryScreen> with Single
           }
           if (returnResult['success']) {
             _returns = returnResult['data'] ?? [];
+          }
+          // Merge refunds processed directly via Razorpay (e.g. from the
+          // Razorpay dashboard / payment gateway) that are recorded on the
+          // order itself, so they also appear in the Refunds tab.
+          if (ordersResult['success']) {
+            _refunds = [
+              ..._refunds,
+              ..._extractRazorpayOrderRefunds(ordersResult['data'], _refunds),
+            ];
           }
         });
       }
@@ -60,6 +71,65 @@ class _ReturnsHistoryScreenState extends State<ReturnsHistoryScreen> with Single
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  /// Extracts refunds that were processed directly through Razorpay (from the
+  /// Razorpay dashboard or a gateway webhook) and recorded on the order,
+  /// rather than through a refund request. Orders already covered by an
+  /// existing refund request are skipped to avoid duplicates.
+  List<dynamic> _extractRazorpayOrderRefunds(dynamic rawData, List<dynamic> existingRefunds) {
+    List orders = [];
+    if (rawData is List) {
+      orders = rawData;
+    } else if (rawData is Map) {
+      orders = rawData['orders'] ?? rawData['data'] ?? [];
+    }
+
+    // Order IDs already covered by refund requests -> avoid duplicates
+    final Set<String> covered = existingRefunds.map((r) {
+      final o = r['order'];
+      return (o is Map ? (o['orderId'] ?? o['_id'] ?? o['id']) : (r['orderId'] ?? ''))?.toString() ?? '';
+    }).where((id) => id.isNotEmpty).toSet();
+
+    final List<dynamic> orderRefunds = [];
+    for (final o in orders) {
+      if (o is! Map) continue;
+
+      final String status = (o['status'] ?? o['orderStatus'] ?? o['paymentStatus'] ?? '').toString().toLowerCase();
+      final String paymentMethod = (o['paymentMethodId'] ?? o['paymentMethod'] ?? '').toString().toLowerCase();
+      final dynamic refundId = o['refundId'] ?? o['razorpayRefundId'] ?? o['refund_id'];
+      final dynamic refundAmount = o['refundAmount'] ?? o['refund_amount'];
+      final bool isRazorpayOrder = paymentMethod.contains('razorpay') || paymentMethod.contains('online') || paymentMethod.contains('prepaid');
+      final bool isRefunded = status.contains('refund') ||
+          (status == 'returned' && isRazorpayOrder) ||
+          refundId != null ||
+          refundAmount != null ||
+          o['isRefunded'] == true ||
+          o['refunded'] == true;
+
+      if (!isRefunded) continue;
+
+      final String orderId = (o['orderId'] ?? o['_id'] ?? o['id'] ?? '').toString();
+      if (orderId.isEmpty || covered.contains(orderId)) continue;
+      covered.add(orderId);
+
+      orderRefunds.add({
+        'status': 'Refunded',
+        'createdAt': o['refundedAt'] ?? o['updatedAt'] ?? o['createdAt'],
+        'reason': o['returnReason'] ?? o['cancelReason'] ?? o['reason'] ?? 'Refunded via Razorpay',
+        'refundAmount': refundAmount ?? o['amount'] ?? o['totalPrice'],
+        'refundId': refundId,
+        'razorpayPaymentId': o['razorpayPaymentId'] ?? o['paymentId'] ?? o['razorpay_payment_id'],
+        'order': {
+          'orderId': orderId,
+          '_id': o['_id'] ?? orderId,
+          'status': o['status'],
+          'total': o['amount'] ?? o['totalPrice'],
+          'createdAt': o['createdAt'],
+        },
+      });
+    }
+    return orderRefunds;
   }
 
   @override
@@ -128,6 +198,10 @@ class _ReturnsHistoryScreenState extends State<ReturnsHistoryScreen> with Single
     final status = item['status']?.toString() ?? 'Pending';
     final date = item['createdAt']?.toString().split('T').first ?? 'N/A';
     final orderId = item['order']?['orderId'] ?? item['orderId'] ?? 'ID: Unknown';
+    final isRefundType = type == 'refund';
+    final dynamic refundAmount = item['refundAmount'] ?? item['amount'];
+    final String paymentId = (item['razorpayPaymentId'] ?? item['paymentId'] ?? '').toString();
+    final String refundId = (item['refundId'] ?? item['razorpayRefundId'] ?? '').toString();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -180,6 +254,47 @@ class _ReturnsHistoryScreenState extends State<ReturnsHistoryScreen> with Single
                 'Reason: ${item['reason'] ?? 'No reason provided'}',
                 style: const TextStyle(fontSize: 14),
               ),
+              if (isRefundType && refundAmount != null) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.currency_rupee, size: 14, color: Colors.green[700]),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Refund Amount: \u20b9${_formatAmount(refundAmount)}',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.green[700]),
+                    ),
+                    if (paymentId.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'via Razorpay',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.blue[700]),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+              if (isRefundType && paymentId.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'Razorpay Payment ID: $paymentId',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 11),
+                ),
+              ],
+              if (isRefundType && refundId.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  'Refund ID: $refundId',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 11),
+                ),
+              ],
               if (item['adminComment'] != null && item['adminComment'].toString().isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Container(
@@ -213,10 +328,16 @@ class _ReturnsHistoryScreenState extends State<ReturnsHistoryScreen> with Single
   }
 
   Widget _buildStatusChip(String status, ColorScheme colorScheme) {
+    final String lower = status.toLowerCase();
     Color color = Colors.orange;
-    if (status.toLowerCase() == 'approved' || status.toLowerCase() == 'processed' || status.toLowerCase() == 'replaced') {
+    if (lower == 'approved' ||
+        lower == 'processed' ||
+        lower == 'replaced' ||
+        lower == 'refunded' ||
+        lower == 'completed' ||
+        lower == 'credited') {
       color = Colors.green;
-    } else if (status.toLowerCase() == 'rejected') {
+    } else if (lower == 'rejected') {
       color = Colors.red;
     }
 
@@ -231,5 +352,11 @@ class _ReturnsHistoryScreenState extends State<ReturnsHistoryScreen> with Single
         style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold),
       ),
     );
+  }
+
+  String _formatAmount(dynamic amount) {
+    final double? value = amount is num ? amount.toDouble() : double.tryParse(amount.toString());
+    if (value == null) return amount.toString();
+    return value % 1 == 0 ? value.toStringAsFixed(0) : value.toStringAsFixed(2);
   }
 }

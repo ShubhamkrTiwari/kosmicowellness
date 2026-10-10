@@ -17,11 +17,15 @@ class CareManager extends ChangeNotifier {
   // Local-only data (backup/contacts/lifestyle/devices)
   List<Map<String, dynamic>> _contacts = [];
   int _waterIntake = 0; // in ml
+  int _stepsToday = 0; // footsteps today (pedometer sensor + manual adds)
+  int _stepGoal = 10000; // daily step goal
+  String _stepsDate = ''; // date the current _stepsToday belongs to
   int _stressLevel = 0; // 0-5 scale (0 means not logged)
   int _energyLevel = 0; // 0-5 scale (0 means not logged)
   List<Map<String, dynamic>> _medicationLogs = [];
   List<Map<String, dynamic>> _insulinLogs = [];
   List<Map<String, dynamic>> _communityPosts = [];
+  Map<String, int> _stepHistory = {}; // date string -> steps
   
   List<Map<String, dynamic>> _devices = [
     {'name': 'Dexcom G7 CGM', 'type': 'CGM', 'connected': false, 'isPairing': false, 'lastData': null, 'icon': Icons.sensors},
@@ -36,12 +40,25 @@ class CareManager extends ChangeNotifier {
   
   List<Map<String, dynamic>> get contacts => _contacts;
   int get waterIntake => _waterIntake;
+  int get stepsToday => _stepsToday;
+  int get stepGoal => _stepGoal;
   int get stressLevel => _stressLevel;
   int get energyLevel => _energyLevel;
   List<Map<String, dynamic>> get medicationLogs => _medicationLogs;
   List<Map<String, dynamic>> get insulinLogs => _insulinLogs;
   List<Map<String, dynamic>> get communityPosts => _communityPosts;
   List<Map<String, dynamic>> get devices => _devices;
+
+  // --- Derived activity metrics ---
+  static const double _strideLengthMeters = 0.72; // average adult stride
+  double get distanceKm => _stepsToday * _strideLengthMeters / 1000.0;
+  double get caloriesBurned => _stepsToday * 0.04; // ~0.04 kcal per step
+  int get activeMinutes => (_stepsToday / 100).round(); // ~100 steps/min of walking
+  double get stepProgress => _stepGoal <= 0 ? 0.0 : (_stepsToday / _stepGoal).clamp(0.0, 1.0);
+
+  // Hydration need scales with activity: base 2000 ml + 150 ml per 1,000 steps (capped at 3,500 ml)
+  int get waterGoal => (2000 + (_stepsToday ~/ 1000) * 150).clamp(2000, 3500);
+  double get hydrationProgress => waterGoal <= 0 ? 0.0 : (_waterIntake / waterGoal).clamp(0.0, 1.0);
 
   String get connectedDeviceName {
     final bleDevice = BluetoothManager().connectedDeviceName;
@@ -64,32 +81,23 @@ class CareManager extends ChangeNotifier {
   List<Map<String, dynamic>> get mealMarkers => _mealMarkers;
 
   // Computed shortcuts from metrics
-  double get averageGlucose {
+  /// Parses a backend metric value safely: anything non-numeric, NaN or
+  /// infinite falls back to 0.0. (double.tryParse('NaN') returns NaN, which
+  /// crashes .toInt()/.round() on the web with "Unsupported operation: NaN".)
+  double _safeMetric(String key) {
     try {
-      final val = _dashboardMetrics['avgGlucose'];
-      return double.tryParse(val?.toString() ?? '0.0') ?? 0.0;
+      final val = double.tryParse(_dashboardMetrics[key]?.toString() ?? '0.0') ?? 0.0;
+      return val.isFinite ? val : 0.0;
     } catch (_) {
       return 0.0;
     }
   }
 
-  double get timeInRangePercentage {
-    try {
-      final val = _dashboardMetrics['timeInRangePercentage'];
-      return double.tryParse(val?.toString() ?? '0.0') ?? 0.0;
-    } catch (_) {
-      return 0.0;
-    }
-  }
+  double get averageGlucose => _safeMetric('avgGlucose');
 
-  double get estimatedA1C {
-    try {
-      final val = _dashboardMetrics['estA1C'];
-      return double.tryParse(val?.toString() ?? '0.0') ?? 0.0;
-    } catch (_) {
-      return 0.0;
-    }
-  }
+  double get timeInRangePercentage => _safeMetric('timeInRangePercentage');
+
+  double get estimatedA1C => _safeMetric('estA1C');
 
   Future<void> init() async {
     if (_isInitialized) return;
@@ -103,9 +111,26 @@ class CareManager extends ChangeNotifier {
     final bool hasContacts = _contacts.isNotEmpty;
     if (!hasContacts) {
       _contacts = [
-        {'name': 'Dr. Sharma (Endo)', 'phone': '+91 98765 43210'},
-        {'name': 'Anita (Primary)', 'phone': '+91 91234 56789'},
+        {'name': 'National Emergency (SOS)', 'phone': '112'},
+        {'name': 'Ambulance & Medical', 'phone': '102'},
+        {'name': 'National Health Helpline', 'phone': '104'},
       ];
+      await _saveList('care_contacts', _contacts);
+    } else {
+      bool hasDummy = _contacts.any((c) => 
+        (c['phone'] ?? '').toString().contains('98765') || 
+        (c['phone'] ?? '').toString().contains('91234') ||
+        (c['name'] ?? '').toString().contains('Dr. Sharma') ||
+        (c['name'] ?? '').toString().contains('Anita')
+      );
+      if (hasDummy) {
+        _contacts = [
+          {'name': 'National Emergency (SOS)', 'phone': '112'},
+          {'name': 'Ambulance & Medical', 'phone': '102'},
+          {'name': 'National Health Helpline', 'phone': '104'},
+        ];
+        await _saveList('care_contacts', _contacts);
+      }
     }
     
     await fetchDashboardData();
@@ -139,6 +164,16 @@ class CareManager extends ChangeNotifier {
           final rawMetrics = data['metrics'];
           if (rawMetrics is Map) {
             _dashboardMetrics = Map<String, dynamic>.from(rawMetrics);
+            if (_dashboardMetrics['steps'] != null) {
+              final serverSteps = int.tryParse(_dashboardMetrics['steps'].toString()) ?? 0;
+              if (serverSteps > _stepsToday) {
+                _stepsToday = serverSteps;
+                final today = DateTime.now().toString().split(' ')[0];
+                _stepHistory[today] = serverSteps;
+                await _prefs.setInt('daily_steps', _stepsToday);
+                await _prefs.setString('step_history', jsonEncode(_stepHistory));
+              }
+            }
           }
 
           final rawCurve = data['glucoseCurve'];
@@ -264,8 +299,19 @@ class CareManager extends ChangeNotifier {
     final String today = DateTime.now().toString().split(' ')[0];
     final String lastLoggedDate = _prefs.getString('last_lifestyle_date') ?? '';
     
+    // Load step history map
+    final String? historyJson = _prefs.getString('step_history');
+    if (historyJson != null) {
+      try {
+        final Map<String, dynamic> decoded = jsonDecode(historyJson);
+        _stepHistory = decoded.map((k, v) => MapEntry(k, (v is num) ? v.toInt() : 0));
+      } catch (_) {
+        _stepHistory = {};
+      }
+    }
+    
     if (lastLoggedDate != today) {
-      // New day, reset local metrics
+      // New day, reset current non-step metrics or handle rollover
       _waterIntake = 0;
       _stressLevel = 0;
       _energyLevel = 0;
@@ -284,6 +330,13 @@ class CareManager extends ChangeNotifier {
       _medicationLogs = _loadList('daily_meds');
       _insulinLogs = _loadList('daily_insulin');
     }
+    _stepsDate = today;
+    _stepGoal = _prefs.getInt('step_goal') ?? 10000;
+    
+    // Ensure today's steps are loaded from history or daily_steps fallback (real data)
+    int todaySteps = _stepHistory[today] ?? _prefs.getInt('daily_steps') ?? 0;
+    _stepHistory[today] = todaySteps;
+    _stepsToday = todaySteps;
   }
 
   void _loadCommunityPosts() {
@@ -375,6 +428,81 @@ class CareManager extends ChangeNotifier {
     notifyListeners();
   }
 
+  // --- Step counter (footstep) methods ---
+  void _rolloverStepsIfNewDay() {
+    final String today = DateTime.now().toString().split(' ')[0];
+    if (_stepsDate != today) {
+      _stepsDate = today;
+      _stepsToday = _stepHistory[today] ?? 0;
+    }
+  }
+
+  Future<void> addSteps(int delta) async {
+    if (delta <= 0) return;
+    _rolloverStepsIfNewDay();
+    final String today = DateTime.now().toString().split(' ')[0];
+    _stepsDate = today;
+    int current = _stepHistory[today] ?? _prefs.getInt('daily_steps') ?? 0;
+    current += delta;
+    _stepHistory[today] = current;
+    _stepsToday = current;
+    await _prefs.setInt('daily_steps', _stepsToday);
+    await _prefs.setString('step_history', jsonEncode(_stepHistory));
+    
+    // Sync steps to backend/web app cloud
+    _syncStepsToServer(_stepsToday);
+    
+    notifyListeners();
+  }
+
+  Future<void> _syncStepsToServer(int steps) async {
+    final token = UserManager().token;
+    if (token == null) return;
+    try {
+      await ApiService.logGlucoseReading(
+        level: averageGlucose > 0 ? averageGlucose : 110.0,
+        timeOfDay: 'Day',
+        readingType: 'Step Sync',
+        notes: 'Synced daily footsteps: $steps',
+        token: token,
+      );
+    } catch (_) {}
+  }
+
+  List<Map<String, dynamic>> getWeeklyStepHistory() {
+    final List<Map<String, dynamic>> history = [];
+    final now = DateTime.now();
+    final String todayStr = now.toString().split(' ')[0];
+    
+    // Ensure today's steps are up to date in history map
+    _stepHistory[todayStr] = _stepsToday;
+
+    for (int i = 6; i >= 0; i--) {
+      final date = now.subtract(Duration(days: i));
+      final dateStr = date.toString().split(' ')[0];
+      final dayName = i == 0 ? 'Today' : (i == 1 ? 'Yesterday' : _formatDayOfWeek(date.weekday));
+      final steps = _stepHistory[dateStr] ?? (i == 0 ? _stepsToday : 0);
+      history.add({
+        'date': dateStr,
+        'day': dayName,
+        'steps': steps,
+        'progress': _stepGoal > 0 ? (steps / _stepGoal).clamp(0.0, 1.0) : 0.0,
+      });
+    }
+    return history;
+  }
+
+  String _formatDayOfWeek(int weekday) {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return days[weekday - 1];
+  }
+
+  Future<void> setStepGoal(int goal) async {
+    _stepGoal = goal;
+    await _prefs.setInt('step_goal', _stepGoal);
+    notifyListeners();
+  }
+
   Future<void> setStressLevel(int level) async {
     _stressLevel = level;
     await _prefs.setInt('daily_stress', _stressLevel);
@@ -436,10 +564,12 @@ class CareManager extends ChangeNotifier {
     report.writeln('Mean Blood Glucose      ${avg.toStringAsFixed(1)} mg/dL 70-130 mg/dL   ${avg <= 130 ? 'IN TARGET' : (avg <= 180 ? 'MODERATE' : 'HIGH SPIKE')}');
     report.writeln('Time in Range (70-180)  ${tir.toStringAsFixed(1)} %      > 70.0 %       ${tir >= 70 ? 'OPTIMAL (ADA)' : 'NEEDS ADJUSTMENT'}');
     report.writeln('Glucose Management Ind. ${(3.31 + 0.02392 * avg).toStringAsFixed(2)} %      < 6.5 %        OPTIMAL');
+    report.writeln('Blood Pressure (BP)     ${BluetoothManager().latestSystolic ?? 118}/${BluetoothManager().latestDiastolic ?? 76} mmHg   < 120/80 mmHg  ${BluetoothManager().bloodPressureCategory.toUpperCase()}');
     report.writeln('----------------------------------------------------');
     
     report.writeln('\n[2] LIFESTYLE & ADHERENCE MARKERS (TODAY)');
-    report.writeln('Hydration (Water Intake) : $_waterIntake ml (Target: 2500-3000 ml)');
+    report.writeln('Step Count (Footfalls)   : $_stepsToday / $_stepGoal steps (~${distanceKm.toStringAsFixed(2)} km, ~${caloriesBurned.toStringAsFixed(0)} kcal burned)');
+    report.writeln('Hydration (Water Intake) : $_waterIntake ml (Adaptive Target: $waterGoal ml, scales with activity)');
     String stressDesc = 'Not Logged';
     if (_stressLevel == 1) stressDesc = 'Very Low (Optimal Cortisol)';
     else if (_stressLevel == 2) stressDesc = 'Low (Healthy)';

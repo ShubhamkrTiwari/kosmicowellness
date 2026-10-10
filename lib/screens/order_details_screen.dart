@@ -107,6 +107,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       final result = await ApiService.cancelOrder(orderId, token);
       if (mounted) {
         if (result['success']) {
+          try {
+            await ShiprocketService.cancelOrder(orderId);
+          } catch (_) {}
+
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Order cancelled successfully'), backgroundColor: Colors.green),
           );
@@ -605,6 +609,16 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     // Subtotal here means the price of items before discount, delivery fee, and GST
     final double subtotal = total + discount - deliveryFee - gstAmount;
 
+    // Part-COD split: advance (delivery + GST) already paid online, balance due
+    // on delivery. Read from the order using multiple field aliases.
+    final double paidAmount = (fullOrder['paidAmount'] ?? fullOrder['upfrontAmount'] ??
+            fullOrder['advanceAmount'] ?? fullOrder['amountPaid'] ?? fullOrder['collectedAmount'] ?? 0).toDouble();
+    double balanceAmount = (fullOrder['balanceAmount'] ?? fullOrder['pendingAmount'] ??
+            fullOrder['remainingAmount'] ?? fullOrder['dueAmount'] ?? fullOrder['codAmount'] ??
+            fullOrder['amountToCollect'] ?? 0).toDouble();
+    final bool isPartCod = total > 0 && paidAmount > 0 && paidAmount < total;
+    if (isPartCod && balanceAmount <= 0) balanceAmount = total - paidAmount;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -635,6 +649,15 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             child: Divider(),
           ),
           _buildSummaryRow('Total Amount', '₹${total.toStringAsFixed(0)}', false, colorScheme, isTotal: true),
+          if (isPartCod) ...[
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Divider(),
+            ),
+            _buildSummaryRow('Advance Paid (Delivery + GST)', '₹${paidAmount.toStringAsFixed(0)}', true, colorScheme),
+            const SizedBox(height: 8),
+            _buildSummaryRow('Balance Payable on Delivery', '₹${balanceAmount.toStringAsFixed(0)}', false, colorScheme),
+          ],
         ],
       ),
     );

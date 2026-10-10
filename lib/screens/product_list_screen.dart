@@ -590,16 +590,47 @@ class ProductListScreenState extends State<ProductListScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Flexible(
-                        child: Text(
-                          price,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 17,
-                            color: colorScheme.primary,
-                            letterSpacing: 0.5,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
+                        child: Builder(
+                          builder: (context) {
+                            final dynamic rawPrice = product['price'] ?? product['selling_price'] ?? product['sale_price'] ?? 0;
+                            final double priceVal = double.tryParse(rawPrice.toString().replaceAll('₹', '').replaceAll(',', '').trim()) ?? 0.0;
+                            
+                            final dynamic rawOriginalPrice = product['original_price'] ?? product['mrp'] ?? product['compare_price'] ?? product['list_price'] ?? product['old_price'] ?? product['originalPrice'] ?? product['comparePrice'] ?? product['mrpPrice'];
+                            double? originalPriceVal;
+                            if (rawOriginalPrice != null && rawOriginalPrice.toString().isNotEmpty) {
+                              originalPriceVal = double.tryParse(rawOriginalPrice.toString().replaceAll('₹', '').replaceAll(',', '').trim());
+                            }
+
+                            final bool hasDiscount = originalPriceVal != null && originalPriceVal > priceVal;
+                            final String formattedOriginalPrice = originalPriceVal != null ? '₹${originalPriceVal.toStringAsFixed(originalPriceVal % 1 == 0 ? 0 : 2)}' : '';
+
+                            return Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '₹${priceVal.toStringAsFixed(priceVal % 1 == 0 ? 0 : 2)}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: colorScheme.primary,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                if (hasDiscount) ...[
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    formattedOriginalPrice,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                                      decoration: TextDecoration.lineThrough,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            );
+                          },
                         ),
                       ),
                       const SizedBox(width: 8),

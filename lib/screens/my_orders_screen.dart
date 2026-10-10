@@ -4,6 +4,7 @@ import 'cart_screen.dart';
 import '../managers/cart_manager.dart';
 import '../managers/user_manager.dart';
 import '../services/api_service.dart';
+import '../services/shiprocket_service.dart';
 import '../widgets/rating_dialog.dart';
 
 class MyOrdersScreen extends StatefulWidget {
@@ -216,15 +217,30 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> with SingleTickerProvid
 
     // Detect Payment Mode
     String method = (o['paymentMethodId'] ?? o['paymentMethod'] ?? '').toString().toLowerCase();
-    String paymentMode = method.contains('razorpay') || method.contains('online') || method.contains('prepaid') 
-        ? 'Online' 
-        : 'COD';
+    bool isOnline = method.contains('razorpay') || method.contains('online') || method.contains('prepaid');
+
+    // Part-COD: an advance (delivery + GST) is collected online and the courier
+    // collects the remaining balance at delivery. Read the split from the order
+    // using multiple field aliases (backend Map payloads have no fixed schema).
+    final double totalAmount = (o['amount'] ?? o['totalPrice'] ?? 0).toDouble();
+    final double paidAmount = (o['paidAmount'] ?? o['upfrontAmount'] ?? o['advanceAmount'] ??
+            o['amountPaid'] ?? o['collectedAmount'] ?? 0).toDouble();
+    double balanceAmount = (o['balanceAmount'] ?? o['pendingAmount'] ?? o['remainingAmount'] ??
+            o['dueAmount'] ?? o['codAmount'] ?? o['amountToCollect'] ?? 0).toDouble();
+
+    final bool isPartCod = totalAmount > 0 && paidAmount > 0 && paidAmount < totalAmount;
+    if (isPartCod && balanceAmount <= 0) balanceAmount = totalAmount - paidAmount;
+
+    String paymentMode = isOnline ? 'Online' : (isPartCod ? 'Part COD' : 'COD');
 
     return {
       'id': (o['_id'] ?? o['id'] ?? 'N/A').toString(),
       'date': (o['createdAt'] ?? o['date'] ?? '').toString().split('T').first,
       'status': displayStatus,
       'payment_mode': paymentMode,
+      'advance_paid': paidAmount,
+      'balance_due': balanceAmount,
+      'is_part_cod': isPartCod,
       'price': '₹${o['amount'] ?? o['totalPrice'] ?? 0}',
       'items_text': items.isNotEmpty 
           ? "${_getItemName(items[0])}${items.length > 1 ? ' + ${items.length - 1} more' : ''}"
@@ -377,6 +393,10 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> with SingleTickerProvid
       final result = await ApiService.cancelOrder(orderId, token);
       if (mounted) {
         if (result['success']) {
+          try {
+            await ShiprocketService.cancelOrder(orderId);
+          } catch (_) {}
+
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Order cancelled successfully'), backgroundColor: Colors.green),
           );
@@ -401,6 +421,10 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> with SingleTickerProvid
     final String date = (order['date'] ?? '').toString();
     final String price = (order['price'] ?? '').toString();
     final int itemCount = order['item_count'] is int ? order['item_count'] : 1;
+    final String paymentModeLabel = (order['payment_mode'] ?? 'COD').toString();
+    final Color modeColor = paymentModeLabel == 'Online'
+        ? Colors.green
+        : (paymentModeLabel == 'Part COD' ? Colors.deepOrange : Colors.blue);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -458,16 +482,16 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> with SingleTickerProvid
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: (order['payment_mode'] == 'Online' ? Colors.green : Colors.blue).withValues(alpha: 0.1),
+                      color: modeColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: (order['payment_mode'] == 'Online' ? Colors.green : Colors.blue).withValues(alpha: 0.2)),
+                      border: Border.all(color: modeColor.withValues(alpha: 0.2)),
                     ),
                     child: Text(
-                      (order['payment_mode'] ?? 'COD').toUpperCase(),
+                      paymentModeLabel.toUpperCase(),
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w900,
-                        color: order['payment_mode'] == 'Online' ? Colors.green[700] : Colors.blue[700],
+                        color: modeColor,
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -535,6 +559,40 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> with SingleTickerProvid
               ),
             ],
           ),
+          if (order['is_part_cod'] == true) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.deepOrange.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.deepOrange.withValues(alpha: 0.25)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Advance Paid: ₹${(order['advance_paid'] as double? ?? 0).toStringAsFixed(0)}',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green[700]),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Balance due on delivery',
+                        style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    '₹${(order['balance_due'] as double? ?? 0).toStringAsFixed(0)}',
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.deepOrange),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           Row(
             children: [

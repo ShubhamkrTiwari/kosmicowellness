@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../managers/bluetooth_manager.dart';
+import '../../managers/subscription_manager.dart';
 import 'care_dashboard_screen.dart';
 
 class CameraPpgBpScreen extends StatefulWidget {
@@ -22,6 +23,11 @@ class _CameraPpgBpScreenState extends State<CameraPpgBpScreen> with WidgetsBindi
 
   int _countdownSeconds = 30;
   Timer? _timer;
+
+  // Subscription gate state (auto-start runs per camera frame, so we must not
+  // re-trigger the paywall repeatedly once the user declines it in this session)
+  bool _isCheckingAccess = false;
+  bool _accessDeclined = false;
 
   final List<double> _ppgValues = [];
   final List<double> _rawBuffer = [];
@@ -76,8 +82,23 @@ class _CameraPpgBpScreenState extends State<CameraPpgBpScreen> with WidgetsBindi
     }
   }
 
-  void _startMeasurement() {
+  Future<void> _startMeasurement() async {
     if (!_isCameraInitialized || _isMeasuring || _isCompleted || !_hasFinger) return;
+    if (_isCheckingAccess || _accessDeclined) return;
+
+    // Premium gate: 2 free BP scans per user, then locked behind ₹99 subscription.
+    // requestAccess consumes one trial use when not subscribed.
+    final subscription = SubscriptionManager();
+    if (!subscription.isSubscribed) {
+      _isCheckingAccess = true;
+      final granted = await subscription.requestAccess(context, PremiumFeature.bpScan);
+      _isCheckingAccess = false;
+      if (!granted) {
+        _accessDeclined = true; // user closed the paywall without paying
+        return;
+      }
+      if (!mounted) return;
+    }
 
     setState(() {
       _isMeasuring = true;

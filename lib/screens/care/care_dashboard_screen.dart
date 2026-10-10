@@ -27,7 +27,7 @@ class CareDashboardScreenState extends State<CareDashboardScreen> with SingleTic
     'Community',
     'Scan Meal',
     'Log Entry',
-    'Care Network'
+    'Care Network',
   ];
 
   void switchTab(int index) {

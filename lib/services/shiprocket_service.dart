@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 class ShiprocketService {
   static const String baseUrl = 'https://apiv2.shiprocket.in/v1/external';
@@ -17,11 +18,20 @@ class ShiprocketService {
 
   static String? _token;
 
+  /// Helper to wrap URL with CORS proxy on Web
+  static String _getUrl(String endpoint) {
+    final url = '$baseUrl$endpoint';
+    if (kIsWeb) {
+      return 'https://corsproxy.io/?${Uri.encodeComponent(url)}';
+    }
+    return url;
+  }
+
   /// Authenticate with Shiprocket and get a JWT token
   static Future<String?> login() async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/auth/login'),
+        Uri.parse(_getUrl('/auth/login')),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': email,
@@ -62,7 +72,7 @@ class ShiprocketService {
         'cod': '1', // Default to COD allowed check
       };
 
-      final uri = Uri.parse('$baseUrl/courier/serviceability/').replace(queryParameters: queryParams);
+      final uri = Uri.parse(_getUrl('/courier/serviceability/')).replace(queryParameters: queryParams);
 
       final response = await http.get(
         uri,
@@ -88,11 +98,15 @@ class ShiprocketService {
   /// Create a new Shiprocket order
   static Future<Map<String, dynamic>> createOrder(Map<String, dynamic> orderDetails) async {
     final token = _token ?? await login();
-    if (token == null) return {'success': false, 'message': 'Authentication failed'};
+    if (token == null) {
+      debugPrint('Shiprocket Create Order: Authentication failed (token is null)');
+      return {'success': false, 'message': 'Authentication failed'};
+    }
 
     try {
+      debugPrint('Shiprocket: Sending order creation request to Shiprocket...');
       final response = await http.post(
-        Uri.parse('$baseUrl/orders/create/adhoc'),
+        Uri.parse(_getUrl('/orders/create/adhoc')),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -100,12 +114,70 @@ class ShiprocketService {
         body: jsonEncode(orderDetails),
       );
 
+      debugPrint('Shiprocket Create Order Status: ${response.statusCode}, Body: ${response.body}');
+
       if (response.statusCode == 200 || response.statusCode == 201) {
+        debugPrint('Shiprocket: Order created successfully on Shiprocket!');
         return {'success': true, 'data': jsonDecode(response.body)};
       } else {
+        // If pickup location failed or 422 error, try fallback pickup locations
+        if (response.body.toLowerCase().contains('pickup') || response.statusCode == 422) {
+          final List<String> fallbackLocations = ['Primary', 'Home', 'Warehouse', 'Default', 'Main'];
+          for (final loc in fallbackLocations) {
+            if (loc == orderDetails['pickup_location']) continue;
+            debugPrint('Shiprocket: Retrying with fallback pickup location: $loc');
+            orderDetails['pickup_location'] = loc;
+            
+            final retryResponse = await http.post(
+              Uri.parse(_getUrl('/orders/create/adhoc')),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $token',
+              },
+              body: jsonEncode(orderDetails),
+            );
+            
+            if (retryResponse.statusCode == 200 || retryResponse.statusCode == 201) {
+              debugPrint('Shiprocket: Order created successfully with pickup location: $loc');
+              return {'success': true, 'data': jsonDecode(retryResponse.body)};
+            }
+          }
+        }
+        
         return {'success': false, 'message': response.body};
       }
     } catch (e) {
+      debugPrint('Shiprocket Create Order Error: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  /// Cancel an order in Shiprocket
+  static Future<Map<String, dynamic>> cancelOrder(dynamic orderId) async {
+    final token = _token ?? await login();
+    if (token == null) return {'success': false, 'message': 'Authentication failed'};
+
+    try {
+      final response = await http.post(
+        Uri.parse(_getUrl('/orders/cancel')),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'ids': [orderId]
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        debugPrint('Shiprocket: Order $orderId cancelled successfully');
+        return {'success': true, 'data': jsonDecode(response.body)};
+      } else {
+        debugPrint('Shiprocket Cancel Order Failed: Status ${response.statusCode}, Body: ${response.body}');
+        return {'success': false, 'message': response.body};
+      }
+    } catch (e) {
+      debugPrint('Shiprocket Cancel Order Error: $e');
       return {'success': false, 'message': e.toString()};
     }
   }
@@ -117,7 +189,7 @@ class ShiprocketService {
 
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/courier/track/awb/$awbNumber'),
+        Uri.parse(_getUrl('/courier/track/awb/$awbNumber')),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -144,7 +216,7 @@ class ShiprocketService {
 
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/courier/assign/awb'),
+        Uri.parse(_getUrl('/courier/assign/awb')),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -172,7 +244,7 @@ class ShiprocketService {
 
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/courier/generate/pickup'),
+        Uri.parse(_getUrl('/courier/generate/pickup')),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -197,7 +269,7 @@ class ShiprocketService {
 
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/manifests/generate'),
+        Uri.parse(_getUrl('/manifests/generate')),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -222,7 +294,7 @@ class ShiprocketService {
 
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/manifests/print'),
+        Uri.parse(_getUrl('/manifests/print')),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -247,7 +319,7 @@ class ShiprocketService {
 
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/courier/generate/label'),
+        Uri.parse(_getUrl('/courier/generate/label')),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -272,7 +344,7 @@ class ShiprocketService {
 
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/orders/print/invoice'),
+        Uri.parse(_getUrl('/orders/print/invoice')),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -297,7 +369,7 @@ class ShiprocketService {
 
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/orders/create/return'),
+        Uri.parse(_getUrl('/orders/create/return')),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',

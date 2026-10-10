@@ -31,6 +31,7 @@ class LanguageManager with ChangeNotifier {
     'en': {
       'app_title': 'Kosmico Wellness',
       'home': 'Home',
+      'all': 'All',
       'products': 'Products',
       'care': 'Care',
       'profile': 'Profile',
@@ -86,6 +87,7 @@ class LanguageManager with ChangeNotifier {
     'hi': {
       'app_title': 'कॉस्मिको वेलनेस',
       'home': 'होम',
+      'all': 'सभी',
       'products': 'उत्पाद',
       'care': 'केयर',
       'profile': 'प्रोफ़ाइल',
