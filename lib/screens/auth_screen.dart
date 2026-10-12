@@ -29,23 +29,36 @@ class _AuthScreenState extends State<AuthScreen> {
       setState(() => _isLoading = true);
 
       final identifier = _inputController.text.trim();
-      
-      // Try login first
-      var result = await ApiService.login(identifier);
-      bool isLoginFlow = true;
+      Map<String, dynamic> result;
+      bool isLoginFlow = _isLogin;
 
-      if (!result['success']) {
-        final message = (result['message'] ?? '').toLowerCase();
-        // If account doesn't exist, automatically sign up (register)
-        if (message.contains('not found') || message.contains('exist') || message.contains('register') || message.contains('account') || message.contains('user') || message.contains('invalid')) {
-          String defaultName = identifier.contains('@') 
+      if (_isLogin) {
+        result = await ApiService.login(identifier);
+        if (!result['success']) {
+          final message = (result['message'] ?? '').toLowerCase();
+          if (message.contains('not found') || message.contains('exist') || message.contains('register') || message.contains('account') || message.contains('user') || message.contains('invalid')) {
+            setState(() => _isLoading = false);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Please register before logging in'),
+                  backgroundColor: Colors.redAccent,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+            return;
+          }
+        }
+      } else {
+        String defaultName = _nameController.text.trim();
+        if (defaultName.isEmpty) {
+          defaultName = identifier.contains('@') 
               ? identifier.split('@').first 
               : 'User ${identifier.replaceAll(RegExp(r'[^0-9]'), '')}';
           if (defaultName.trim().isEmpty || defaultName == 'User ') defaultName = 'Wellness User';
-
-          result = await ApiService.register(defaultName, identifier);
-          isLoginFlow = false;
         }
+        result = await ApiService.register(defaultName, identifier);
       }
 
       setState(() => _isLoading = false);

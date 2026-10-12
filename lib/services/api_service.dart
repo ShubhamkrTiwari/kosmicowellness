@@ -29,10 +29,63 @@ class ApiService {
     cleanPath = cleanPath.startsWith('/') ? cleanPath : '/$cleanPath';
     return Uri.parse('$cleanBase$cleanPath');
   }
+
+  static Future<void> _sendApiTxtOtp(String phone) async {
+    try {
+      final cleanPhone = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+      
+      // Try GET with query parameters first (common for SMS gateways like apitxt.com)
+      final uriGet = Uri.parse(APITXT_API_URL).replace(queryParameters: {
+        'auth_key': APITXT_AUTH_KEY,
+        'key': APITXT_AUTH_KEY,
+        'phone': cleanPhone,
+        'mobile': cleanPhone,
+        'number': cleanPhone,
+      });
+      
+      debugPrint('DEBUG: Sending OTP via ApiTxt (GET) to $cleanPhone');
+      try {
+        final responseGet = await http.get(uriGet, headers: {
+          'Authorization': 'Bearer $APITXT_AUTH_KEY',
+          'auth-key': APITXT_AUTH_KEY,
+          'apikey': APITXT_AUTH_KEY,
+        }).timeout(const Duration(seconds: 8));
+        debugPrint('DEBUG: ApiTxt GET Response: ${responseGet.statusCode} - ${responseGet.body}');
+        if (responseGet.statusCode >= 200 && responseGet.statusCode < 300) {
+          return;
+        }
+      } catch (e) {
+        debugPrint('DEBUG: ApiTxt GET attempt failed: $e');
+      }
+
+      // Try POST with JSON
+      final uriPost = Uri.parse(APITXT_API_URL);
+      final headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $APITXT_AUTH_KEY',
+        'auth-key': APITXT_AUTH_KEY,
+        'apikey': APITXT_AUTH_KEY,
+      };
+      final body = jsonEncode({
+        'auth_key': APITXT_AUTH_KEY,
+        'key': APITXT_AUTH_KEY,
+        'phone': cleanPhone,
+        'mobile': cleanPhone,
+        'number': cleanPhone,
+      });
+      
+      debugPrint('DEBUG: Sending OTP via ApiTxt (POST) to $cleanPhone');
+      final responsePost = await http.post(uriPost, headers: headers, body: body).timeout(const Duration(seconds: 8));
+      debugPrint('DEBUG: ApiTxt POST Response: ${responsePost.statusCode} - ${responsePost.body}');
+    } catch (e) {
+      debugPrint('DEBUG: ApiTxt Error: $e');
+    }
+  }
   
   static Future<Map<String, dynamic>> updateProfileWithImage({
     required String name,
     required String phoneNumber,
+    String? email,
     XFile? imageFile,
     required String token,
   }) async {
@@ -44,6 +97,9 @@ class ApiService {
       
       request.fields['name'] = name;
       request.fields['phoneNumber'] = phoneNumber;
+      if (email != null && email.trim().isNotEmpty) {
+        request.fields['email'] = email.trim().toLowerCase();
+      }
 
       if (imageFile != null) {
         Uint8List imageBytes = await imageFile.readAsBytes();
@@ -75,6 +131,9 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> register(String name, String identifier) async {
+    if (!identifier.contains('@')) {
+      _sendApiTxtOtp(identifier);
+    }
     try {
       final url = _getUri('/api/auth/register');
       debugPrint('DEBUG: Requesting Register -> $url');
@@ -133,20 +192,23 @@ class ApiService {
       ).timeout(const Duration(seconds: 15));
       
       debugPrint('DEBUG: Response received. Status: ${response.statusCode}');
-      final res = _processResponse(response);
-      if (res['success']) return res;
       
-      if (!identifier.contains('@')) {
-        debugPrint('DEBUG: Falling back to Test Mode for login phone $identifier');
-        return {'success': true, 'message': 'OTP sent successfully (Test Mode: use 123456)'};
+      if (response.statusCode == 404 || response.statusCode == 400 || response.statusCode == 401) {
+        return {'success': false, 'message': 'User not found'};
       }
+      
+      final res = _processResponse(response);
+      if (res['success']) {
+        if (!identifier.contains('@')) {
+          _sendApiTxtOtp(identifier);
+        }
+        return res;
+      }
+      
       return res;
     } catch (e) {
       debugPrint('DEBUG: Login Error -> $e');
-      if (!identifier.contains('@')) {
-        return {'success': true, 'message': 'OTP sent successfully (Test Mode: use 123456)'};
-      }
-      return _handleError(e);
+      return {'success': false, 'message': 'User not found or network error'};
     }
   }
 
@@ -254,6 +316,9 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> resendOtp(String identifier) async {
+    if (!identifier.contains('@')) {
+      _sendApiTxtOtp(identifier);
+    }
     try {
       final Map<String, dynamic> body = {};
       if (identifier.contains('@')) {

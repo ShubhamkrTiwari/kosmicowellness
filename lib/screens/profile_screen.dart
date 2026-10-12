@@ -150,7 +150,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     if (mounted) {
       setState(() {
         userName = UserManager().userName ?? 'Guest User';
-        userEmail = UserManager().userEmail ?? 'Not logged in';
+        userEmail = UserManager().userEmail ?? (UserManager().userPhone ?? (UserManager().isLoggedIn ? 'Logged In' : 'Not logged in'));
         userPhone = UserManager().userPhone ?? 'Add phone number';
       });
     }
@@ -475,13 +475,17 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: emailController,
-                          readOnly: true,
-                          enabled: false,
-                          style: TextStyle(color: colorScheme.onSurfaceVariant),
-                          decoration: _inputDecoration('Email Address', Icons.email_outlined).copyWith(
-                            filled: true,
-                            fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                          ),
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: _inputDecoration('Email Address', Icons.email_outlined),
+                          validator: (value) {
+                            if (value != null && value.trim().isNotEmpty) {
+                              final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                              if (!emailRegex.hasMatch(value.trim())) {
+                                return 'Please enter a valid email address';
+                              }
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
@@ -512,6 +516,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                               
                               final newName = nameController.text.trim();
                               final newPhone = PhoneUtils.normalize(phoneController.text.trim());
+                              final newEmail = emailController.text.trim();
                               setModalState(() => isSaving = true);
                               
                               final messenger = ScaffoldMessenger.of(context);
@@ -538,6 +543,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                               final result = await ApiService.updateProfileWithImage(
                                 name: newName,
                                 phoneNumber: newPhone,
+                                email: newEmail,
                                 imageFile: _pickedImage, // Use the currently picked image if any
                                 token: token,
                               );
@@ -615,7 +621,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     if (mounted) {
       setState(() {
         userName = UserManager().userName ?? 'User';
-        userEmail = UserManager().userEmail ?? 'No Email';
+        userEmail = UserManager().userEmail ?? (UserManager().userPhone ?? (UserManager().isLoggedIn ? 'Logged In' : 'No Email'));
         userPhone = UserManager().userPhone ?? 'Add phone number';
         _pickedImage = null;
       });
