@@ -36,7 +36,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateMixin {
   String userName = 'Loading...';
-  String userEmail = 'Loading...';
+  String userEmail = '';
   String userPhone = '';
   XFile? _pickedImage;
   int _couponCount = 0;
@@ -66,7 +66,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       if (mounted) {
         setState(() {
           userName = UserManager().userName ?? userName;
-          userEmail = UserManager().userEmail ?? userEmail;
+          final emailVal = UserManager().userEmail;
+          userEmail = (emailVal != null && emailVal.contains('@')) ? emailVal : '';
           userPhone = UserManager().userPhone ?? userPhone;
         });
       }
@@ -150,7 +151,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     if (mounted) {
       setState(() {
         userName = UserManager().userName ?? 'Guest User';
-        userEmail = UserManager().userEmail ?? (UserManager().userPhone ?? (UserManager().isLoggedIn ? 'Logged In' : 'Not logged in'));
+        final emailVal = UserManager().userEmail;
+        userEmail = (emailVal != null && emailVal.contains('@')) ? emailVal : '';
         userPhone = UserManager().userPhone ?? 'Add phone number';
       });
     }
@@ -223,7 +225,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             setState(() {
               _pickedImage = null;
               userName = UserManager().userName ?? userName;
-              userEmail = UserManager().userEmail ?? userEmail;
+              final emailVal = UserManager().userEmail;
+              userEmail = (emailVal != null && emailVal.contains('@')) ? emailVal : '';
               userPhone = UserManager().userPhone ?? userPhone;
             });
           }
@@ -429,7 +432,9 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
 
   void _showEditProfileSheet() {
     final nameController = TextEditingController(text: userName);
-    final emailController = TextEditingController(text: userEmail);
+    final String savedEmail = UserManager().userEmail ?? '';
+    final String displayEmail = savedEmail.contains('@') ? savedEmail : (userEmail.contains('@') ? userEmail : '');
+    final emailController = TextEditingController(text: displayEmail);
     final phoneController = TextEditingController(text: PhoneUtils.digits(userPhone == 'Add phone number' ? '' : userPhone));
     bool isSaving = false;
     final formKey = GlobalKey<FormState>();
@@ -476,7 +481,9 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                         TextFormField(
                           controller: emailController,
                           keyboardType: TextInputType.emailAddress,
-                          decoration: _inputDecoration('Email Address', Icons.email_outlined),
+                          decoration: _inputDecoration('Email Address', Icons.email_outlined).copyWith(
+                            hintText: 'name@example.com (Optional)',
+                          ),
                           validator: (value) {
                             if (value != null && value.trim().isNotEmpty) {
                               final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
@@ -516,7 +523,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                               
                               final newName = nameController.text.trim();
                               final newPhone = PhoneUtils.normalize(phoneController.text.trim());
-                              final newEmail = emailController.text.trim();
+                              final rawEmail = emailController.text.trim();
+                              final newEmail = rawEmail.contains('@') ? rawEmail : '';
                               setModalState(() => isSaving = true);
                               
                               final messenger = ScaffoldMessenger.of(context);
@@ -556,7 +564,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
 
                                 setState(() {
                                   userName = UserManager().userName ?? newName;
-                                  userEmail = UserManager().userEmail ?? userEmail;
+                                  final emailVal = UserManager().userEmail;
+                                  userEmail = (emailVal != null && emailVal.contains('@')) ? emailVal : '';
                                   userPhone = UserManager().userPhone ?? (newPhone.isEmpty ? 'Add phone number' : newPhone);
                                 });
                                 
@@ -621,7 +630,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     if (mounted) {
       setState(() {
         userName = UserManager().userName ?? 'User';
-        userEmail = UserManager().userEmail ?? (UserManager().userPhone ?? (UserManager().isLoggedIn ? 'Logged In' : 'No Email'));
+        final emailVal = UserManager().userEmail;
+        userEmail = (emailVal != null && emailVal.contains('@')) ? emailVal : '';
         userPhone = UserManager().userPhone ?? 'Add phone number';
         _pickedImage = null;
       });
@@ -731,16 +741,20 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 4),
-                          Text(
-                            userEmail,
-                            style: TextStyle(color: colorScheme.onSurfaceVariant ?? Colors.grey, fontSize: 14),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            PhoneUtils.display(userPhone),
-                            style: TextStyle(color: colorScheme.onSurfaceVariant ?? Colors.grey, fontSize: 14),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          if (userEmail.contains('@')) ...[
+                            Text(
+                              userEmail,
+                              style: TextStyle(color: colorScheme.onSurfaceVariant ?? Colors.grey, fontSize: 14),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                          if (userPhone.isNotEmpty && userPhone != 'Add phone number') ...[
+                            Text(
+                              PhoneUtils.display(userPhone),
+                              style: TextStyle(color: colorScheme.onSurfaceVariant ?? Colors.grey, fontSize: 14),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ],
                       ),
                     ),

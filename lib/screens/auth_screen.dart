@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'otp_verification_screen.dart';
 import '../services/api_service.dart';
+import '../managers/user_manager.dart';
+import '../utils/phone_utils.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -36,21 +38,53 @@ class _AuthScreenState extends State<AuthScreen> {
         result = await ApiService.login(identifier);
         if (!result['success']) {
           final message = (result['message'] ?? '').toLowerCase();
-          if (message.contains('not found') || message.contains('exist') || message.contains('register') || message.contains('account') || message.contains('user') || message.contains('invalid')) {
-            setState(() => _isLoading = false);
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Please register before logging in'),
-                  backgroundColor: Colors.redAccent,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+          setState(() => _isLoading = false);
+          if (mounted) {
+            String displayMsg = result['message'] ?? 'Please register before logging in';
+            if (message.contains('not found') || message.contains('exist') || message.contains('register') || message.contains('account') || message.contains('user') || message.contains('invalid')) {
+              displayMsg = 'Please register before logging in';
             }
-            return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(displayMsg),
+                backgroundColor: Colors.redAccent,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
           }
+          return;
         }
       } else {
+        // Local check if phone or email matches user's saved profile
+        final savedPhone = UserManager().userPhone;
+        final savedEmail = UserManager().userEmail;
+        final cleanInput = PhoneUtils.digits(identifier);
+        
+        bool matchesSavedPhone = savedPhone != null && 
+            savedPhone.isNotEmpty && 
+            PhoneUtils.digits(savedPhone) == cleanInput && 
+            cleanInput.length >= 10;
+        bool matchesSavedEmail = savedEmail != null && 
+            savedEmail.isNotEmpty && 
+            identifier.contains('@') && 
+            savedEmail.trim().toLowerCase() == identifier.trim().toLowerCase();
+
+        if (matchesSavedPhone || matchesSavedEmail) {
+          setState(() => _isLoading = false);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(identifier.contains('@')
+                    ? 'Email already registered. Please login instead.'
+                    : 'Mobile number already exists. Please login instead.'),
+                backgroundColor: Colors.redAccent,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+          return;
+        }
+
         String defaultName = _nameController.text.trim();
         if (defaultName.isEmpty) {
           defaultName = identifier.contains('@') 
@@ -69,7 +103,7 @@ class _AuthScreenState extends State<AuthScreen> {
             MaterialPageRoute(
               builder: (context) => OtpVerificationScreen(
                 email: identifier,
-                name: isLoginFlow ? null : identifier,
+                name: isLoginFlow ? null : _nameController.text.trim(),
                 isLogin: isLoginFlow,
               ),
             ),
@@ -77,9 +111,19 @@ class _AuthScreenState extends State<AuthScreen> {
         }
       } else {
         if (mounted) {
+          final message = (result['message'] ?? '').toString();
+          final lowerMsg = message.toLowerCase();
+          String displayMsg = message;
+          if (lowerMsg.contains('exist') || lowerMsg.contains('already') || lowerMsg.contains('registered')) {
+            displayMsg = identifier.contains('@')
+                ? 'Email already registered. Please login instead.'
+                : 'Mobile number already exists. Please login instead.';
+          } else if (displayMsg.isEmpty) {
+            displayMsg = 'Registration failed. Please try again.';
+          }
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(result['message']),
+              content: Text(displayMsg),
               backgroundColor: Colors.redAccent,
               behavior: SnackBarBehavior.floating,
             ),

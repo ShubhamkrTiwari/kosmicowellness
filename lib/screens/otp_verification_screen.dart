@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import '../home_screen.dart';
-import '../utils/keys.dart';
 import '../services/api_service.dart';
 import '../managers/user_manager.dart';
 import '../managers/language_manager.dart';
@@ -163,12 +162,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     if (otp.length == 6) {
       _showLoadingDialog();
       
-      // Start both the API call and a 3-second timer
       final resultFuture = ApiService.verifyOtp(widget.email, otp, widget.isLogin);
-      
-      final delayFuture = Future.delayed(const Duration(seconds: 3));
+      final delayFuture = Future.delayed(const Duration(milliseconds: 1200));
 
-      // Wait for both to complete
       final results = await Future.wait([resultFuture, delayFuture]);
       final result = results[0] as Map<String, dynamic>;
       
@@ -187,9 +183,12 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         }
       } else {
         if (mounted) {
+          final msg = (result['message'] != null && result['message'].toString().trim().isNotEmpty)
+              ? result['message'].toString()
+              : 'Invalid OTP. Please try again.';
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(result['message']),
+              content: Text(msg),
               backgroundColor: Colors.redAccent,
               behavior: SnackBarBehavior.floating,
             ),

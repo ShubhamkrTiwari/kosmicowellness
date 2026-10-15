@@ -19,7 +19,12 @@ class UserManager {
   String? _sessionLoginTime;
 
   String? get userName => _userName;
-  String? get userEmail => _userEmail;
+  String? get userEmail {
+    if (_userEmail != null && _userEmail!.trim().contains('@')) {
+      return _userEmail!.trim();
+    }
+    return null;
+  }
   String? get userPhone => _userPhone;
   String? get profilePicture => _profilePicture;
   String? get token => _token;
@@ -30,6 +35,10 @@ class UserManager {
     final prefs = await SharedPreferences.getInstance();
     _userName = prefs.getString('user_name');
     _userEmail = prefs.getString('user_email');
+    if (_userEmail != null && !_userEmail!.contains('@')) {
+      _userEmail = null;
+      await prefs.remove('user_email');
+    }
     _userPhone = prefs.getString('user_phone');
     _profilePicture = prefs.getString('profile_picture');
     _token = prefs.getString('auth_token');
@@ -60,7 +69,12 @@ class UserManager {
                 user['username'] ?? 
                 user['displayName'] ?? 
                 manualName;
-    _userEmail = user['email'] ?? userData['email'];
+    final rawEmail = user['email'] ?? userData['email'];
+    if (rawEmail != null && rawEmail.toString().trim().contains('@')) {
+      _userEmail = rawEmail.toString().trim().toLowerCase();
+    } else {
+      _userEmail = null;
+    }
     _userPhone = user['phone'] ?? user['mobile'] ?? user['phoneNumber'];
     _userId = user['_id'] ?? user['id'] ?? user['uid'];
 
@@ -85,7 +99,11 @@ class UserManager {
     }
 
     if (_userName != null) await prefs.setString('user_name', _userName!);
-    if (_userEmail != null) await prefs.setString('user_email', _userEmail!);
+    if (_userEmail != null && _userEmail!.contains('@')) {
+      await prefs.setString('user_email', _userEmail!);
+    } else {
+      await prefs.remove('user_email');
+    }
     if (_userPhone != null) await prefs.setString('user_phone', _userPhone!);
     if (_userId != null) await prefs.setString('user_id', _userId!);
     if (_profilePicture != null) {
@@ -119,10 +137,14 @@ class UserManager {
   Future<void> updateProfile(String name, String email, String phone) async {
     final prefs = await SharedPreferences.getInstance();
     _userName = name;
-    _userEmail = email;
+    _userEmail = email.contains('@') ? email.trim().toLowerCase() : null;
     _userPhone = phone;
     await prefs.setString('user_name', name);
-    await prefs.setString('user_email', email);
+    if (_userEmail != null) {
+      await prefs.setString('user_email', _userEmail!);
+    } else {
+      await prefs.remove('user_email');
+    }
     await prefs.setString('user_phone', phone);
   }
 

@@ -368,8 +368,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         // Scan plate banner -> Open Plate Scanner
         _openPlateScan();
       } else if (index == 2) {
-        // Social/community banner -> Go to Care Community Tab
-        _openCareTab(1);
+        // Social/community banner -> Go to Care Community Tab (Index 2 in CareDashboard)
+        _openCareTab(2);
       }
     });
   }
@@ -724,7 +724,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   icon: Icons.diversity_3_rounded,
                   badge: '🤝 Support',
                   cardGradient: const [Color(0xFF22C55E), Color(0xFF86EFAC), Color(0xFFF0FDF4), Colors.white],
-                  onTap: () => _openCareTab(1), // Tab 1 is Community
+                  onTap: () => _openCareTab(2), // Tab 2 is Community
                 ),
               ),
             ],

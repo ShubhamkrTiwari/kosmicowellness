@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../utils/keys.dart';
+import '../utils/phone_utils.dart';
 import '../screens/maintenance_screen.dart';
 import '../managers/user_manager.dart';
 import '../models/post.dart';
@@ -97,8 +98,10 @@ class ApiService {
       
       request.fields['name'] = name;
       request.fields['phoneNumber'] = phoneNumber;
-      if (email != null && email.trim().isNotEmpty) {
+      if (email != null && email.trim().contains('@')) {
         request.fields['email'] = email.trim().toLowerCase();
+      } else {
+        request.fields['email'] = '';
       }
 
       if (imageFile != null) {
@@ -144,8 +147,11 @@ class ApiService {
       if (identifier.contains('@')) {
         body['email'] = identifier.trim().toLowerCase();
       } else {
-        body['phone'] = identifier.trim();
-        body['phoneNumber'] = identifier.trim();
+        final cleanPhone = PhoneUtils.digits(identifier);
+        final normalizedPhone = PhoneUtils.normalize(identifier);
+        body['phone'] = normalizedPhone;
+        body['phoneNumber'] = normalizedPhone;
+        body['mobile'] = cleanPhone;
       }
       
       final response = await http.post(
@@ -155,19 +161,9 @@ class ApiService {
       ).timeout(const Duration(seconds: 15));
       
       debugPrint('DEBUG: Response received. Status: ${response.statusCode}');
-      final res = _processResponse(response);
-      if (res['success']) return res;
-
-      if (!identifier.contains('@')) {
-        debugPrint('DEBUG: Falling back to Test Mode for register phone $identifier');
-        return {'success': true, 'message': 'OTP sent successfully (Test Mode: use 123456)'};
-      }
-      return res;
+      return _processResponse(response);
     } catch (e) {
       debugPrint('DEBUG: Register Error -> $e');
-      if (!identifier.contains('@')) {
-        return {'success': true, 'message': 'OTP sent successfully (Test Mode: use 123456)'};
-      }
       return _handleError(e);
     }
   }
@@ -181,8 +177,11 @@ class ApiService {
       if (identifier.contains('@')) {
         body['email'] = identifier.trim().toLowerCase();
       } else {
-        body['phone'] = identifier.trim();
-        body['phoneNumber'] = identifier.trim();
+        final cleanPhone = PhoneUtils.digits(identifier);
+        final normalizedPhone = PhoneUtils.normalize(identifier);
+        body['phone'] = normalizedPhone;
+        body['phoneNumber'] = normalizedPhone;
+        body['mobile'] = cleanPhone;
       }
       
       final response = await http.post(
@@ -192,10 +191,6 @@ class ApiService {
       ).timeout(const Duration(seconds: 15));
       
       debugPrint('DEBUG: Response received. Status: ${response.statusCode}');
-      
-      if (response.statusCode == 404 || response.statusCode == 400 || response.statusCode == 401) {
-        return {'success': false, 'message': 'User not found'};
-      }
       
       final res = _processResponse(response);
       if (res['success']) {
@@ -208,7 +203,7 @@ class ApiService {
       return res;
     } catch (e) {
       debugPrint('DEBUG: Login Error -> $e');
-      return {'success': false, 'message': 'User not found or network error'};
+      return _handleError(e);
     }
   }
 
@@ -218,10 +213,13 @@ class ApiService {
         'otp': otp,
       };
       if (identifier.contains('@')) {
-        body['email'] = identifier;
+        body['email'] = identifier.trim().toLowerCase();
       } else {
-        body['phone'] = identifier;
-        body['phoneNumber'] = identifier;
+        final cleanPhone = PhoneUtils.digits(identifier);
+        final normalizedPhone = PhoneUtils.normalize(identifier);
+        body['phone'] = normalizedPhone;
+        body['phoneNumber'] = normalizedPhone;
+        body['mobile'] = cleanPhone;
       }
 
       final response = await http.post(
@@ -241,10 +239,13 @@ class ApiService {
         'otp': otp,
       };
       if (identifier.contains('@')) {
-        body['email'] = identifier;
+        body['email'] = identifier.trim().toLowerCase();
       } else {
-        body['phone'] = identifier;
-        body['phoneNumber'] = identifier;
+        final cleanPhone = PhoneUtils.digits(identifier);
+        final normalizedPhone = PhoneUtils.normalize(identifier);
+        body['phone'] = normalizedPhone;
+        body['phoneNumber'] = normalizedPhone;
+        body['mobile'] = cleanPhone;
       }
 
       final response = await http.post(
@@ -259,58 +260,16 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> verifyOtp(String identifier, String otp, bool isLogin) async {
-    if (!identifier.contains('@') && otp == '123456') {
-      debugPrint('DEBUG: Test Mode OTP verified successfully for $identifier');
-      return {
-        'success': true,
-        'message': 'Login successful (Test Mode)',
-        'data': {
-          'token': 'test_token_kosmico_12345',
-          'user': {
-            'name': 'Wellness User',
-            'phone': identifier,
-            '_id': 'test_user_id_123',
-          }
-        }
-      };
-    }
-
     try {
       var result = isLogin ? await verifyLogin(identifier, otp) : await verifySignup(identifier, otp);
       if (!result['success']) {
-        result = isLogin ? await verifySignup(identifier, otp) : await verifyLogin(identifier, otp);
-      }
-      
-      if (!result['success'] && !identifier.contains('@') && otp.length == 6) {
-        return {
-          'success': true,
-          'message': 'Login successful (Test Mode Fallback)',
-          'data': {
-            'token': 'test_token_kosmico_12345',
-            'user': {
-              'name': 'Wellness User',
-              'phone': identifier,
-              '_id': 'test_user_id_123',
-            }
-          }
-        };
+        final secondary = isLogin ? await verifySignup(identifier, otp) : await verifyLogin(identifier, otp);
+        if (secondary['success']) {
+          result = secondary;
+        }
       }
       return result;
     } catch (e) {
-      if (!identifier.contains('@') && otp.length == 6) {
-        return {
-          'success': true,
-          'message': 'Login successful (Test Mode Catch)',
-          'data': {
-            'token': 'test_token_kosmico_12345',
-            'user': {
-              'name': 'Wellness User',
-              'phone': identifier,
-              '_id': 'test_user_id_123',
-            }
-          }
-        };
-      }
       return _handleError(e);
     }
   }
@@ -1963,12 +1922,26 @@ class ApiService {
 
       if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 204) {
         final data = hasBody ? jsonDecode(body) : null;
+        if (data is Map) {
+          if (data['success'] == false || data['status'] == false) {
+            final msg = data['message'] ?? data['error'] ?? 'Something went wrong';
+            return {
+              'success': false,
+              'message': msg,
+              'data': data,
+            };
+          }
+        }
         return {'success': true, 'data': data};
       } else {
         final data = hasBody ? jsonDecode(body) : null;
+        final String errMsg = (data != null && data is Map && (data['message'] != null || data['error'] != null))
+            ? (data['message'] ?? data['error']).toString()
+            : 'Something went wrong';
         return {
           'success': false, 
-          'message': (data != null && data is Map && data['message'] != null) ? data['message'] : 'Something went wrong'
+          'message': errMsg,
+          'data': data,
         };
       }
     } catch (e) {
